@@ -1,76 +1,64 @@
 # 공공시설 유지보수 및 자산관리 AI 시스템
 
 ## 아키텍처
-- **Backend**: Spring Boot 3.x (Java 17), Gradle, REST API
-- **AI Server**: Python FastAPI
+- **Backend**: FastAPI (Python), SQLAlchemy, REST API
 - **Frontend**: React (Vite, Tailwind CSS)
-- **DB**: H2 (Dev), MySQL (Prod)
+- **DB**: MySQL / MariaDB
 
 ## 주요 기능
 
 ### 1. 자산 관리
-- 자산 CRUD (등록/수정/삭제/조회)
+- 자산 CRUD (등록/삭제/조회)
 - 자산 검색 및 필터링
-- 유지보수 이력 타임라인
+- 유지보수 이력 관리
 
 ### 2. 자연어 검색
-- "3 년 이상 사용한 노트북 보여줘" 같은 자연어 질문 → JSON 검색조건 변환
-- LLM 기반 스마트 검색
+- "5 년 이상 사용한 노트북 보여줘" 같은 자연어 질문 → 검색조건 변환
 
 ### 3. AI 교체 우선순위 추천
 - 사용기간/수리비/고장횟수/구매가 대비 수리비율 기반 점수 계산
 - 예산 입력 시 순위별 추천
 
 ### 4. AI 유지보수 분석
-- 반복고장/비용증가율 통계 분석
-- Recharts 차트 시각화
+- 반복고장/누적비용 통계 분석
 
 ### 5. AI 질의응답 (Q&A)
-- 자연어 질문 → DB 데이터 조회 → LLM 기반 답변
+- 자연어 질문 → DB 데이터 조회 기반 답변
 - 채팅형 UI
 
-### 6. AI 보고서 자동생성
-- 자산현황/유지보수비용/교체추천/문제점 종합
-- PDF 다운로드
-
-### 7. 파일 업로드 + AI 분석
+### 6. 파일 업로드
 - 엑셀/CSV/PDF 파일 업로드
-- AI 기반 데이터 추출 (자산명/수리비용/수리일/고장유형)
-- 미리보기 및 수동 적용
+- 분석 결과 미리보기 및 수동 적용 (프로토타입 단계)
 
-### 8. 데모용 랜덤 대시보드 데이터
+### 7. 데모용 랜덤 대시보드 데이터
 - DEMO_MODE 환경변수로 활성화
 - ±10~20% 랜덤 변동
 - isSimulated 플래그
 
-### 9. 로그인/권한
+### 8. 로그인/권한
 - JWT 인증
 - ADMIN/USER 권한 구분
 
 ## 프로젝트 구조
 
 ```
-C:\Myproject3/
-├── backend/                 # Spring Boot 백엔드
-│   ├── src/main/java/com/asset/
-│   │   ├── config/         # 설정 클래스
-│   │   ├── controller/     # REST API 컨트롤러
-│   │   ├── dto/            # 데이터 전송 객체
-│   │   ├── entity/         # JPA 엔티티
-│   │   ├── repository/     # 데이터 액세스
-│   │   └── service/        # 비즈니스 로직
-│   └── build.gradle
-├── ai-server/              # FastAPI AI 서버
-│   ├── main.py
-│   └── requirements.txt
-├── frontend/               # React 프론트엔드
+Assistant-Project/
+├── backend-py/              # FastAPI 백엔드
+│   ├── app/
+│   │   ├── routers/         # REST API 라우터
+│   │   ├── models.py        # SQLAlchemy 모델
+│   │   ├── schemas.py       # Pydantic 스키마
+│   │   ├── auth.py          # JWT/비밀번호 처리
+│   │   ├── config.py        # 환경설정
+│   │   └── main.py          # 앱 진입점
+│   ├── requirements.txt
+│   └── README.md
+├── frontend/                 # React 프론트엔드
 │   ├── src/
-│   │   ├── components/
 │   │   ├── pages/
-│   │   ├── services/
 │   │   └── utils/
 │   └── package.json
-└── docs/                   # 문서
+└── docs/                     # 문서 (schema.sql 등)
 ```
 
 ## 실행 방법
@@ -78,23 +66,20 @@ C:\Myproject3/
 ### 1. 백엔드 실행
 
 ```bash
-cd backend
-gradle bootRun
-```
-
-백엔드는 `http://localhost:8080` 에서 실행됩니다.
-
-### 2. AI 서버 실행
-
-```bash
-cd ai-server
+cd backend-py
+python3 -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
-python main.py
+cp .env.example .env  # DATABASE_URL 등 환경에 맞게 수정
+uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload
 ```
 
-AI 서버는 `http://localhost:8001` 에서 실행됩니다.
+백엔드는 `http://localhost:8080` 에서 실행됩니다. 최초 기동 시 테이블을 자동 생성하고
+관리자 계정(admin/admin123), 일반 계정(user/user123)을 시딩합니다.
 
-### 3. 프론트엔드 실행
+자세한 내용은 `backend-py/README.md` 참고.
+
+### 2. 프론트엔드 실행
 
 ```bash
 cd frontend
@@ -112,67 +97,49 @@ npm run dev
 
 ### 인증
 - `POST /api/auth/login` - 로그인
-- `POST /api/auth/register` - 등록
 
 ### 자산
 - `GET /api/assets` - 자산 목록 조회
 - `GET /api/assets/{id}` - 자산 상세 조회
 - `POST /api/assets` - 자산 등록
-- `PUT /api/assets/{id}` - 자산 수정
 - `DELETE /api/assets/{id}` - 자산 삭제
-- `POST /api/assets/search` - 자산 검색
 
 ### AI 기능
 - `POST /api/ai/natural-language-search` - 자연어 검색
 - `POST /api/ai/replacement-recommendation` - 교체 추천
 - `GET /api/ai/maintenance-analysis` - 유지보수 분석
-- `POST /api/ai/qa` - Q&A
+- `POST /api/ai/qa`, `POST /api/qa/ask` - Q&A
 - `GET /api/dashboard` - 대시보드 데이터
 
 ### 파일
+- `GET /api/files` - 업로드 파일 목록
 - `POST /api/files/upload` - 파일 업로드
-- `POST /api/files/{id}/process` - 파일 분석
+- `POST /api/files/{id}/process` - 파일 분석(Mock)
 - `POST /api/files/{id}/apply` - 분석 결과 적용
 - `DELETE /api/files/{id}` - 파일 삭제
 
-### 보고서
-- `GET /api/reports/generate` - PDF 보고서 생성
+## 환경 변수 설정 (backend-py/.env)
 
-## 환경 변수 설정
-
-### application.properties (백엔드)
-```properties
-# AI 서버 URL
-ai.server.url=http://localhost:8001
-
-# Claude API 키 (선택사항)
-claude.api.key=your-api-key
-
-# 데모 모드
-demo.mode=false
-
-# 파일 업로드 디렉토리
-upload.directory=./uploads
+```env
+DATABASE_URL=mysql+pymysql://asset:assetpass@127.0.0.1:3306/asset_management?charset=utf8mb4
+JWT_SECRET=asset-management-secret-key-for-development
+JWT_EXPIRATION_SECONDS=86400
+UPLOAD_DIRECTORY=./uploads
+DEMO_MODE=true
 ```
 
 ## 기술 스택
 
 ### 백엔드
-- Spring Boot 3.2.0
-- Spring Data JPA
-- Spring Security
-- JWT (jjwt)
-- H2 Database / MySQL
-- Lombok
-- iText (PDF 생성)
-
-### AI 서버
 - FastAPI
-- Pydantic
-- Uvicorn
+- SQLAlchemy
+- PyMySQL
+- python-jose (JWT)
+- passlib[bcrypt]
+- MySQL / MariaDB
 
 ### 프론트엔드
-- React 18
+- React 19
 - Vite
 - Tailwind CSS
 - Axios
@@ -191,7 +158,7 @@ upload.directory=./uploads
 - id, assetId, maintenanceDate, maintenanceType
 - cost, description, technician, failureType
 
-### User (사용자)
+### User (app_user 테이블)
 - id, username, password, role, email
 
 ### FileUpload (파일 업로드)
@@ -201,9 +168,9 @@ upload.directory=./uploads
 ## 개발 가이드
 
 ### 코드 컨벤션
-- 백엔드: Java 17, Spring Boot 스타일 가이드
+- 백엔드: Python 3.10+, PEP 8
 - 프론트엔드: React Hooks, 함수형 컴포넌트
-- 네이밍: camelCase (변수/함수), PascalCase (클래스/컴포넌트)
+- 네이밍: camelCase(API 응답 필드), snake_case(Python 내부), PascalCase(클래스/컴포넌트)
 
 ### Git 워크플로우
 1. feature 브랜치 생성
@@ -214,16 +181,11 @@ upload.directory=./uploads
 ## 문제 해결
 
 ### 백엔드 시작 안 됨
-- Java 17 설치 확인
-- Gradle 캐시 클리어: `gradle clean`
+- MySQL/MariaDB가 실행 중인지, DATABASE_URL이 올바른지 확인
+- 한글 데이터 오류 발생 시 DB/커넥션 문자열에 `utf8mb4` charset이 설정되어 있는지 확인
 
 ### 프론트엔드 빌드 오류
 - node_modules 재설치: `rm -rf node_modules && npm install`
-- package.json 버전 확인
-
-### AI 서버 연결 안 됨
-- 포트 8001 사용 확인
-- requirements.txt 의존성 설치 확인
 
 ## 라이선스
 MIT License
