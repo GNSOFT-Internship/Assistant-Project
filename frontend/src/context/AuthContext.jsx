@@ -1,28 +1,45 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
+import { authApi } from '../services/api';
 
 const AuthContext = createContext(null);
 
+const STORAGE_KEY = 'auth_user';
+
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState({ username: 'admin', role: 'ADMIN' });
-  const [loading, setLoading] = useState(false);
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // 자동 로그인 - 더미 사용자 설정
-    setUser({ username: 'admin', role: 'ADMIN' });
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      try {
+        setUser(JSON.parse(stored));
+      } catch {
+        localStorage.removeItem(STORAGE_KEY);
+      }
+    }
     setLoading(false);
   }, []);
 
   const login = async (username, password) => {
-    // 임시 로그인 - 항상 성공
-    setUser({ username: username || 'admin', role: 'ADMIN' });
-    return true;
+    try {
+      const response = await authApi.login({ username, password });
+      const { token, username: name, role } = response.data.data;
+      const authUser = { token, username: name, role };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(authUser));
+      setUser(authUser);
+      return true;
+    } catch (error) {
+      return false;
+    }
   };
 
   const logout = () => {
-    setUser({ username: 'admin', role: 'ADMIN' });
+    localStorage.removeItem(STORAGE_KEY);
+    setUser(null);
   };
 
-  const isAuthenticated = () => true;
+  const isAuthenticated = () => !!user?.token;
 
   return (
     <AuthContext.Provider value={{ user, login, logout, isAuthenticated, loading }}>

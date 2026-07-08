@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 export default function Login() {
@@ -8,7 +7,6 @@ export default function Login() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
-  const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -17,11 +15,10 @@ export default function Login() {
 
     try {
       const success = await login(username, password);
-      if (success) {
-        navigate('/dashboard');
-      } else {
+      if (!success) {
         setError('아이디 또는 비밀번호가 잘못되었습니다');
       }
+      // 성공 시에는 로그인 상태가 갱신되면서 LoginRoute가 자동으로 /dashboard로 이동시킨다.
     } catch (err) {
       setError('로그인 중 오류가 발생했습니다');
     } finally {

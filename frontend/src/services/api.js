@@ -10,6 +10,22 @@ const api = axios.create({
   timeout: 30000,
 });
 
+// 요청 인터셉터 - 로그인 토큰 자동 첨부
+api.interceptors.request.use((config) => {
+  const stored = localStorage.getItem('auth_user');
+  if (stored) {
+    try {
+      const { token } = JSON.parse(stored);
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    } catch {
+      // 손상된 값이면 무시
+    }
+  }
+  return config;
+});
+
 // 응답 인터셉터 - 에러 처리 개선
 api.interceptors.response.use(
   (response) => response,
