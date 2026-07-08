@@ -59,12 +59,12 @@ export default function Recommendations() {
                   </div>
                   <div className="text-right">
                     <div className="text-2xl font-bold text-blue-600">
-                      {rec.priorityScore.toFixed(1)}/100
+                      {rec.score?.toFixed(1)}점
                     </div>
                     <div className="text-xs text-gray-500">우선순위 점수</div>
                   </div>
                 </div>
-                
+
                 <div className="grid grid-cols-4 gap-4 text-sm mb-3">
                   <div>
                     <div className="text-gray-500">구매가</div>
@@ -72,15 +72,15 @@ export default function Recommendations() {
                   </div>
                   <div>
                     <div className="text-gray-500">누적 수리비</div>
-                    <div className="font-medium">{rec.totalMaintenanceCost?.toLocaleString()}원</div>
+                    <div className="font-medium">{rec.totalRepairCost?.toLocaleString()}원</div>
                   </div>
                   <div>
                     <div className="text-gray-500">사용기간</div>
-                    <div className="font-medium">{rec.usageYears}년</div>
+                    <div className="font-medium">{rec.usedYears}/{rec.usefulLife}년</div>
                   </div>
                   <div>
                     <div className="text-gray-500">고장횟수</div>
-                    <div className="font-medium">{rec.repairCount}회</div>
+                    <div className="font-medium">{rec.maintenanceCount}회</div>
                   </div>
                 </div>
 

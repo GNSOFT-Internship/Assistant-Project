@@ -44,6 +44,15 @@ class AssetDTO(BaseModel):
     updatedAt: Optional[datetime] = None
 
 
+class MaintenanceRecordRequest(BaseModel):
+    maintenanceDate: str
+    maintenanceType: str
+    cost: Optional[float] = None
+    description: Optional[str] = None
+    technician: Optional[str] = None
+    failureType: Optional[str] = None
+
+
 class DashboardData(BaseModel):
     currentMonthMaintenanceCost: float
     newFailureCount: int

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, User, Bot } from 'lucide-react';
-import { mockQAResponses } from '../utils/dummyData';
+import { aiApi } from '../services/api';
 
 export default function QnA() {
   const [messages, setMessages] = useState([]);
@@ -16,18 +16,6 @@ export default function QnA() {
     scrollToBottom();
   }, [messages]);
 
-  const getDummyResponse = (question) => {
-    const questionLower = question.toLowerCase();
-    
-    for (const [key, response] of Object.entries(mockQAResponses.questions)) {
-      if (questionLower.includes(key)) {
-        return response;
-      }
-    }
-    
-    return mockQAResponses.default;
-  };
-
   const handleSend = async (e) => {
     e.preventDefault();
     if (!input.trim()) return;
@@ -37,33 +25,19 @@ export default function QnA() {
     setInput('');
     setLoading(true);
 
-    // TODO: 실제 AI API 연결 시 아래 코드를 해제하고 실제 API 호출로 교체
-    // try {
-    //   const response = await api.post('/api/qa/ask', { question: input });
-    //   const aiMessage = { 
-    //     type: 'ai', 
-    //     content: response.data.data.answer 
-    //   };
-    //   setMessages(prev => [...prev, aiMessage]);
-    // } catch (error) {
-    //   console.error('질문 실패:', error);
-    //   setMessages(prev => [...prev, { 
-    //     type: 'ai', 
-    //     content: '질문에 답변하는 중 오류가 발생했습니다. 다시 시도해주세요.' 
-    //   }]);
-    // } finally {
-    //   setLoading(false);
-    // }
-    
-    // 더미 데이터로 응답 (프로토타입용)
-    setTimeout(() => {
-      const aiMessage = { 
-        type: 'ai', 
-        content: getDummyResponse(input) 
-      };
+    try {
+      const response = await aiApi.askQuestion(input);
+      const aiMessage = { type: 'ai', content: response.data.data.answer };
       setMessages(prev => [...prev, aiMessage]);
+    } catch (error) {
+      console.error('질문 실패:', error);
+      setMessages(prev => [...prev, {
+        type: 'ai',
+        content: '질문에 답변하는 중 오류가 발생했습니다. 다시 시도해주세요.',
+      }]);
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
 
   const suggestedQuestions = [

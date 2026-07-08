@@ -1,15 +1,33 @@
 import React from 'react';
 import { reportApi } from '../services/api';
-import { FileText, Download } from 'lucide-react';
+import { FileText, Download, RefreshCw } from 'lucide-react';
 
 export default function Reports() {
   const [generating, setGenerating] = React.useState(false);
+  const [loading, setLoading] = React.useState(true);
+  const [report, setReport] = React.useState(null);
+
+  const loadPreview = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      const response = await reportApi.getMonthly();
+      setReport(response.data.data);
+    } catch (error) {
+      console.error('보고서 미리보기 로드 실패:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    loadPreview();
+  }, [loadPreview]);
 
   const handleGenerate = async () => {
     setGenerating(true);
     try {
-      const response = await reportApi.generate();
-      
+      const response = await reportApi.downloadPdf();
+
       const blob = new Blob([response.data], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -27,22 +45,31 @@ export default function Reports() {
     }
   };
 
+  const activeCount = report?.byStatus?.ACTIVE || 0;
+  const replacementCount = report?.byStatus?.REPLACEMENT_NEEDED || 0;
+
   return (
     <div className="space-y-6">
       <div className="card">
-        <h1 className="text-2xl font-bold mb-4">보고서 자동 생성</h1>
-        
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-2xl font-bold">AI 보고서 자동 생성</h1>
+          <button onClick={loadPreview} className="btn btn-secondary flex items-center gap-2" disabled={loading}>
+            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+            새로고침
+          </button>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="border rounded-lg p-6">
             <div className="flex items-center gap-3 mb-4">
               <FileText className="text-blue-600" size={32} />
-              <h2 className="text-lg font-semibold">자산 관리 보고서</h2>
+              <h2 className="text-lg font-semibold">월간 자산관리 보고서</h2>
             </div>
             <ul className="space-y-2 text-sm text-gray-600 mb-6">
               <li>• 자산 현황 요약</li>
               <li>• 유지보수 비용 분석</li>
               <li>• 교체 권장 자산 목록</li>
-              <li>• 문제점 및 개선사항</li>
+              <li>• 주요 문제점 및 향후 관리 권장사항 (AI 생성)</li>
             </ul>
             <button
               onClick={handleGenerate}
@@ -56,30 +83,61 @@ export default function Reports() {
 
           <div className="border rounded-lg p-6 bg-gray-50">
             <h3 className="font-semibold mb-4">보고서 미리보기</h3>
-            <div className="space-y-3 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-600">총 자산 수</span>
-                <span className="font-medium">25 개</span>
+            {loading || !report ? (
+              <p className="text-sm text-gray-500">불러오는 중...</p>
+            ) : (
+              <div className="space-y-3 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">총 자산 수</span>
+                  <span className="font-medium">{report.totalAssets} 개</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">가동 중 자산</span>
+                  <span className="font-medium">{activeCount} 개</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">교체 필요 자산</span>
+                  <span className="font-medium text-red-600">{replacementCount} 개</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">총 유지보수 비용</span>
+                  <span className="font-medium">₩{Math.round(report.totalMaintenanceCost).toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">반복 고장 자산</span>
+                  <span className="font-medium">{report.repeatedFailureCount} 개</span>
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">가동 중 자산</span>
-                <span className="font-medium">20 개</span>
+            )}
+          </div>
+        </div>
+
+        {!loading && report && (
+          <div className="mt-6 space-y-4">
+            <div className="border rounded-lg p-4">
+              <h3 className="font-semibold mb-2">AI 요약</h3>
+              <p className="text-sm text-gray-700">{report.executiveSummary}</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="border rounded-lg p-4">
+                <h3 className="font-semibold mb-2">주요 문제점</h3>
+                <ul className="text-sm text-gray-700 space-y-1 list-disc list-inside">
+                  {(report.keyIssues || []).map((issue, i) => (
+                    <li key={i}>{issue}</li>
+                  ))}
+                </ul>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">교체 필요 자산</span>
-                <span className="font-medium text-red-600">5 개</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">총 유지보수 비용</span>
-                <span className="font-medium">₩3,850,000</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">평균 유지보수 비용</span>
-                <span className="font-medium">₩127,833</span>
+              <div className="border rounded-lg p-4">
+                <h3 className="font-semibold mb-2">향후 관리 권장사항</h3>
+                <ul className="text-sm text-gray-700 space-y-1 list-disc list-inside">
+                  {(report.recommendations || []).map((rec, i) => (
+                    <li key={i}>{rec}</li>
+                  ))}
+                </ul>
               </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

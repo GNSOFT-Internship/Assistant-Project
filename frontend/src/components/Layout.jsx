@@ -1,9 +1,9 @@
 import React from 'react';
 import { Link, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { 
-  LayoutDashboard, Package, Wrench, Lightbulb, MessageSquare, 
-  Upload, FileText, LogOut 
+import {
+  LayoutDashboard, Package, Wrench, Lightbulb, MessageSquare,
+  Upload, FileText, LogOut, Search
 } from 'lucide-react';
 
 export default function Layout() {
@@ -20,6 +20,7 @@ export default function Layout() {
     { path: '/dashboard', label: '대시보드', icon: LayoutDashboard },
     { path: '/assets', label: '자산 관리', icon: Package },
     { path: '/maintenance', label: '유지보수 분석', icon: Wrench },
+    { path: '/search', label: '자연어 검색', icon: Search },
     { path: '/recommendations', label: '교체 추천', icon: Lightbulb },
     { path: '/qa', label: '질문하기', icon: MessageSquare },
     { path: '/files', label: '파일 업로드', icon: Upload },

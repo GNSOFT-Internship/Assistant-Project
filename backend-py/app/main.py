@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from . import models, auth
 from .database import Base, engine, SessionLocal
-from .routers import auth_router, assets, dashboard, files, qna, ai
+from .routers import auth_router, assets, dashboard, files, qna, ai, reports
 
 app = FastAPI(title="Asset Management API (Python)")
 
@@ -23,6 +23,7 @@ app.include_router(dashboard.router)
 app.include_router(files.router)
 app.include_router(qna.router)
 app.include_router(ai.router)
+app.include_router(reports.router)
 
 
 @app.on_event("startup")

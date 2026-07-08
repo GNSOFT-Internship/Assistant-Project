@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Search, MessageSquare } from 'lucide-react';
-import { mockSearchResults, mockAssets } from '../utils/dummyData';
+import { aiApi } from '../services/api';
 
 export default function NaturalSearch() {
   const [query, setQuery] = useState('');
@@ -13,26 +13,16 @@ export default function NaturalSearch() {
 
     setLoading(true);
     setResults(null);
-    
-    // TODO: 실제 AI API 연결 시 아래 코드를 해제하고 실제 API 호출로 교체
-    // const response = await aiApi.naturalLanguageSearch(query);
-    // setResults(response.data.data);
-    
-    // 더미 데이터로 응답 (프로토타입용)
-    setTimeout(() => {
-      const filteredAssets = mockAssets.filter(asset => {
-        const queryLower = query.toLowerCase();
-        return asset.assetName?.toLowerCase().includes(queryLower) ||
-               asset.category?.toLowerCase().includes(queryLower) ||
-               asset.location?.toLowerCase().includes(queryLower);
-      });
-      
-      setResults({
-        explanation: `"${query}"에 대한 검색 결과입니다.`,
-        assets: filteredAssets.length > 0 ? filteredAssets : mockAssets.slice(0, 10),
-      });
+
+    try {
+      const response = await aiApi.naturalLanguageSearch(query);
+      setResults(response.data.data);
+    } catch (error) {
+      console.error('자연어 검색 실패:', error);
+      setResults({ explanation: '검색 중 오류가 발생했습니다.', assets: [] });
+    } finally {
       setLoading(false);
-    }, 800);
+    }
   };
 
   return (

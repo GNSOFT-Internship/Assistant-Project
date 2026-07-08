@@ -53,5 +53,6 @@ export const fileApi = {
 };
 
 export const reportApi = {
-  generate: () => api.get('/reports/generate', { responseType: 'blob' }),
+  getMonthly: () => api.get('/reports/monthly'),
+  downloadPdf: () => api.get('/reports/monthly/pdf', { responseType: 'blob' }),
 };
