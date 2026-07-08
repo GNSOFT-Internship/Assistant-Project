@@ -1,25 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api } from '../utils/api';
+import { aiApi } from '../services/api';
 import { TrendingUp, TrendingDown, AlertCircle, CheckCircle } from 'lucide-react';
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     fetchDashboardData();
   }, []);
 
   const fetchDashboardData = async () => {
+    setLoading(true);
+    setError(false);
     try {
-      const response = await api.get('/dashboard');
-      if (response.data) {
-        setData(response.data);
-      }
-    } catch (error) {
-      console.error('대시보드 데이터 로드 실패:', error);
+      const response = await aiApi.getDashboardData();
+      setData(response.data.data);
+    } catch (err) {
+      console.error('대시보드 데이터 로드 실패:', err);
+      setError(true);
     } finally {
       setLoading(false);
     }
@@ -27,6 +29,15 @@ export default function Dashboard() {
 
   if (loading) {
     return <div className="text-center py-10">로딩 중...</div>;
+  }
+
+  if (error || !data) {
+    return (
+      <div className="card text-center py-10">
+        <p className="text-gray-600 mb-4">대시보드 데이터를 불러오지 못했습니다.</p>
+        <button onClick={fetchDashboardData} className="btn btn-primary">다시 시도</button>
+      </div>
+    );
   }
 
   const stats = [
