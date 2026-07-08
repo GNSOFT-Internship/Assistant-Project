@@ -26,7 +26,12 @@ export default function Recommendations() {
   const handleBudgetChange = (e) => {
     const value = e.target.value ? parseFloat(e.target.value) : null;
     setBudget(value);
-    loadRecommendations(value);
+  };
+
+  const handleBudgetKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      loadRecommendations(budget);
+    }
   };
 
   if (loading) return <div className="card">로딩 중...</div>;
@@ -42,9 +47,16 @@ export default function Recommendations() {
               type="number"
               value={budget || ''}
               onChange={handleBudgetChange}
-              placeholder="제한 예산 입력"
+              onKeyDown={handleBudgetKeyDown}
+              placeholder="입력 후 Enter"
               className="input w-40"
             />
+            <button
+              onClick={() => loadRecommendations(budget)}
+              className="btn btn-secondary"
+            >
+              조회
+            </button>
           </div>
         </div>
 
