@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from typing import Dict, Any, Optional, List
 import json
 import os
+import re
 
 app = FastAPI(title="AI Asset Management Server")
 
@@ -37,29 +38,34 @@ def read_root():
 @app.post("/api/ai/parse-query")
 def parse_query(request: QueryRequest):
     query = request.query.lower()
+    # 공백 유무와 관계없이 매칭되도록 공백을 제거한 버전도 함께 사용한다.
+    query_nospace = re.sub(r"\s+", "", query)
     criteria = {}
-    
+
     if "노트북" in query or "pc" in query or "컴퓨터" in query:
         criteria["category"] = "IT 장비"
-    
+
     if "프린터" in query or "복사기" in query:
         criteria["category"] = "사무기기"
-    
+
     if "에어컨" in query or "설비" in query:
         criteria["category"] = "설비"
-    
-    if "3 년" in query or "3 년 이상" in query:
-        criteria["minUsageYears"] = 3.0
-    
-    if "5 년" in query or "5 년 이상" in query:
-        criteria["minUsageYears"] = 5.0
-    
+
+    # "N년 이상" 형태의 사용 기간 조건을 숫자와 함께 추출한다.
+    year_match = re.search(r"(\d+)\s*년\s*이상", query)
+    if year_match:
+        criteria["minUsageYears"] = float(year_match.group(1))
+
     if "고장" in query or "교체" in query:
         criteria["status"] = "REPLACEMENT_NEEDED"
-    
-    if "100 만" in query or "1000000" in query:
+
+    # "100만원 이상" 등 금액 조건 추출 (만원 단위)
+    price_match = re.search(r"(\d+)\s*만\s*원?\s*이상", query)
+    if price_match:
+        criteria["minPrice"] = float(price_match.group(1)) * 10000
+    elif "1000000" in query_nospace:
         criteria["minPrice"] = 1000000.0
-    
+
     return {
         "criteria": criteria,
         "explanation": f"'{request.query}'를 검색 조건으로 변환했습니다."
