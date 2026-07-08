@@ -1,6 +1,7 @@
+import json
 import os
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
@@ -11,8 +12,51 @@ from ..database import get_db
 
 router = APIRouter(prefix="/api/files", tags=["files"])
 
+MAINTENANCE_TYPE_MAP = {
+    "정기점검": models.MaintenanceType.ROUTINE,
+    "점검": models.MaintenanceType.INSPECTION,
+    "수리": models.MaintenanceType.REPAIR,
+    "교체": models.MaintenanceType.REPLACEMENT,
+    "ROUTINE": models.MaintenanceType.ROUTINE,
+    "REPAIR": models.MaintenanceType.REPAIR,
+    "REPLACEMENT": models.MaintenanceType.REPLACEMENT,
+    "INSPECTION": models.MaintenanceType.INSPECTION,
+}
+
+COLUMN_ALIASES = {
+    "asset_code": ["자산코드", "asset_code", "assetCode"],
+    "maintenance_date": ["정비일", "정비일자", "maintenance_date"],
+    "maintenance_type": ["정비유형", "유형", "maintenance_type"],
+    "cost": ["비용", "정비비용", "cost"],
+    "description": ["설명", "내용", "description"],
+    "technician": ["담당자", "기술자", "technician"],
+    "failure_type": ["고장유형", "failure_type"],
+}
+
 
 def file_to_response(f: models.FileUpload) -> dict:
+    extracted_summary = None
+    if f.extracted_data:
+        try:
+            parsed = json.loads(f.extracted_data)
+            if parsed.get("kind") == "maintenance_records":
+                extracted_summary = {
+                    "kind": "maintenance_records",
+                    "totalRows": parsed.get("totalRows"),
+                    "validRows": parsed.get("validRows"),
+                    "errorRowCount": len(parsed.get("errorRows", [])),
+                    "unmatchedAssetCodes": parsed.get("unmatchedAssetCodes", []),
+                    "appliedRecordCount": parsed.get("appliedRecordCount"),
+                }
+            elif parsed.get("kind") == "pdf_text":
+                extracted_summary = {
+                    "kind": "pdf_text",
+                    "characterCount": parsed.get("characterCount"),
+                    "preview": (parsed.get("extractedText") or "")[:300],
+                }
+        except (TypeError, ValueError):
+            extracted_summary = None
+
     return {
         "id": f.id,
         "filename": f.filename,
@@ -20,6 +64,8 @@ def file_to_response(f: models.FileUpload) -> dict:
         "fileType": f.file_type.value if f.file_type else None,
         "status": f.status.value if f.status else None,
         "applied": f.applied,
+        "errorMessage": f.error_message,
+        "extractedSummary": extracted_summary,
     }
 
 
@@ -32,6 +78,81 @@ def detect_file_type(filename: str) -> models.FileType:
     if lower.endswith(".xlsx") or lower.endswith(".xls"):
         return models.FileType.EXCEL
     return models.FileType.PDF
+
+
+def _find_column(columns, aliases):
+    for alias in aliases:
+        for col in columns:
+            if str(col).strip() == alias:
+                return col
+    return None
+
+
+def _parse_spreadsheet(file_path: str, file_type: models.FileType):
+    import pandas as pd
+
+    if file_type == models.FileType.CSV:
+        df = pd.read_csv(file_path, dtype=str, keep_default_na=False)
+    else:
+        df = pd.read_excel(file_path, dtype=str, keep_default_na=False)
+
+    col_map = {}
+    for field, aliases in COLUMN_ALIASES.items():
+        found = _find_column(df.columns, aliases)
+        if found:
+            col_map[field] = found
+
+    if "asset_code" not in col_map or "maintenance_date" not in col_map:
+        raise ValueError("필수 컬럼(자산코드, 정비일)을 찾을 수 없습니다.")
+
+    rows = []
+    errors = []
+    for idx, row in df.iterrows():
+        line_no = idx + 2  # header is row 1
+        asset_code = str(row.get(col_map["asset_code"], "")).strip()
+        maint_date_raw = str(row.get(col_map["maintenance_date"], "")).strip()
+        if not asset_code or not maint_date_raw:
+            errors.append({"row": line_no, "reason": "자산코드 또는 정비일 누락"})
+            continue
+
+        try:
+            maint_date = pd.to_datetime(maint_date_raw).date().isoformat()
+        except Exception:
+            errors.append({"row": line_no, "reason": f"정비일 형식 오류: {maint_date_raw}"})
+            continue
+
+        type_raw = str(row.get(col_map.get("maintenance_type", ""), "")).strip() if "maintenance_type" in col_map else ""
+        maint_type = MAINTENANCE_TYPE_MAP.get(type_raw, models.MaintenanceType.REPAIR)
+
+        cost_raw = str(row.get(col_map.get("cost", ""), "")).strip() if "cost" in col_map else ""
+        cost_clean = cost_raw.replace(",", "").replace("원", "").strip()
+        try:
+            cost = float(cost_clean) if cost_clean else None
+        except ValueError:
+            cost = None
+
+        rows.append({
+            "row": line_no,
+            "assetCode": asset_code,
+            "maintenanceDate": maint_date,
+            "maintenanceType": maint_type.value,
+            "cost": cost,
+            "description": str(row.get(col_map.get("description", ""), "")).strip() or None,
+            "technician": str(row.get(col_map.get("technician", ""), "")).strip() or None,
+            "failureType": str(row.get(col_map.get("failure_type", ""), "")).strip() or None,
+        })
+
+    return rows, errors
+
+
+def _parse_pdf(file_path: str) -> str:
+    import pdfplumber
+
+    text_parts = []
+    with pdfplumber.open(file_path) as pdf:
+        for page in pdf.pages:
+            text_parts.append(page.extract_text() or "")
+    return "\n".join(text_parts)
 
 
 @router.get("")
@@ -75,21 +196,46 @@ def process_file(file_id: int, db: Session = Depends(get_db)):
     if file_upload is None:
         raise HTTPException(status_code=400, detail="File not found")
 
+    file_upload.status = models.UploadStatus.PROCESSING
+    db.commit()
+
     try:
-        file_upload.status = models.UploadStatus.PROCESSING
-        db.commit()
+        if file_upload.file_type in (models.FileType.EXCEL, models.FileType.CSV):
+            rows, errors = _parse_spreadsheet(file_upload.file_path, file_upload.file_type)
 
-        mock_result = {
-            "message": "Mock 분석 완료",
-            "filename": file_upload.original_filename,
-            "fileType": file_upload.file_type.value if file_upload.file_type else None,
-            "uploadTime": file_upload.created_at.isoformat() if file_upload.created_at else None,
-            "estimatedRows": 10,
-            "sheets": 1,
-        }
+            asset_codes = {r["assetCode"] for r in rows}
+            existing_codes = set()
+            if asset_codes:
+                existing_codes = {
+                    a.asset_code
+                    for a in db.query(models.Asset.asset_code)
+                    .filter(models.Asset.asset_code.in_(asset_codes))
+                    .all()
+                }
+            for r in rows:
+                r["assetExists"] = r["assetCode"] in existing_codes
 
+            result = {
+                "kind": "maintenance_records",
+                "filename": file_upload.original_filename,
+                "totalRows": len(rows) + len(errors),
+                "validRows": len(rows),
+                "errorRows": errors,
+                "unmatchedAssetCodes": sorted({r["assetCode"] for r in rows if not r["assetExists"]}),
+                "records": rows,
+            }
+        else:
+            text = _parse_pdf(file_upload.file_path)
+            result = {
+                "kind": "pdf_text",
+                "filename": file_upload.original_filename,
+                "extractedText": text,
+                "characterCount": len(text),
+            }
+
+        file_upload.extracted_data = json.dumps(result, ensure_ascii=False)
         file_upload.status = models.UploadStatus.COMPLETED
-        file_upload.extracted_data = str(mock_result)
+        file_upload.error_message = None
     except Exception as e:
         file_upload.status = models.UploadStatus.FAILED
         file_upload.error_message = str(e)
@@ -108,12 +254,48 @@ def apply_file(file_id: int, db: Session = Depends(get_db)):
 
     if file_upload.status != models.UploadStatus.COMPLETED:
         raise HTTPException(status_code=400, detail="Completed file only can be applied")
+    if file_upload.applied:
+        raise HTTPException(status_code=400, detail="File already applied")
+
+    try:
+        result = json.loads(file_upload.extracted_data) if file_upload.extracted_data else {}
+    except (TypeError, ValueError):
+        result = {}
+
+    created_count = 0
+    if result.get("kind") == "maintenance_records":
+        assets_by_code = {
+            a.asset_code: a.id for a in db.query(models.Asset.id, models.Asset.asset_code).all()
+        }
+        for r in result.get("records", []):
+            asset_id = assets_by_code.get(r["assetCode"])
+            if not asset_id:
+                continue
+            record = models.MaintenanceRecord(
+                asset_id=asset_id,
+                maintenance_date=date.fromisoformat(r["maintenanceDate"]),
+                maintenance_type=models.MaintenanceType(r["maintenanceType"]),
+                cost=r.get("cost"),
+                description=r.get("description"),
+                technician=r.get("technician"),
+                failure_type=r.get("failureType"),
+            )
+            db.add(record)
+            created_count += 1
+
+        result["appliedRecordCount"] = created_count
+        file_upload.extracted_data = json.dumps(result, ensure_ascii=False)
 
     file_upload.applied = True
     file_upload.updated_at = datetime.now()
     db.commit()
     db.refresh(file_upload)
-    return {"success": True, "message": "File applied successfully", "data": file_to_response(file_upload)}
+
+    message = "File applied successfully"
+    if result.get("kind") == "maintenance_records":
+        message = f"유지보수 기록 {created_count}건이 등록되었습니다."
+
+    return {"success": True, "message": message, "data": file_to_response(file_upload)}
 
 
 @router.delete("/{file_id}")

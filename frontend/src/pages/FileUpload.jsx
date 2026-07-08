@@ -175,6 +175,29 @@ export default function FileUpload() {
                     오류: {file.errorMessage}
                   </div>
                 )}
+
+                {file.extractedSummary?.kind === 'maintenance_records' && (
+                  <div className="mt-3 bg-gray-50 rounded p-3 text-sm space-y-1">
+                    <div>총 {file.extractedSummary.totalRows}행 중 유효 {file.extractedSummary.validRows}행, 오류 {file.extractedSummary.errorRowCount}행</div>
+                    {file.extractedSummary.unmatchedAssetCodes?.length > 0 && (
+                      <div className="text-yellow-700">
+                        일치하는 자산이 없는 코드: {file.extractedSummary.unmatchedAssetCodes.join(', ')}
+                      </div>
+                    )}
+                    {file.applied && (
+                      <div className="text-green-700 font-medium">
+                        등록된 유지보수 기록: {file.extractedSummary.appliedRecordCount ?? 0}건
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {file.extractedSummary?.kind === 'pdf_text' && (
+                  <div className="mt-3 bg-gray-50 rounded p-3 text-sm">
+                    <div className="text-gray-500 mb-1">추출된 텍스트 ({file.extractedSummary.characterCount}자) 미리보기:</div>
+                    <pre className="whitespace-pre-wrap text-xs text-gray-700">{file.extractedSummary.preview}</pre>
+                  </div>
+                )}
               </div>
             ))}
           </div>
