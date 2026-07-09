@@ -78,6 +78,7 @@ export const fileApi = {
   }),
   process: (id) => api.post(`/files/${id}/process`),
   apply: (id) => api.post(`/files/${id}/apply`),
+  unapply: (id) => api.post(`/files/${id}/unapply`),
   delete: (id) => api.delete(`/files/${id}`),
 };
 

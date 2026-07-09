@@ -63,6 +63,18 @@ export default function FileUpload() {
     }
   };
 
+  const handleUnapply = async (id) => {
+    if (!confirm('적용을 취소하면 이 파일로 등록된 유지보수 기록이 모두 삭제됩니다. 계속할까요?')) return;
+    try {
+      const response = await fileApi.unapply(id);
+      alert(response.data.message);
+      loadFiles();
+    } catch (error) {
+      console.error('적용 취소 실패:', error);
+      alert('적용 취소 실패');
+    }
+  };
+
   const handleDelete = async (id) => {
     if (!confirm('삭제하시겠습니까?')) return;
     try {
@@ -144,6 +156,14 @@ export default function FileUpload() {
                       <CheckCircle size={14} /> 적용
                     </button>
                   )}
+                  {file.applied && (
+                    <button
+                      onClick={() => handleUnapply(file.id)}
+                      className="btn btn-secondary flex items-center gap-2"
+                    >
+                      <XCircle size={14} /> 적용 취소
+                    </button>
+                  )}
                   <button
                     onClick={() => handleDelete(file.id)}
                     className="btn btn-danger flex items-center gap-2"
@@ -170,6 +190,59 @@ export default function FileUpload() {
                       <div className="text-green-700 font-medium">
                         등록된 유지보수 기록: {file.extractedSummary.appliedRecordCount ?? 0}건
                       </div>
+                    )}
+
+                    {file.extractedSummary.records?.length > 0 && (
+                      <details className="mt-2">
+                        <summary className="text-gray-500 cursor-pointer">
+                          행별 미리보기 ({file.extractedSummary.records.length}행)
+                        </summary>
+                        <div className="mt-2 overflow-x-auto">
+                          <table className="table text-xs">
+                            <thead className="table-header">
+                              <tr>
+                                <th className="table-cell">행</th>
+                                <th className="table-cell">자산코드</th>
+                                <th className="table-cell">일치여부</th>
+                                <th className="table-cell">정비일</th>
+                                <th className="table-cell">유형</th>
+                                <th className="table-cell">비용</th>
+                                <th className="table-cell">설명</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {file.extractedSummary.records.map((r) => (
+                                <tr key={r.row} className={r.assetExists ? '' : 'bg-yellow-50'}>
+                                  <td className="table-cell">{r.row}</td>
+                                  <td className="table-cell">{r.assetCode}</td>
+                                  <td className="table-cell">
+                                    {r.assetExists
+                                      ? <span className="text-green-700">일치</span>
+                                      : <span className="text-yellow-700">불일치</span>}
+                                  </td>
+                                  <td className="table-cell">{r.maintenanceDate}</td>
+                                  <td className="table-cell">{r.maintenanceType}</td>
+                                  <td className="table-cell">{r.cost != null ? r.cost.toLocaleString() : '-'}</td>
+                                  <td className="table-cell">{r.description || '-'}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </details>
+                    )}
+
+                    {file.extractedSummary.errorRows?.length > 0 && (
+                      <details className="mt-2">
+                        <summary className="text-red-600 cursor-pointer">
+                          오류 행 ({file.extractedSummary.errorRows.length}행)
+                        </summary>
+                        <ul className="mt-1 list-disc list-inside text-red-600">
+                          {file.extractedSummary.errorRows.map((e, i) => (
+                            <li key={i}>{e.row}행: {e.reason}</li>
+                          ))}
+                        </ul>
+                      </details>
                     )}
                   </div>
                 )}

@@ -46,7 +46,9 @@ def file_to_response(f: models.FileUpload) -> dict:
                     "totalRows": parsed.get("totalRows"),
                     "validRows": parsed.get("validRows"),
                     "errorRowCount": len(parsed.get("errorRows", [])),
+                    "errorRows": parsed.get("errorRows", []),
                     "unmatchedAssetCodes": parsed.get("unmatchedAssetCodes", []),
+                    "records": parsed.get("records", []),
                     "appliedRecordCount": parsed.get("appliedRecordCount"),
                 }
             elif parsed.get("kind") == "pdf_quote":
@@ -323,6 +325,7 @@ def apply_file(file_id: int, db: Session = Depends(get_db)):
         result = {}
 
     created_count = 0
+    created_ids = []
     if result.get("kind") == "maintenance_records":
         assets_by_code = {
             a.asset_code: a.id for a in db.query(models.Asset.id, models.Asset.asset_code).all()
@@ -341,9 +344,12 @@ def apply_file(file_id: int, db: Session = Depends(get_db)):
                 failure_type=r.get("failureType"),
             )
             db.add(record)
+            db.flush()
+            created_ids.append(record.id)
             created_count += 1
 
         result["appliedRecordCount"] = created_count
+        result["appliedMaintenanceRecordIds"] = created_ids
         file_upload.extracted_data = json.dumps(result, ensure_ascii=False)
     elif result.get("kind") == "pdf_quote":
         asset = None
@@ -367,9 +373,12 @@ def apply_file(file_id: int, db: Session = Depends(get_db)):
                 description=" ".join(description_parts),
             )
             db.add(record)
+            db.flush()
+            created_ids.append(record.id)
             created_count = 1
 
         result["appliedRecordCount"] = created_count
+        result["appliedMaintenanceRecordIds"] = created_ids
         file_upload.extracted_data = json.dumps(result, ensure_ascii=False)
 
     file_upload.applied = True
@@ -387,6 +396,43 @@ def apply_file(file_id: int, db: Session = Depends(get_db)):
         )
 
     return {"success": True, "message": message, "data": file_to_response(file_upload)}
+
+
+@router.post("/{file_id}/unapply")
+def unapply_file(file_id: int, db: Session = Depends(get_db)):
+    file_upload = db.query(models.FileUpload).filter(models.FileUpload.id == file_id).first()
+    if file_upload is None:
+        raise HTTPException(status_code=400, detail="File not found")
+    if not file_upload.applied:
+        raise HTTPException(status_code=400, detail="File is not applied")
+
+    try:
+        result = json.loads(file_upload.extracted_data) if file_upload.extracted_data else {}
+    except (TypeError, ValueError):
+        result = {}
+
+    record_ids = result.get("appliedMaintenanceRecordIds", [])
+    deleted_count = 0
+    if record_ids:
+        deleted_count = (
+            db.query(models.MaintenanceRecord)
+            .filter(models.MaintenanceRecord.id.in_(record_ids))
+            .delete(synchronize_session=False)
+        )
+
+    result["appliedRecordCount"] = 0
+    result["appliedMaintenanceRecordIds"] = []
+    file_upload.extracted_data = json.dumps(result, ensure_ascii=False)
+    file_upload.applied = False
+    file_upload.updated_at = datetime.now()
+    db.commit()
+    db.refresh(file_upload)
+
+    return {
+        "success": True,
+        "message": f"적용된 유지보수 기록 {deleted_count}건을 취소했습니다.",
+        "data": file_to_response(file_upload),
+    }
 
 
 @router.delete("/{file_id}")
