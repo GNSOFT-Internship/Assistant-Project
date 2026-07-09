@@ -7,9 +7,10 @@ from datetime import date, datetime
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 
-from .. import models
+from .. import auth, models
 from ..config import settings
 from ..database import get_db
+from .assets import _log_change, _maintenance_summary
 
 router = APIRouter(prefix="/api/files", tags=["files"])
 
@@ -309,7 +310,11 @@ def process_file(file_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/{file_id}/apply")
-def apply_file(file_id: int, db: Session = Depends(get_db)):
+def apply_file(
+    file_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(auth.get_current_user),
+):
     file_upload = db.query(models.FileUpload).filter(models.FileUpload.id == file_id).first()
     if file_upload is None:
         raise HTTPException(status_code=400, detail="File not found")
@@ -326,16 +331,19 @@ def apply_file(file_id: int, db: Session = Depends(get_db)):
 
     created_count = 0
     created_ids = []
+    source_label = f"엑셀 업로드: {file_upload.original_filename}"
+    changed_by = current_user.get("username")
+
     if result.get("kind") == "maintenance_records":
-        assets_by_code = {
-            a.asset_code: a.id for a in db.query(models.Asset.id, models.Asset.asset_code).all()
-        }
+        assets_by_code = {a.asset_code: a for a in db.query(models.Asset).all()}
+        touched_assets: dict[int, models.Asset] = {}
+        counts_by_asset: dict[int, int] = {}
         for r in result.get("records", []):
-            asset_id = assets_by_code.get(r["assetCode"])
-            if not asset_id:
+            asset = assets_by_code.get(r["assetCode"])
+            if asset is None:
                 continue
             record = models.MaintenanceRecord(
-                asset_id=asset_id,
+                asset_id=asset.id,
                 maintenance_date=date.fromisoformat(r["maintenanceDate"]),
                 maintenance_type=models.MaintenanceType(r["maintenanceType"]),
                 cost=r.get("cost"),
@@ -347,6 +355,17 @@ def apply_file(file_id: int, db: Session = Depends(get_db)):
             db.flush()
             created_ids.append(record.id)
             created_count += 1
+            touched_assets[asset.id] = asset
+            counts_by_asset[asset.id] = counts_by_asset.get(asset.id, 0) + 1
+
+        for asset_id, count in counts_by_asset.items():
+            _log_change(
+                db, touched_assets[asset_id], models.AuditAction.CREATE, changed_by,
+                {
+                    "source": {"old": None, "new": source_label},
+                    "maintenance_record": {"old": None, "new": f"{count}건 등록됨"},
+                },
+            )
 
         result["appliedRecordCount"] = created_count
         result["appliedMaintenanceRecordIds"] = created_ids
@@ -376,6 +395,13 @@ def apply_file(file_id: int, db: Session = Depends(get_db)):
             db.flush()
             created_ids.append(record.id)
             created_count = 1
+            _log_change(
+                db, asset, models.AuditAction.CREATE, changed_by,
+                {
+                    "source": {"old": None, "new": f"견적서(PDF) 업로드: {file_upload.original_filename}"},
+                    "maintenance_record": {"old": None, "new": _maintenance_summary(record)},
+                },
+            )
 
         result["appliedRecordCount"] = created_count
         result["appliedMaintenanceRecordIds"] = created_ids
@@ -399,7 +425,11 @@ def apply_file(file_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/{file_id}/unapply")
-def unapply_file(file_id: int, db: Session = Depends(get_db)):
+def unapply_file(
+    file_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(auth.get_current_user),
+):
     file_upload = db.query(models.FileUpload).filter(models.FileUpload.id == file_id).first()
     if file_upload is None:
         raise HTTPException(status_code=400, detail="File not found")
@@ -414,6 +444,34 @@ def unapply_file(file_id: int, db: Session = Depends(get_db)):
     record_ids = result.get("appliedMaintenanceRecordIds", [])
     deleted_count = 0
     if record_ids:
+        records = (
+            db.query(models.MaintenanceRecord)
+            .filter(models.MaintenanceRecord.id.in_(record_ids))
+            .all()
+        )
+        counts_by_asset: dict[int, int] = {}
+        assets_by_id: dict[int, models.Asset] = {}
+        for r in records:
+            counts_by_asset[r.asset_id] = counts_by_asset.get(r.asset_id, 0) + 1
+        if counts_by_asset:
+            assets_by_id = {
+                a.id: a
+                for a in db.query(models.Asset).filter(models.Asset.id.in_(counts_by_asset.keys())).all()
+            }
+        source_label = f"엑셀 업로드 적용 취소: {file_upload.original_filename}"
+        changed_by = current_user.get("username")
+        for asset_id, count in counts_by_asset.items():
+            asset = assets_by_id.get(asset_id)
+            if asset is None:
+                continue
+            _log_change(
+                db, asset, models.AuditAction.DELETE, changed_by,
+                {
+                    "source": {"old": source_label, "new": None},
+                    "maintenance_record": {"old": f"{count}건 삭제됨", "new": None},
+                },
+            )
+
         deleted_count = (
             db.query(models.MaintenanceRecord)
             .filter(models.MaintenanceRecord.id.in_(record_ids))

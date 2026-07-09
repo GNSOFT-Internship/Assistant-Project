@@ -31,6 +31,8 @@ const FIELD_LABELS = {
   useful_life: '내용연수',
   status: '상태',
   description: '설명',
+  maintenance_record: '유지보수 기록',
+  source: '출처',
 };
 
 const ACTION_LABELS = {

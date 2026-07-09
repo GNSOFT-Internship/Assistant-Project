@@ -26,6 +26,18 @@ _TRACKED_FIELDS = [
 ]
 
 
+def _maintenance_summary(record: models.MaintenanceRecord) -> str:
+    cost = f"{float(record.cost):,.0f}원" if record.cost is not None else "비용 미기재"
+    parts = [
+        record.maintenance_date.isoformat() if record.maintenance_date else "-",
+        record.maintenance_type.value if record.maintenance_type else "-",
+        cost,
+    ]
+    if record.description:
+        parts.append(record.description)
+    return " | ".join(parts)
+
+
 def maintenance_to_dto(record: models.MaintenanceRecord) -> dict:
     return {
         "id": record.id,
@@ -238,7 +250,12 @@ def get_asset_maintenance_history(asset_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/{asset_id}/maintenance")
-def add_asset_maintenance_record(asset_id: int, request: schemas.MaintenanceRecordRequest, db: Session = Depends(get_db)):
+def add_asset_maintenance_record(
+    asset_id: int,
+    request: schemas.MaintenanceRecordRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(auth.get_current_user),
+):
     asset = db.query(models.Asset).filter(models.Asset.id == asset_id).first()
     if asset is None:
         raise HTTPException(status_code=404, detail="Asset not found")
@@ -253,6 +270,11 @@ def add_asset_maintenance_record(asset_id: int, request: schemas.MaintenanceReco
         failure_type=request.failureType,
     )
     db.add(record)
+    db.flush()
+    _log_change(
+        db, asset, models.AuditAction.CREATE, current_user.get("username"),
+        {"maintenance_record": {"old": None, "new": _maintenance_summary(record)}},
+    )
     db.commit()
     db.refresh(record)
     return {"success": True, "message": "Maintenance record added", "data": maintenance_to_dto(record)}
@@ -264,7 +286,12 @@ def update_maintenance_record(
     record_id: int,
     request: schemas.MaintenanceRecordRequest,
     db: Session = Depends(get_db),
+    current_user: dict = Depends(auth.get_current_user),
 ):
+    asset = db.query(models.Asset).filter(models.Asset.id == asset_id).first()
+    if asset is None:
+        raise HTTPException(status_code=404, detail="Asset not found")
+
     record = (
         db.query(models.MaintenanceRecord)
         .filter(models.MaintenanceRecord.id == record_id, models.MaintenanceRecord.asset_id == asset_id)
@@ -273,6 +300,8 @@ def update_maintenance_record(
     if record is None:
         raise HTTPException(status_code=404, detail="Maintenance record not found")
 
+    before_summary = _maintenance_summary(record)
+
     record.maintenance_date = date.fromisoformat(request.maintenanceDate)
     record.maintenance_type = models.MaintenanceType(request.maintenanceType)
     record.cost = Decimal(str(request.cost)) if request.cost is not None else None
@@ -280,20 +309,40 @@ def update_maintenance_record(
     record.technician = request.technician
     record.failure_type = request.failureType
 
+    db.flush()
+    after_summary = _maintenance_summary(record)
+    if before_summary != after_summary:
+        _log_change(
+            db, asset, models.AuditAction.UPDATE, current_user.get("username"),
+            {"maintenance_record": {"old": before_summary, "new": after_summary}},
+        )
+
     db.commit()
     db.refresh(record)
     return {"success": True, "message": "Maintenance record updated", "data": maintenance_to_dto(record)}
 
 
 @router.delete("/{asset_id}/maintenance/{record_id}")
-def delete_maintenance_record(asset_id: int, record_id: int, db: Session = Depends(get_db)):
+def delete_maintenance_record(
+    asset_id: int,
+    record_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(auth.get_current_user),
+):
+    asset = db.query(models.Asset).filter(models.Asset.id == asset_id).first()
     record = (
         db.query(models.MaintenanceRecord)
         .filter(models.MaintenanceRecord.id == record_id, models.MaintenanceRecord.asset_id == asset_id)
         .first()
     )
     if record is not None:
+        summary = _maintenance_summary(record)
         db.delete(record)
+        if asset is not None:
+            _log_change(
+                db, asset, models.AuditAction.DELETE, current_user.get("username"),
+                {"maintenance_record": {"old": summary, "new": None}},
+            )
         db.commit()
     return {"success": True, "message": "Maintenance record deleted", "data": None}
 
