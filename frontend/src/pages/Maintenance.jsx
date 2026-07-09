@@ -1,18 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { aiApi } from '../services/api';
+import { Link } from 'react-router-dom';
+import { aiApi, assetApi } from '../services/api';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { AssetStatusBadge } from '../components/StatusBadge';
+import { AssetStatusBadge, MaintenanceTypeBadge } from '../components/StatusBadge';
+import { ArrowLeft } from 'lucide-react';
 
 const TOP_FAILURE_COUNT = 5;
 
 export default function Maintenance() {
-  const navigate = useNavigate();
   const [analysis, setAnalysis] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedFailureType, setSelectedFailureType] = useState(null);
   const [failureAssets, setFailureAssets] = useState([]);
   const [loadingFailureAssets, setLoadingFailureAssets] = useState(false);
+  const [viewingAsset, setViewingAsset] = useState(null);
+  const [viewingMaintenance, setViewingMaintenance] = useState([]);
+  const [loadingAssetDetail, setLoadingAssetDetail] = useState(false);
 
   useEffect(() => {
     loadAnalysis();
@@ -46,6 +49,29 @@ export default function Maintenance() {
   const closeFailureAssetsModal = () => {
     setSelectedFailureType(null);
     setFailureAssets([]);
+    setViewingAsset(null);
+    setViewingMaintenance([]);
+  };
+
+  const handleAssetClick = async (assetId) => {
+    setLoadingAssetDetail(true);
+    try {
+      const [assetRes, maintenanceRes] = await Promise.all([
+        assetApi.getById(assetId),
+        assetApi.getMaintenanceHistory(assetId),
+      ]);
+      setViewingAsset(assetRes.data.data);
+      setViewingMaintenance(maintenanceRes.data.data || []);
+    } catch (error) {
+      console.error('자산 상세 로드 실패:', error);
+    } finally {
+      setLoadingAssetDetail(false);
+    }
+  };
+
+  const backToFailureAssetList = () => {
+    setViewingAsset(null);
+    setViewingMaintenance([]);
   };
 
   if (loading) return <div className="card">로딩 중...</div>;
@@ -188,44 +214,120 @@ export default function Maintenance() {
             className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">'{selectedFailureType}' 발생 자산</h2>
-              <button onClick={closeFailureAssetsModal} className="btn btn-secondary">닫기</button>
-            </div>
+            {viewingAsset ? (
+              <>
+                <div className="flex items-center gap-2 mb-4">
+                  <button onClick={backToFailureAssetList} className="btn btn-secondary flex items-center gap-1">
+                    <ArrowLeft size={14} /> 목록으로
+                  </button>
+                  <button onClick={closeFailureAssetsModal} className="btn btn-secondary ml-auto">닫기</button>
+                </div>
 
-            {loadingFailureAssets ? (
-              <div className="text-center text-gray-500 py-8">로딩 중...</div>
-            ) : failureAssets.length === 0 ? (
-              <div className="text-center text-gray-500 py-8">해당 고장 유형이 발생한 자산이 없습니다.</div>
+                {loadingAssetDetail ? (
+                  <div className="text-center text-gray-500 py-8">로딩 중...</div>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between mb-4">
+                      <h2 className="text-xl font-bold">{viewingAsset.assetName}</h2>
+                      <AssetStatusBadge status={viewingAsset.status} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 mb-6 text-sm">
+                      <div>
+                        <div className="text-gray-500">자산번호</div>
+                        <div className="font-medium">{viewingAsset.assetCode}</div>
+                      </div>
+                      <div>
+                        <div className="text-gray-500">카테고리</div>
+                        <div className="font-medium">{viewingAsset.category}</div>
+                      </div>
+                      <div>
+                        <div className="text-gray-500">위치</div>
+                        <div className="font-medium">{viewingAsset.location}</div>
+                      </div>
+                      <div>
+                        <div className="text-gray-500">담당자</div>
+                        <div className="font-medium">{viewingAsset.responsiblePerson}</div>
+                      </div>
+                      <div>
+                        <div className="text-gray-500">구매일</div>
+                        <div className="font-medium">{viewingAsset.purchaseDate?.split('T')[0]}</div>
+                      </div>
+                      <div>
+                        <div className="text-gray-500">구매가</div>
+                        <div className="font-medium">{viewingAsset.purchasePrice?.toLocaleString()}원</div>
+                      </div>
+                    </div>
+
+                    <h3 className="font-semibold mb-2">유지보수 이력</h3>
+                    {viewingMaintenance.length === 0 ? (
+                      <div className="text-center text-gray-500 py-6">유지보수 이력이 없습니다.</div>
+                    ) : (
+                      <div className="space-y-3 mb-4">
+                        {viewingMaintenance.map((record) => (
+                          <div key={record.id} className="border-l-4 border-blue-500 pl-3 py-1">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <MaintenanceTypeBadge type={record.maintenanceType} />
+                                <div className="text-sm text-gray-600 mt-1">{record.description}</div>
+                              </div>
+                              <div className="text-right">
+                                <div className="text-sm font-medium">{record.cost?.toLocaleString()}원</div>
+                                <div className="text-xs text-gray-500">{record.maintenanceDate?.split('T')[0]}</div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <Link to={`/assets/${viewingAsset.id}`} className="text-sm text-blue-600 hover:underline">
+                      자산 상세 페이지에서 전체 내용 보기 →
+                    </Link>
+                  </>
+                )}
+              </>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="table">
-                  <thead className="table-header">
-                    <tr>
-                      <th className="table-cell">자산명</th>
-                      <th className="table-cell">자산번호</th>
-                      <th className="table-cell">카테고리</th>
-                      <th className="table-cell">상태</th>
-                      <th className="table-cell">발생 횟수</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {failureAssets.map((asset) => (
-                      <tr
-                        key={asset.id}
-                        className="border-t cursor-pointer hover:bg-gray-50"
-                        onClick={() => navigate(`/assets/${asset.id}`)}
-                      >
-                        <td className="table-cell font-medium">{asset.assetName}</td>
-                        <td className="table-cell">{asset.assetCode}</td>
-                        <td className="table-cell">{asset.category}</td>
-                        <td className="table-cell"><AssetStatusBadge status={asset.status} /></td>
-                        <td className="table-cell">{asset.occurrenceCount}회</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <>
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-xl font-bold">'{selectedFailureType}' 발생 자산</h2>
+                  <button onClick={closeFailureAssetsModal} className="btn btn-secondary">닫기</button>
+                </div>
+
+                {loadingFailureAssets ? (
+                  <div className="text-center text-gray-500 py-8">로딩 중...</div>
+                ) : failureAssets.length === 0 ? (
+                  <div className="text-center text-gray-500 py-8">해당 고장 유형이 발생한 자산이 없습니다.</div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="table">
+                      <thead className="table-header">
+                        <tr>
+                          <th className="table-cell">자산명</th>
+                          <th className="table-cell">자산번호</th>
+                          <th className="table-cell">카테고리</th>
+                          <th className="table-cell">상태</th>
+                          <th className="table-cell">발생 횟수</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {failureAssets.map((asset) => (
+                          <tr
+                            key={asset.id}
+                            className="border-t cursor-pointer hover:bg-gray-50"
+                            onClick={() => handleAssetClick(asset.id)}
+                          >
+                            <td className="table-cell font-medium">{asset.assetName}</td>
+                            <td className="table-cell">{asset.assetCode}</td>
+                            <td className="table-cell">{asset.category}</td>
+                            <td className="table-cell"><AssetStatusBadge status={asset.status} /></td>
+                            <td className="table-cell">{asset.occurrenceCount}회</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
