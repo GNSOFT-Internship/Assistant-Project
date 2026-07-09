@@ -1,10 +1,94 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   LayoutDashboard, Package, Wrench, Lightbulb, MessageSquare,
-  Upload, FileText, LogOut, Search, Wallet
+  Upload, FileText, LogOut, Search, Wallet, ChevronLeft, ChevronRight
 } from 'lucide-react';
+
+function ScrollableNav({ items, activePath, variant }) {
+  const scrollRef = useRef(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const updateScrollState = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 4);
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+  };
+
+  useEffect(() => {
+    updateScrollState();
+    const el = scrollRef.current;
+    if (!el) return;
+    el.addEventListener('scroll', updateScrollState);
+    window.addEventListener('resize', updateScrollState);
+    return () => {
+      el.removeEventListener('scroll', updateScrollState);
+      window.removeEventListener('resize', updateScrollState);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items.length]);
+
+  const scrollByAmount = (direction) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTo({ left: el.scrollLeft + direction * 220, behavior: 'smooth' });
+  };
+
+  const isMobile = variant === 'mobile';
+  const itemClass = isMobile
+    ? 'px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 whitespace-nowrap flex-shrink-0 transition-colors'
+    : 'px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 transition-colors';
+  const iconSize = isMobile ? 14 : 16;
+
+  return (
+    <div className="relative flex items-center min-w-0 flex-1">
+      {canScrollLeft && (
+        <button
+          onClick={() => scrollByAmount(-1)}
+          aria-label="이전 메뉴"
+          className="absolute left-0 z-10 h-full px-1 flex items-center bg-gradient-to-r from-white via-white to-transparent"
+        >
+          <ChevronLeft size={16} className="text-gray-500" />
+        </button>
+      )}
+      <div
+        ref={scrollRef}
+        className={`flex ${isMobile ? 'gap-1' : 'space-x-1'} overflow-x-auto scrollbar-hide`}
+      >
+        {items.map((item) => {
+          const Icon = item.icon;
+          const active = activePath === item.path;
+          return (
+            <Link
+              key={item.path}
+              to={item.path}
+              className={`${itemClass} ${
+                active
+                  ? 'bg-blue-50 text-blue-700'
+                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+              }`}
+            >
+              <Icon size={iconSize} />
+              <span>{item.label}</span>
+            </Link>
+          );
+        })}
+      </div>
+      {canScrollRight && (
+        <button
+          onClick={() => scrollByAmount(1)}
+          aria-label="다음 메뉴"
+          className="absolute right-0 z-10 h-full px-1 flex items-center bg-gradient-to-l from-white via-white to-transparent"
+        >
+          <ChevronRight size={16} className="text-gray-500" />
+        </button>
+      )}
+    </div>
+  );
+}
 
 export default function Layout() {
   const { user, logout } = useAuth();
@@ -33,7 +117,7 @@ export default function Layout() {
       <nav className="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex justify-between h-16">
-            <div className="flex items-center min-w-0">
+            <div className="flex items-center min-w-0 flex-1">
               <div className="flex-shrink-0 flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-sm">
                   자
@@ -42,25 +126,8 @@ export default function Layout() {
                   자산관리 시스템
                 </h1>
               </div>
-              <div className="hidden lg:flex ml-8 space-x-1 overflow-x-auto">
-                {menuItems.map((item) => {
-                  const Icon = item.icon;
-                  const active = location.pathname === item.path;
-                  return (
-                    <Link
-                      key={item.path}
-                      to={item.path}
-                      className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5 whitespace-nowrap transition-colors ${
-                        active
-                          ? 'bg-blue-50 text-blue-700'
-                          : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                      }`}
-                    >
-                      <Icon size={16} />
-                      <span>{item.label}</span>
-                    </Link>
-                  );
-                })}
+              <div className="hidden lg:flex ml-8 min-w-0 flex-1">
+                <ScrollableNav items={menuItems} activePath={location.pathname} variant="desktop" />
               </div>
             </div>
             <div className="flex items-center gap-3 flex-shrink-0">
@@ -79,25 +146,8 @@ export default function Layout() {
               </button>
             </div>
           </div>
-          <div className="lg:hidden flex gap-1 overflow-x-auto pb-2 -mx-1 px-1">
-            {menuItems.map((item) => {
-              const Icon = item.icon;
-              const active = location.pathname === item.path;
-              return (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 whitespace-nowrap flex-shrink-0 transition-colors ${
-                    active
-                      ? 'bg-blue-50 text-blue-700'
-                      : 'text-gray-600 hover:bg-gray-100'
-                  }`}
-                >
-                  <Icon size={14} />
-                  <span>{item.label}</span>
-                </Link>
-              );
-            })}
+          <div className="lg:hidden pb-2 -mx-1 px-1">
+            <ScrollableNav items={menuItems} activePath={location.pathname} variant="mobile" />
           </div>
         </div>
       </nav>
