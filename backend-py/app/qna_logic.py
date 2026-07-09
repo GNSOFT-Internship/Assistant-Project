@@ -37,6 +37,16 @@ def _build_context(db: Session) -> str:
             f"내용연수={a.useful_life}년 | 구매가={float(a.purchase_price):.0f} | 상태={a.status.value} | "
             f"유지보수횟수={len(asset_records)} | 누적수리비={total_cost:.0f}"
         )
+        # 각 자산의 개별 유지보수 이력(정비유형/비용/설명/고장유형)까지 포함해야
+        # "하드디스크를 교체한 장비" 같이 특정 정비 내용을 근거로 하는 질문에
+        # AI가 실제 이력을 인용해 답할 수 있다.
+        for r in asset_records:
+            record_cost = float(r.cost) if r.cost is not None else 0.0
+            lines.append(
+                f"  - id={a.id}의 이력: {r.maintenance_date} | {r.maintenance_type.value} | "
+                f"비용={record_cost:.0f} | 설명={r.description or '-'} | "
+                f"고장유형={r.failure_type or '-'} | 기술자={r.technician or '-'}"
+            )
 
     return "\n".join(lines)
 

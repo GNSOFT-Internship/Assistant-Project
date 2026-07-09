@@ -40,9 +40,11 @@ _SEARCH_FILTER_SCHEMA = {
         "failureKeyword": {
             "type": ["string", "null"],
             "description": (
-                "유지보수 이력의 고장 유형(failure_type)에서 부분 일치로 찾을 키워드. "
-                "'전원고장', '배터리', 'HDD 오류' 같은 고장 이력 조건이 있으면 설정하고, 없으면 null. "
-                "'~이 있었던', '~을 겪은', '~이 한번이라도 발생한' 등의 표현이 있으면 이 필드를 사용한다."
+                "유지보수 이력의 고장 유형(failure_type) 또는 정비 설명(description)에서 부분 일치로 "
+                "찾을 키워드. '전원고장', '배터리', 'HDD 오류' 같은 고장 유형은 물론, "
+                "'하드디스크를 교체한', '키보드 수리한'처럼 실제 정비 내용을 가리키는 표현도 여기에 "
+                "핵심 키워드(예: '하드디스크', '키보드')로 추출한다. 조건이 없으면 null. "
+                "'~이 있었던', '~을 겪은', '~한 적 있는', '~을 교체한' 등의 표현이 있으면 이 필드를 사용한다."
             ),
         },
         "minFailureCount": {
@@ -82,7 +84,9 @@ def _apply_filter(asset: models.Asset, f: dict, db: "Session" = None) -> bool:
         return False
     if f.get("statusFilter") and asset.status.value != f["statusFilter"]:
         return False
-    # 고장 유형 이력 필터: maintenance_record.failure_type 에서 키워드 부분 일치 검색
+    # 고장/정비 이력 필터: failure_type뿐 아니라 정비 설명(description)에서도
+    # 키워드를 찾는다 ("하드디스크를 교체한 장비"처럼 고장유형이 아닌 정비
+    # 내용으로 질문하는 경우를 포함하기 위함).
     if f.get("failureKeyword") and db is not None:
         kw = f["failureKeyword"].lower()
         min_count = f.get("minFailureCount") or 1
@@ -93,7 +97,8 @@ def _apply_filter(asset: models.Asset, f: dict, db: "Session" = None) -> bool:
         )
         matched = sum(
             1 for r in records
-            if r.failure_type and kw in r.failure_type.lower()
+            if (r.failure_type and kw in r.failure_type.lower())
+            or (r.description and kw in r.description.lower())
         )
         if matched < min_count:
             return False
