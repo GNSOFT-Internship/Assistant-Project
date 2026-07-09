@@ -156,7 +156,9 @@ export default function Maintenance() {
                 <BarChart data={failureChartData} layout="vertical" margin={{ left: 10, right: 30 }}>
                   <XAxis type="number" hide />
                   <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 12 }} />
-                  <Tooltip />
+                  <Tooltip
+                    formatter={(value) => [`${value}대`, '발생 건수']}
+                  />
                   <Bar
                     dataKey="value"
                     radius={[0, 4, 4, 0]}
@@ -179,7 +181,9 @@ export default function Maintenance() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" />
                 <YAxis />
-                <Tooltip />
+                <Tooltip
+                  formatter={(value) => [`${value.toLocaleString()}원`, '유지보수 비용']}
+                />
                 <Bar dataKey="value" fill="#3B82F6" />
               </BarChart>
             </ResponsiveContainer>
