@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import models, auth
@@ -17,13 +17,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# 로그인(/api/auth/login)을 제외한 모든 API는 로그인해야 호출 가능하다.
+# 프론트엔드가 토큰을 헤더에 실어 보내더라도 서버가 검증하지 않으면
+# 의미가 없으므로, 라우터 단위로 인증 의존성을 강제한다.
+_auth_dep = [Depends(auth.get_current_user)]
+
 app.include_router(auth_router.router)
-app.include_router(assets.router)
-app.include_router(dashboard.router)
-app.include_router(files.router)
-app.include_router(qna.router)
-app.include_router(ai.router)
-app.include_router(reports.router)
+app.include_router(assets.router, dependencies=_auth_dep)
+app.include_router(dashboard.router, dependencies=_auth_dep)
+app.include_router(files.router, dependencies=_auth_dep)
+app.include_router(qna.router, dependencies=_auth_dep)
+app.include_router(ai.router, dependencies=_auth_dep)
+app.include_router(reports.router, dependencies=_auth_dep)
 
 
 @app.on_event("startup")

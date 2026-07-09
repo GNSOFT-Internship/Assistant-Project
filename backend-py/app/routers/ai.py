@@ -5,9 +5,8 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from .. import llm, models, schemas
+from .. import llm, models
 from ..database import get_db
-from ..qna_logic import answer_question
 from .assets import asset_to_dto
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
@@ -19,12 +18,6 @@ class NaturalSearchRequest(BaseModel):
 
 class ReplacementRequest(BaseModel):
     budget: Optional[float] = None
-
-
-@router.post("/qa")
-def ask_question(request: schemas.QnARequest, db: Session = Depends(get_db)):
-    result = answer_question(db, request.question)
-    return {"success": True, "message": None, "data": result}
 
 
 # ---------------------------------------------------------------------------

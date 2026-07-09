@@ -20,14 +20,17 @@ def get_dashboard_data(db: Session = Depends(get_db)):
 
     now = datetime.now()
     records = db.query(models.MaintenanceRecord).all()
-    current_month_cost = sum(
-        float(r.cost) if r.cost is not None else 0.0
-        for r in records
+    current_month_records = [
+        r for r in records
         if r.maintenance_date and r.maintenance_date.month == now.month and r.maintenance_date.year == now.year
-    )
+    ]
+    current_month_cost = sum(float(r.cost) if r.cost is not None else 0.0 for r in current_month_records)
+    new_failure_count = sum(1 for r in current_month_records if r.maintenance_type == models.MaintenanceType.REPAIR)
 
     operation_rate = (active_assets * 100.0 / total_assets) if total_assets > 0 else 100.0
-    budget_consumption_rate = 45.0
+    # 예산 데이터를 별도로 관리하지 않아 실제 소진율을 계산할 수 없다.
+    # 데모 모드가 아니면 이 자리 표시자 값을 그대로 보여주는 대신 null을 반환한다.
+    budget_consumption_rate = 45.0 if settings.DEMO_MODE else None
 
     if settings.DEMO_MODE:
         factor = 1.0 + (random.random() * 0.2 - 0.1)
@@ -37,7 +40,7 @@ def get_dashboard_data(db: Session = Depends(get_db)):
 
     data = {
         "currentMonthMaintenanceCost": current_month_cost,
-        "newFailureCount": 5,
+        "newFailureCount": new_failure_count,
         "operationRate": operation_rate,
         "budgetConsumptionRate": budget_consumption_rate,
         "totalAssets": total_assets,

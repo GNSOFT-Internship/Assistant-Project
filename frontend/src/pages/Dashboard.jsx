@@ -44,7 +44,12 @@ export default function Dashboard() {
     { label: '이번달 유지보수 비용', value: `₩${data.currentMonthMaintenanceCost?.toLocaleString()}`, icon: TrendingUp, color: 'text-blue-600' },
     { label: '신규 고장 건수', value: data.newFailureCount, icon: AlertCircle, color: 'text-red-600' },
     { label: '가동률', value: `${data.operationRate?.toFixed(1)}%`, icon: CheckCircle, color: 'text-green-600' },
-    { label: '예산 소진율', value: `${data.budgetConsumptionRate?.toFixed(1)}%`, icon: TrendingDown, color: 'text-yellow-600' },
+    {
+      label: '예산 소진율',
+      value: data.budgetConsumptionRate != null ? `${data.budgetConsumptionRate.toFixed(1)}%` : '데이터 없음',
+      icon: TrendingDown,
+      color: 'text-yellow-600',
+    },
   ];
 
   return (

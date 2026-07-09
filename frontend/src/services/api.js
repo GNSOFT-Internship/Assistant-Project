@@ -31,6 +31,16 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     console.error('API Error:', error.response?.status, error.message);
+
+    // 토큰이 만료/무효화된 경우 (로그인 요청 자체의 401은 제외) 자동 로그아웃 후 로그인 페이지로 이동
+    const isLoginRequest = error.config?.url?.includes('/auth/login');
+    if (error.response?.status === 401 && !isLoginRequest) {
+      localStorage.removeItem('auth_user');
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
+    }
+
     return Promise.reject(error);
   }
 );
@@ -41,7 +51,6 @@ export const assetApi = {
   create: (data) => api.post('/assets', data),
   update: (id, data) => api.put(`/assets/${id}`, data),
   delete: (id) => api.delete(`/assets/${id}`),
-  search: (criteria) => api.post('/assets/search', criteria),
   getMaintenanceHistory: (id) => api.get(`/assets/${id}/maintenance`),
 };
 
