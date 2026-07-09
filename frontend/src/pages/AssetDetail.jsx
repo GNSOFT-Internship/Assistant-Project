@@ -1,18 +1,46 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { assetApi } from '../services/api';
-import { Calendar, DollarSign, Clock, MapPin, User, Package } from 'lucide-react';
+import { Calendar, DollarSign, Clock, MapPin, User, Package, History } from 'lucide-react';
 import { AssetStatusBadge, MaintenanceTypeBadge } from '../components/StatusBadge';
+
+const FIELD_LABELS = {
+  asset_name: '자산명',
+  asset_code: '자산번호',
+  category: '카테고리',
+  location: '위치',
+  responsible_person: '담당자',
+  purchase_date: '구매일',
+  purchase_price: '구매가',
+  useful_life: '내용연수',
+  status: '상태',
+  description: '설명',
+};
+
+const ACTION_LABELS = {
+  CREATE: { label: '등록', className: 'badge-green' },
+  UPDATE: { label: '수정', className: 'badge-blue' },
+  DELETE: { label: '삭제', className: 'badge-red' },
+};
+
+function formatValue(field, value) {
+  if (value === null || value === undefined || value === '') return '(없음)';
+  if (field === 'purchase_price') return `${Number(value).toLocaleString()}원`;
+  if (field === 'status') return value;
+  return String(value);
+}
 
 export default function AssetDetail() {
   const { id } = useParams();
   const [asset, setAsset] = useState(null);
   const [maintenance, setMaintenance] = useState([]);
+  const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadAsset();
     loadMaintenance();
+    loadHistory();
   }, [id]);
 
   const loadAsset = async () => {
@@ -35,6 +63,15 @@ export default function AssetDetail() {
     }
   };
 
+  const loadHistory = async () => {
+    try {
+      const response = await assetApi.getHistory(id);
+      setHistory(response.data.data || []);
+    } catch (error) {
+      console.error('변경 이력 로드 실패:', error);
+    }
+  };
+
   if (loading || !asset) return <div className="card">로딩 중...</div>;
 
   const usageYears = asset.purchaseDate ? 
@@ -52,7 +89,7 @@ export default function AssetDetail() {
         <div className="lg:col-span-2 card">
           <h1 className="text-2xl font-bold mb-4">{asset.assetName}</h1>
           
-          <div className="grid grid-cols-2 gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
             <div>
               <div className="text-sm text-gray-500">자산번호</div>
               <div className="font-medium">{asset.assetCode}</div>
@@ -157,6 +194,58 @@ export default function AssetDetail() {
                 )}
               </div>
             ))}
+          </div>
+        )}
+      </div>
+
+      <div className="card">
+        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+          <History size={18} /> 변경 이력
+        </h3>
+
+        {history.length === 0 ? (
+          <div className="text-center text-gray-500 py-8">변경 이력이 없습니다.</div>
+        ) : (
+          <div className="space-y-3">
+            {history.map((entry) => {
+              const actionInfo = ACTION_LABELS[entry.action] || { label: entry.action, className: 'badge-gray' };
+              const changedFields = entry.changes ? Object.keys(entry.changes) : [];
+              return (
+                <div key={entry.id} className="border-l-4 border-gray-300 pl-4 py-2">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className={actionInfo.className}>{actionInfo.label}</span>
+                      <span className="text-sm text-gray-600">{entry.changedBy || '알 수 없음'}</span>
+                    </div>
+                    <span className="text-sm text-gray-500">
+                      {entry.createdAt ? new Date(entry.createdAt).toLocaleString('ko-KR') : ''}
+                    </span>
+                  </div>
+                  {changedFields.length > 0 && (
+                    <ul className="mt-2 text-sm text-gray-700 space-y-1">
+                      {changedFields.map((field) => {
+                        const change = entry.changes[field];
+                        const label = FIELD_LABELS[field] || field;
+                        return (
+                          <li key={field}>
+                            <span className="font-medium">{label}</span>:{' '}
+                            {entry.action === 'CREATE' ? (
+                              <span>{formatValue(field, change.new)}</span>
+                            ) : entry.action === 'DELETE' ? (
+                              <span>{formatValue(field, change.old)}</span>
+                            ) : (
+                              <span>
+                                {formatValue(field, change.old)} → {formatValue(field, change.new)}
+                              </span>
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

@@ -1,13 +1,29 @@
+import json
 from datetime import date
 from decimal import Decimal
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
-from .. import models, schemas
+from .. import auth, models, schemas
 from ..database import get_db
 
 router = APIRouter(prefix="/api/assets", tags=["assets"])
+
+_TRACKED_FIELDS = [
+    ("asset_name", "assetName"),
+    ("asset_code", "assetCode"),
+    ("category", "category"),
+    ("location", "location"),
+    ("responsible_person", "responsiblePerson"),
+    ("purchase_date", "purchaseDate"),
+    ("purchase_price", "purchasePrice"),
+    ("useful_life", "usefulLife"),
+    ("status", "status"),
+    ("description", "description"),
+]
 
 
 def maintenance_to_dto(record: models.MaintenanceRecord) -> dict:
@@ -41,10 +57,88 @@ def asset_to_dto(asset: models.Asset) -> dict:
     }
 
 
+def _field_value(asset: models.Asset, field: str):
+    value = getattr(asset, field)
+    if isinstance(value, (date,)):
+        return value.isoformat()
+    if isinstance(value, Decimal):
+        return float(value)
+    if hasattr(value, "value"):  # enum
+        return value.value
+    return value
+
+
+def audit_to_dto(log: models.AssetAuditLog) -> dict:
+    try:
+        changes = json.loads(log.changes) if log.changes else None
+    except (TypeError, ValueError):
+        changes = None
+    return {
+        "id": log.id,
+        "assetId": log.asset_id,
+        "assetCode": log.asset_code,
+        "action": log.action.value if log.action else None,
+        "changedBy": log.changed_by,
+        "changes": changes,
+        "createdAt": log.created_at,
+    }
+
+
+def _log_change(
+    db: Session,
+    asset: models.Asset,
+    action: models.AuditAction,
+    changed_by: Optional[str],
+    changes: Optional[dict],
+):
+    entry = models.AssetAuditLog(
+        asset_id=asset.id,
+        asset_code=asset.asset_code,
+        action=action,
+        changed_by=changed_by,
+        changes=json.dumps(changes, ensure_ascii=False) if changes is not None else None,
+    )
+    db.add(entry)
+
+
 @router.get("")
-def get_all_assets(db: Session = Depends(get_db)):
-    assets = db.query(models.Asset).all()
-    return {"success": True, "message": None, "data": [asset_to_dto(a) for a in assets]}
+def get_all_assets(
+    db: Session = Depends(get_db),
+    page: int = 1,
+    pageSize: int = 20,
+    search: str = "",
+    category: str = "",
+):
+    query = db.query(models.Asset)
+
+    if search:
+        like = f"%{search}%"
+        query = query.filter(
+            or_(models.Asset.asset_name.like(like), models.Asset.asset_code.like(like))
+        )
+    if category:
+        query = query.filter(models.Asset.category == category)
+
+    total = query.count()
+    page = max(1, page)
+    page_size = max(1, min(pageSize, 200))
+    assets = (
+        query.order_by(models.Asset.id)
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+
+    return {
+        "success": True,
+        "message": None,
+        "data": {
+            "items": [asset_to_dto(a) for a in assets],
+            "total": total,
+            "page": page,
+            "pageSize": page_size,
+        },
+    }
 
 
 @router.get("/{asset_id}")
@@ -56,7 +150,11 @@ def get_asset(asset_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("")
-def create_asset(request: schemas.AssetRequest, db: Session = Depends(get_db)):
+def create_asset(
+    request: schemas.AssetRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(auth.get_current_user),
+):
     asset = models.Asset(
         asset_name=request.assetName,
         asset_code=request.assetCode,
@@ -70,16 +168,33 @@ def create_asset(request: schemas.AssetRequest, db: Session = Depends(get_db)):
         description=request.description,
     )
     db.add(asset)
+    db.flush()
+
+    _log_change(
+        db,
+        asset,
+        models.AuditAction.CREATE,
+        current_user.get("username"),
+        {field: {"old": None, "new": _field_value(asset, field)} for field, _ in _TRACKED_FIELDS},
+    )
+
     db.commit()
     db.refresh(asset)
     return {"success": True, "message": "Asset created successfully", "data": asset_to_dto(asset)}
 
 
 @router.put("/{asset_id}")
-def update_asset(asset_id: int, request: schemas.AssetRequest, db: Session = Depends(get_db)):
+def update_asset(
+    asset_id: int,
+    request: schemas.AssetRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(auth.get_current_user),
+):
     asset = db.query(models.Asset).filter(models.Asset.id == asset_id).first()
     if asset is None:
         raise HTTPException(status_code=404, detail="Asset not found")
+
+    before = {field: _field_value(asset, field) for field, _ in _TRACKED_FIELDS}
 
     asset.asset_name = request.assetName
     asset.asset_code = request.assetCode
@@ -91,6 +206,16 @@ def update_asset(asset_id: int, request: schemas.AssetRequest, db: Session = Dep
     asset.useful_life = request.usefulLife
     asset.status = models.AssetStatus(request.status or "ACTIVE")
     asset.description = request.description
+
+    db.flush()
+    after = {field: _field_value(asset, field) for field, _ in _TRACKED_FIELDS}
+    changed = {
+        field: {"old": before[field], "new": after[field]}
+        for field, _ in _TRACKED_FIELDS
+        if before[field] != after[field]
+    }
+    if changed:
+        _log_change(db, asset, models.AuditAction.UPDATE, current_user.get("username"), changed)
 
     db.commit()
     db.refresh(asset)
@@ -133,10 +258,32 @@ def add_asset_maintenance_record(asset_id: int, request: schemas.MaintenanceReco
     return {"success": True, "message": "Maintenance record added", "data": maintenance_to_dto(record)}
 
 
+@router.get("/{asset_id}/history")
+def get_asset_history(asset_id: int, db: Session = Depends(get_db)):
+    logs = (
+        db.query(models.AssetAuditLog)
+        .filter(models.AssetAuditLog.asset_id == asset_id)
+        .order_by(models.AssetAuditLog.created_at.desc())
+        .all()
+    )
+    return {"success": True, "message": None, "data": [audit_to_dto(l) for l in logs]}
+
+
 @router.delete("/{asset_id}")
-def delete_asset(asset_id: int, db: Session = Depends(get_db)):
+def delete_asset(
+    asset_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(auth.get_current_user),
+):
     asset = db.query(models.Asset).filter(models.Asset.id == asset_id).first()
     if asset is not None:
+        _log_change(
+            db,
+            asset,
+            models.AuditAction.DELETE,
+            current_user.get("username"),
+            {field: {"old": _field_value(asset, field), "new": None} for field, _ in _TRACKED_FIELDS},
+        )
         db.delete(asset)
         db.commit()
     return {"success": True, "message": "Asset deleted", "data": None}

@@ -174,10 +174,28 @@ export default function FileUpload() {
                   </div>
                 )}
 
-                {file.extractedSummary?.kind === 'pdf_text' && (
-                  <div className="mt-3 bg-gray-50 rounded p-3 text-sm">
-                    <div className="text-gray-500 mb-1">추출된 텍스트 ({file.extractedSummary.characterCount}자) 미리보기:</div>
-                    <pre className="whitespace-pre-wrap text-xs text-gray-700">{file.extractedSummary.preview}</pre>
+                {file.extractedSummary?.kind === 'pdf_quote' && (
+                  <div className="mt-3 bg-gray-50 rounded p-3 text-sm space-y-1">
+                    <div>
+                      자산코드: {file.extractedSummary.assetCode || '인식 안 됨'}
+                      {file.extractedSummary.assetCode && (
+                        <span className={file.extractedSummary.assetExists ? 'text-green-700' : 'text-yellow-700'}>
+                          {' '}({file.extractedSummary.assetExists ? '자산 일치' : '일치하는 자산 없음'})
+                        </span>
+                      )}
+                    </div>
+                    <div>업체: {file.extractedSummary.vendor || '인식 안 됨'}</div>
+                    <div>견적일자: {file.extractedSummary.quoteDate || '인식 안 됨'}</div>
+                    <div>총 금액: {file.extractedSummary.totalAmount != null ? `${file.extractedSummary.totalAmount.toLocaleString()}원` : '인식 안 됨'}</div>
+                    {file.applied && (
+                      <div className={file.extractedSummary.appliedRecordCount ? 'text-green-700 font-medium' : 'text-yellow-700'}>
+                        {file.extractedSummary.appliedRecordCount ? '유지보수 기록으로 등록됨' : '자동 등록 실패 (자산코드/금액 인식 불가)'}
+                      </div>
+                    )}
+                    <details className="mt-1">
+                      <summary className="text-gray-500 cursor-pointer">추출된 텍스트 전체 보기</summary>
+                      <pre className="whitespace-pre-wrap text-xs text-gray-700 mt-1">{file.extractedSummary.preview}</pre>
+                    </details>
                   </div>
                 )}
               </div>

@@ -28,9 +28,9 @@ export const AuthProvider = ({ children }) => {
       const authUser = { token, username: name, role };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(authUser));
       setUser(authUser);
-      return true;
+      return { success: true };
     } catch (error) {
-      return false;
+      return { success: false, message: error.response?.data?.message };
     }
   };
 

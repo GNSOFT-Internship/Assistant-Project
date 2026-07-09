@@ -12,6 +12,7 @@ from sqlalchemy import (
     Enum,
     ForeignKey,
     Integer,
+    UniqueConstraint,
 )
 from sqlalchemy.sql import func
 
@@ -108,5 +109,36 @@ class FileUpload(Base):
     extracted_data = Column(Text, nullable=True)
     error_message = Column(Text, nullable=True)
     applied = Column(Boolean, default=False)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class AuditAction(str, enum.Enum):
+    CREATE = "CREATE"
+    UPDATE = "UPDATE"
+    DELETE = "DELETE"
+
+
+class AssetAuditLog(Base):
+    __tablename__ = "asset_audit_log"
+
+    # asset_id는 자산이 삭제된 뒤에도 이력이 남아야 하므로 FK를 걸지 않는다.
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    asset_id = Column(BigInteger, nullable=False, index=True)
+    asset_code = Column(String(50), nullable=True)
+    action = Column(Enum(AuditAction), nullable=False)
+    changed_by = Column(String(50), nullable=True)
+    changes = Column(Text, nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class Budget(Base):
+    __tablename__ = "budget"
+    __table_args__ = (UniqueConstraint("year", "month", name="uq_budget_year_month"),)
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    year = Column(Integer, nullable=False)
+    month = Column(Integer, nullable=False)
+    allocated_amount = Column(DECIMAL(15, 2), nullable=False)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())

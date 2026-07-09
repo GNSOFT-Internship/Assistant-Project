@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from . import models, auth
 from .database import Base, engine, SessionLocal
-from .routers import auth_router, assets, dashboard, files, qna, ai, reports
+from .routers import auth_router, assets, budgets, dashboard, files, qna, ai, reports
 
 app = FastAPI(title="Asset Management API (Python)")
 
@@ -24,6 +24,7 @@ _auth_dep = [Depends(auth.get_current_user)]
 
 app.include_router(auth_router.router)
 app.include_router(assets.router, dependencies=_auth_dep)
+app.include_router(budgets.router, dependencies=_auth_dep)
 app.include_router(dashboard.router, dependencies=_auth_dep)
 app.include_router(files.router, dependencies=_auth_dep)
 app.include_router(qna.router, dependencies=_auth_dep)

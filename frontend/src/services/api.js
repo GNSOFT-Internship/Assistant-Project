@@ -46,12 +46,13 @@ api.interceptors.response.use(
 );
 
 export const assetApi = {
-  getAll: () => api.get('/assets'),
+  getAll: (params) => api.get('/assets', { params }),
   getById: (id) => api.get(`/assets/${id}`),
   create: (data) => api.post('/assets', data),
   update: (id, data) => api.put(`/assets/${id}`, data),
   delete: (id) => api.delete(`/assets/${id}`),
   getMaintenanceHistory: (id) => api.get(`/assets/${id}/maintenance`),
+  getHistory: (id) => api.get(`/assets/${id}/history`),
 };
 
 export const aiApi = {
@@ -80,4 +81,10 @@ export const fileApi = {
 export const reportApi = {
   getMonthly: () => api.get('/reports/monthly'),
   downloadPdf: () => api.get('/reports/monthly/pdf', { responseType: 'blob' }),
+};
+
+export const budgetApi = {
+  getAll: () => api.get('/budgets'),
+  set: (year, month, allocatedAmount) => api.put(`/budgets/${year}/${month}`, { allocatedAmount }),
+  delete: (year, month) => api.delete(`/budgets/${year}/${month}`),
 };

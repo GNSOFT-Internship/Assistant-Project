@@ -39,10 +39,10 @@ export default function Recommendations() {
   return (
     <div className="space-y-6">
       <div className="card">
-        <div className="flex justify-between items-center mb-4">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
           <h1 className="text-2xl font-bold">AI 교체 우선순위 추천</h1>
-          <div className="flex items-center gap-2">
-            <label className="text-sm">예산 제한 (원):</label>
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="text-sm whitespace-nowrap">예산 제한 (원):</label>
             <input
               type="number"
               value={budget || ''}
@@ -77,7 +77,7 @@ export default function Recommendations() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-4 gap-4 text-sm mb-3">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm mb-3">
                   <div>
                     <div className="text-gray-500">구매가</div>
                     <div className="font-medium">{rec.purchasePrice?.toLocaleString()}원</div>

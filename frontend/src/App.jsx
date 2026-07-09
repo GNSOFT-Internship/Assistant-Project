@@ -12,6 +12,7 @@ import Recommendations from './pages/Recommendations';
 import QnA from './pages/QnA';
 import FileUpload from './pages/FileUpload';
 import Reports from './pages/Reports';
+import Budget from './pages/Budget';
 import Layout from './components/Layout';
 
 function RequireAuth({ children }) {
@@ -53,6 +54,7 @@ function App() {
               <Route path="qa" element={<QnA />} />
               <Route path="files" element={<FileUpload />} />
               <Route path="reports" element={<Reports />} />
+              <Route path="budget" element={<Budget />} />
             </Route>
           </Routes>
         </AuthProvider>

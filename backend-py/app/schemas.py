@@ -77,6 +77,10 @@ class QnARequest(BaseModel):
     question: str
 
 
+class BudgetRequest(BaseModel):
+    allocatedAmount: float
+
+
 class QnAResponse(BaseModel):
     answer: str
     sourceData: List[Any] = []

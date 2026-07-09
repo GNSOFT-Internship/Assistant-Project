@@ -1,13 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { assetApi } from '../services/api';
-import { Plus, Edit, Trash2, Eye } from 'lucide-react';
+import { Plus, Edit, Trash2, Eye, ChevronLeft, ChevronRight } from 'lucide-react';
 import { AssetStatusBadge } from '../components/StatusBadge';
+
+const PAGE_SIZE = 20;
 
 export default function Assets() {
   const navigate = useNavigate();
   const [assets, setAssets] = useState([]);
-  const [filteredAssets, setFilteredAssets] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [searchInput, setSearchInput] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [loading, setLoading] = useState(true);
@@ -19,37 +23,43 @@ export default function Assets() {
     usefulLife: 5, status: 'ACTIVE', description: ''
   });
 
+  // 검색어 입력을 400ms 디바운스해서 서버 요청을 과도하게 보내지 않도록 함
   useEffect(() => {
-    loadAssets();
-  }, []);
+    const timer = setTimeout(() => {
+      setSearchTerm(searchInput);
+      setPage(1);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   useEffect(() => {
-    let result = [...assets];
-    
-    if (searchTerm) {
-      result = result.filter(a => 
-        (a.assetName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (a.assetCode || '').toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-    
-    if (categoryFilter) {
-      result = result.filter(a => a.category === categoryFilter);
-    }
-    
-    setFilteredAssets(result);
-  }, [searchTerm, categoryFilter, assets]);
+    setPage(1);
+  }, [categoryFilter]);
 
-  const loadAssets = async () => {
+  const loadAssets = useCallback(async () => {
+    setLoading(true);
     try {
-      const response = await assetApi.getAll();
-      setAssets(response.data.data);
+      const response = await assetApi.getAll({
+        page,
+        pageSize: PAGE_SIZE,
+        search: searchTerm,
+        category: categoryFilter,
+      });
+      const data = response.data.data;
+      setAssets(data.items || []);
+      setTotal(data.total || 0);
     } catch (error) {
       console.error('자산 로드 실패:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, searchTerm, categoryFilter]);
+
+  useEffect(() => {
+    loadAssets();
+  }, [loadAssets]);
+
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -110,11 +120,9 @@ export default function Assets() {
     resetForm();
   };
 
-  if (loading) return <div className="card">로딩 중...</div>;
-
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center flex-wrap gap-2">
         <h1 className="text-2xl font-bold">자산 관리</h1>
         <button
           onClick={() => { resetForm(); setShowModal(true); }}
@@ -125,18 +133,18 @@ export default function Assets() {
       </div>
 
       <div className="card">
-        <div className="flex gap-4 mb-4">
+        <div className="flex flex-col sm:flex-row gap-4 mb-4">
           <input
             type="text"
             placeholder="자산명/자산번호 검색..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
             className="input flex-1"
           />
           <select
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
-            className="input w-40"
+            className="input sm:w-40"
           >
             <option value="">전체 카테고리</option>
             <option value="IT 장비">IT 장비</option>
@@ -150,6 +158,11 @@ export default function Assets() {
           </select>
         </div>
 
+        {loading ? (
+          <div className="text-center text-gray-500 py-8">로딩 중...</div>
+        ) : assets.length === 0 ? (
+          <div className="text-center text-gray-500 py-8">일치하는 자산이 없습니다.</div>
+        ) : (
         <div className="overflow-x-auto">
           <table className="table">
             <thead className="table-header">
@@ -165,7 +178,7 @@ export default function Assets() {
               </tr>
             </thead>
             <tbody>
-              {filteredAssets.map((asset) => (
+              {assets.map((asset) => (
                 <tr
                   key={asset.id}
                   className="border-t cursor-pointer hover:bg-gray-50"
@@ -205,10 +218,34 @@ export default function Assets() {
             </tbody>
           </table>
         </div>
+        )}
+
+        {!loading && total > 0 && (
+          <div className="flex items-center justify-between mt-4 text-sm text-gray-600">
+            <div>전체 {total}건 중 {(page - 1) * PAGE_SIZE + 1}-{Math.min(page * PAGE_SIZE, total)}건</div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1}
+                className="btn btn-secondary px-2 py-1 disabled:opacity-40"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <span>{page} / {totalPages}</span>
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+                className="btn btn-secondary px-2 py-1 disabled:opacity-40"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <h2 className="text-xl font-bold mb-4">
               {editingAsset ? '자산 수정' : '자산 등록'}

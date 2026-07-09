@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import uuid
 from datetime import date, datetime
 
@@ -48,11 +49,17 @@ def file_to_response(f: models.FileUpload) -> dict:
                     "unmatchedAssetCodes": parsed.get("unmatchedAssetCodes", []),
                     "appliedRecordCount": parsed.get("appliedRecordCount"),
                 }
-            elif parsed.get("kind") == "pdf_text":
+            elif parsed.get("kind") == "pdf_quote":
                 extracted_summary = {
-                    "kind": "pdf_text",
+                    "kind": "pdf_quote",
                     "characterCount": parsed.get("characterCount"),
                     "preview": (parsed.get("extractedText") or "")[:300],
+                    "assetCode": parsed.get("assetCode"),
+                    "assetExists": parsed.get("assetExists"),
+                    "vendor": parsed.get("vendor"),
+                    "quoteDate": parsed.get("quoteDate"),
+                    "totalAmount": parsed.get("totalAmount"),
+                    "appliedRecordCount": parsed.get("appliedRecordCount"),
                 }
         except (TypeError, ValueError):
             extracted_summary = None
@@ -155,6 +162,45 @@ def _parse_pdf(file_path: str) -> str:
     return "\n".join(text_parts)
 
 
+_ASSET_CODE_LABELED_RE = re.compile(r"자산\s?(?:코드|번호)\s*[:\-]?\s*([A-Za-z]+-\d+)")
+_ASSET_CODE_BARE_RE = re.compile(r"\b([A-Z]{2,}-\d{2,})\b")
+_TOTAL_AMOUNT_RE = re.compile(r"(?:합\s?계|총\s?금액|총액|견적\s?금액)\s*[:\-]?\s*([\d,]+)\s*원?")
+_QUOTE_DATE_RE = re.compile(r"(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})")
+_VENDOR_RE = re.compile(r"(?:상호|업체명|공급자)\s*[:\-]?\s*([^\n]+)")
+
+
+def _parse_pdf_quote(text: str) -> dict:
+    asset_code_match = _ASSET_CODE_LABELED_RE.search(text) or _ASSET_CODE_BARE_RE.search(text)
+    asset_code = asset_code_match.group(1) if asset_code_match else None
+
+    total_match = _TOTAL_AMOUNT_RE.search(text)
+    total_amount = None
+    if total_match:
+        try:
+            total_amount = float(total_match.group(1).replace(",", ""))
+        except ValueError:
+            total_amount = None
+
+    date_match = _QUOTE_DATE_RE.search(text)
+    quote_date = None
+    if date_match:
+        try:
+            y, m, d = (int(g) for g in date_match.groups())
+            quote_date = date(y, m, d).isoformat()
+        except ValueError:
+            quote_date = None
+
+    vendor_match = _VENDOR_RE.search(text)
+    vendor = vendor_match.group(1).strip() if vendor_match else None
+
+    return {
+        "assetCode": asset_code,
+        "totalAmount": total_amount,
+        "quoteDate": quote_date,
+        "vendor": vendor,
+    }
+
+
 @router.get("")
 def get_all_files(db: Session = Depends(get_db)):
     files = db.query(models.FileUpload).all()
@@ -226,11 +272,25 @@ def process_file(file_id: int, db: Session = Depends(get_db)):
             }
         else:
             text = _parse_pdf(file_upload.file_path)
+            quote = _parse_pdf_quote(text)
+            asset_exists = False
+            if quote["assetCode"]:
+                asset_exists = (
+                    db.query(models.Asset)
+                    .filter(models.Asset.asset_code == quote["assetCode"])
+                    .first()
+                    is not None
+                )
             result = {
-                "kind": "pdf_text",
+                "kind": "pdf_quote",
                 "filename": file_upload.original_filename,
                 "extractedText": text,
                 "characterCount": len(text),
+                "assetCode": quote["assetCode"],
+                "assetExists": asset_exists,
+                "vendor": quote["vendor"],
+                "quoteDate": quote["quoteDate"],
+                "totalAmount": quote["totalAmount"],
             }
 
         file_upload.extracted_data = json.dumps(result, ensure_ascii=False)
@@ -285,6 +345,32 @@ def apply_file(file_id: int, db: Session = Depends(get_db)):
 
         result["appliedRecordCount"] = created_count
         file_upload.extracted_data = json.dumps(result, ensure_ascii=False)
+    elif result.get("kind") == "pdf_quote":
+        asset = None
+        if result.get("assetCode"):
+            asset = (
+                db.query(models.Asset)
+                .filter(models.Asset.asset_code == result["assetCode"])
+                .first()
+            )
+        if asset is not None and result.get("totalAmount") is not None:
+            description_parts = ["[견적서 자동 등록]"]
+            if result.get("vendor"):
+                description_parts.append(f"업체: {result['vendor']}")
+            record = models.MaintenanceRecord(
+                asset_id=asset.id,
+                maintenance_date=(
+                    date.fromisoformat(result["quoteDate"]) if result.get("quoteDate") else date.today()
+                ),
+                maintenance_type=models.MaintenanceType.REPAIR,
+                cost=result["totalAmount"],
+                description=" ".join(description_parts),
+            )
+            db.add(record)
+            created_count = 1
+
+        result["appliedRecordCount"] = created_count
+        file_upload.extracted_data = json.dumps(result, ensure_ascii=False)
 
     file_upload.applied = True
     file_upload.updated_at = datetime.now()
@@ -294,6 +380,11 @@ def apply_file(file_id: int, db: Session = Depends(get_db)):
     message = "File applied successfully"
     if result.get("kind") == "maintenance_records":
         message = f"유지보수 기록 {created_count}건이 등록되었습니다."
+    elif result.get("kind") == "pdf_quote":
+        message = (
+            f"견적서 기반 유지보수 기록이 등록되었습니다." if created_count else
+            "견적서에서 자산코드/금액을 자동으로 인식하지 못해 기록을 생성하지 못했습니다."
+        )
 
     return {"success": True, "message": message, "data": file_to_response(file_upload)}
 

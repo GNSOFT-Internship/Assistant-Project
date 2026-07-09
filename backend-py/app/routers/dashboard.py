@@ -28,21 +28,32 @@ def get_dashboard_data(db: Session = Depends(get_db)):
     new_failure_count = sum(1 for r in current_month_records if r.maintenance_type == models.MaintenanceType.REPAIR)
 
     operation_rate = (active_assets * 100.0 / total_assets) if total_assets > 0 else 100.0
-    # 예산 데이터를 별도로 관리하지 않아 실제 소진율을 계산할 수 없다.
-    # 데모 모드가 아니면 이 자리 표시자 값을 그대로 보여주는 대신 null을 반환한다.
-    budget_consumption_rate = 45.0 if settings.DEMO_MODE else None
+
+    current_budget = (
+        db.query(models.Budget)
+        .filter(models.Budget.year == now.year, models.Budget.month == now.month)
+        .first()
+    )
+    if current_budget is not None and float(current_budget.allocated_amount) > 0:
+        budget_consumption_rate = round(current_month_cost / float(current_budget.allocated_amount) * 100, 1)
+    elif settings.DEMO_MODE:
+        budget_consumption_rate = 45.0
+    else:
+        budget_consumption_rate = None
 
     if settings.DEMO_MODE:
         factor = 1.0 + (random.random() * 0.2 - 0.1)
         current_month_cost *= factor
         operation_rate = max(0.0, min(100.0, operation_rate + random.random() * 4 - 2))
-        budget_consumption_rate *= factor
+        if current_budget is None:
+            budget_consumption_rate *= factor
 
     data = {
         "currentMonthMaintenanceCost": current_month_cost,
         "newFailureCount": new_failure_count,
         "operationRate": operation_rate,
         "budgetConsumptionRate": budget_consumption_rate,
+        "hasBudgetData": current_budget is not None,
         "totalAssets": total_assets,
         "activeAssets": active_assets,
         "replacementNeededAssets": replacement_needed_assets,

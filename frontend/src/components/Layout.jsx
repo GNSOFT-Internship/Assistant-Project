@@ -3,7 +3,7 @@ import { Link, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   LayoutDashboard, Package, Wrench, Lightbulb, MessageSquare,
-  Upload, FileText, LogOut, Search
+  Upload, FileText, LogOut, Search, Wallet
 } from 'lucide-react';
 
 export default function Layout() {
@@ -25,6 +25,7 @@ export default function Layout() {
     { path: '/qa', label: '질문하기', icon: MessageSquare },
     { path: '/files', label: '파일 업로드', icon: Upload },
     { path: '/reports', label: '보고서', icon: FileText },
+    { path: '/budget', label: '예산 관리', icon: Wallet },
   ];
 
   return (
