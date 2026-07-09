@@ -6,18 +6,31 @@ import { AssetStatusBadge, MaintenanceTypeBadge } from '../components/StatusBadg
 import { ArrowLeft } from 'lucide-react';
 
 const TOP_FAILURE_COUNT = 5;
+const CURRENT_YEAR = new Date().getFullYear();
+const YEAR_OPTIONS = Array.from({ length: 20 }, (_, i) => CURRENT_YEAR + 1 - i);
+const MONTH_OPTIONS = Array.from({ length: 12 }, (_, i) => i + 1);
+
+function buildYearMonth(year, month) {
+  if (!year || !month) return '';
+  return `${year}-${String(month).padStart(2, '0')}`;
+}
 
 export default function Maintenance() {
   const [analysis, setAnalysis] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [startMonth, setStartMonth] = useState('');
-  const [endMonth, setEndMonth] = useState('');
+  const [startYear, setStartYear] = useState('');
+  const [startMonthNum, setStartMonthNum] = useState('');
+  const [endYear, setEndYear] = useState('');
+  const [endMonthNum, setEndMonthNum] = useState('');
   const [selectedFailureType, setSelectedFailureType] = useState(null);
   const [failureAssets, setFailureAssets] = useState([]);
   const [loadingFailureAssets, setLoadingFailureAssets] = useState(false);
   const [viewingAsset, setViewingAsset] = useState(null);
   const [viewingMaintenance, setViewingMaintenance] = useState([]);
   const [loadingAssetDetail, setLoadingAssetDetail] = useState(false);
+
+  const startMonth = buildYearMonth(startYear, startMonthNum);
+  const endMonth = buildYearMonth(endYear, endMonthNum);
 
   useEffect(() => {
     loadAnalysis();
@@ -36,8 +49,10 @@ export default function Maintenance() {
   };
 
   const resetRange = () => {
-    setStartMonth('');
-    setEndMonth('');
+    setStartYear('');
+    setStartMonthNum('');
+    setEndYear('');
+    setEndMonthNum('');
   };
 
   const handleFailureTypeClick = async (failureType) => {
@@ -128,20 +143,40 @@ export default function Maintenance() {
           <div className="border rounded-lg p-4">
             <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
               <h3 className="font-semibold">고장 유형 분포 (상위 {TOP_FAILURE_COUNT}개)</h3>
-              <div className="flex items-center gap-1.5 text-sm">
-                <input
-                  type="month"
-                  value={startMonth}
-                  onChange={(e) => setStartMonth(e.target.value)}
-                  className="input py-1 text-sm"
-                />
+              <div className="flex items-center flex-wrap gap-1 text-sm">
+                <select
+                  value={startYear}
+                  onChange={(e) => setStartYear(e.target.value)}
+                  className="input py-1 text-sm w-auto"
+                >
+                  <option value="">년도</option>
+                  {YEAR_OPTIONS.map((y) => <option key={y} value={y}>{y}년</option>)}
+                </select>
+                <select
+                  value={startMonthNum}
+                  onChange={(e) => setStartMonthNum(e.target.value)}
+                  className="input py-1 text-sm w-auto"
+                >
+                  <option value="">월</option>
+                  {MONTH_OPTIONS.map((m) => <option key={m} value={m}>{m}월</option>)}
+                </select>
                 <span className="text-gray-400">~</span>
-                <input
-                  type="month"
-                  value={endMonth}
-                  onChange={(e) => setEndMonth(e.target.value)}
-                  className="input py-1 text-sm"
-                />
+                <select
+                  value={endYear}
+                  onChange={(e) => setEndYear(e.target.value)}
+                  className="input py-1 text-sm w-auto"
+                >
+                  <option value="">년도</option>
+                  {YEAR_OPTIONS.map((y) => <option key={y} value={y}>{y}년</option>)}
+                </select>
+                <select
+                  value={endMonthNum}
+                  onChange={(e) => setEndMonthNum(e.target.value)}
+                  className="input py-1 text-sm w-auto"
+                >
+                  <option value="">월</option>
+                  {MONTH_OPTIONS.map((m) => <option key={m} value={m}>{m}월</option>)}
+                </select>
                 {(startMonth || endMonth) && (
                   <button onClick={resetRange} className="btn btn-secondary py-1 px-2 text-xs">전체 기간</button>
                 )}
