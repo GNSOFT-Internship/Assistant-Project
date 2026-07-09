@@ -339,3 +339,30 @@ def maintenance_analysis(db: Session = Depends(get_db)):
             "failurePatterns": failure_patterns,
         },
     }
+
+
+@router.get("/maintenance-analysis/failure-assets")
+def get_assets_by_failure_type(failureType: str, db: Session = Depends(get_db)):
+    records = (
+        db.query(models.MaintenanceRecord)
+        .filter(models.MaintenanceRecord.failure_type == failureType)
+        .all()
+    )
+
+    occurrence_count: dict = {}
+    for r in records:
+        occurrence_count[r.asset_id] = occurrence_count.get(r.asset_id, 0) + 1
+
+    assets = (
+        db.query(models.Asset).filter(models.Asset.id.in_(occurrence_count.keys())).all()
+        if occurrence_count
+        else []
+    )
+
+    result = [
+        {**asset_to_dto(a), "occurrenceCount": occurrence_count.get(a.id, 0)}
+        for a in assets
+    ]
+    result.sort(key=lambda a: -a["occurrenceCount"])
+
+    return {"success": True, "message": None, "data": result}

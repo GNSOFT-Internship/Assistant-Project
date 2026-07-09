@@ -61,6 +61,7 @@ export const aiApi = {
   naturalLanguageSearch: (query) => api.post('/ai/natural-language-search', { query }),
   getReplacementRecommendation: (budget) => api.post('/ai/replacement-recommendation', { budget }),
   getMaintenanceAnalysis: () => api.get('/ai/maintenance-analysis'),
+  getAssetsByFailureType: (failureType) => api.get('/ai/maintenance-analysis/failure-assets', { params: { failureType } }),
   askQuestion: (question) => api.post('/qa/ask', { question }),
   getDashboardData: () => api.get('/dashboard'),
 };

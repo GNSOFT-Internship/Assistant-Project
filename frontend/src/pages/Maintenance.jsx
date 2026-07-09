@@ -1,12 +1,18 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { aiApi } from '../services/api';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { AssetStatusBadge } from '../components/StatusBadge';
 
 const TOP_FAILURE_COUNT = 5;
 
 export default function Maintenance() {
+  const navigate = useNavigate();
   const [analysis, setAnalysis] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [selectedFailureType, setSelectedFailureType] = useState(null);
+  const [failureAssets, setFailureAssets] = useState([]);
+  const [loadingFailureAssets, setLoadingFailureAssets] = useState(false);
 
   useEffect(() => {
     loadAnalysis();
@@ -21,6 +27,25 @@ export default function Maintenance() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleFailureTypeClick = async (failureType) => {
+    setSelectedFailureType(failureType);
+    setLoadingFailureAssets(true);
+    try {
+      const response = await aiApi.getAssetsByFailureType(failureType);
+      setFailureAssets(response.data.data || []);
+    } catch (error) {
+      console.error('고장 유형별 자산 로드 실패:', error);
+      setFailureAssets([]);
+    } finally {
+      setLoadingFailureAssets(false);
+    }
+  };
+
+  const closeFailureAssetsModal = () => {
+    setSelectedFailureType(null);
+    setFailureAssets([]);
   };
 
   if (loading) return <div className="card">로딩 중...</div>;
@@ -78,7 +103,12 @@ export default function Maintenance() {
                   <XAxis type="number" hide />
                   <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 12 }} />
                   <Tooltip />
-                  <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                  <Bar
+                    dataKey="value"
+                    radius={[0, 4, 4, 0]}
+                    onClick={(entry) => entry.name !== '기타' && handleFailureTypeClick(entry.name)}
+                    cursor="pointer"
+                  >
                     {failureChartData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.name === '기타' ? '#9CA3AF' : '#3B82F6'} />
                     ))}
@@ -119,8 +149,12 @@ export default function Maintenance() {
                   {failureEntries.map(([name, value]) => {
                     const percent = totalFailures ? (value / totalFailures) * 100 : 0;
                     return (
-                      <tr key={name} className="border-t">
-                        <td className="table-cell">{name}</td>
+                      <tr
+                        key={name}
+                        className="border-t cursor-pointer hover:bg-gray-50"
+                        onClick={() => handleFailureTypeClick(name)}
+                      >
+                        <td className="table-cell text-blue-600 hover:underline">{name}</td>
                         <td className="table-cell">{value}건</td>
                         <td className="table-cell">{percent.toFixed(1)}%</td>
                         <td className="table-cell w-40">
@@ -144,6 +178,58 @@ export default function Maintenance() {
           </div>
         )}
       </div>
+
+      {selectedFailureType && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          onClick={closeFailureAssetsModal}
+        >
+          <div
+            className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold">'{selectedFailureType}' 발생 자산</h2>
+              <button onClick={closeFailureAssetsModal} className="btn btn-secondary">닫기</button>
+            </div>
+
+            {loadingFailureAssets ? (
+              <div className="text-center text-gray-500 py-8">로딩 중...</div>
+            ) : failureAssets.length === 0 ? (
+              <div className="text-center text-gray-500 py-8">해당 고장 유형이 발생한 자산이 없습니다.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="table">
+                  <thead className="table-header">
+                    <tr>
+                      <th className="table-cell">자산명</th>
+                      <th className="table-cell">자산번호</th>
+                      <th className="table-cell">카테고리</th>
+                      <th className="table-cell">상태</th>
+                      <th className="table-cell">발생 횟수</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {failureAssets.map((asset) => (
+                      <tr
+                        key={asset.id}
+                        className="border-t cursor-pointer hover:bg-gray-50"
+                        onClick={() => navigate(`/assets/${asset.id}`)}
+                      >
+                        <td className="table-cell font-medium">{asset.assetName}</td>
+                        <td className="table-cell">{asset.assetCode}</td>
+                        <td className="table-cell">{asset.category}</td>
+                        <td className="table-cell"><AssetStatusBadge status={asset.status} /></td>
+                        <td className="table-cell">{asset.occurrenceCount}회</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
