@@ -3,6 +3,7 @@ from datetime import date
 from sqlalchemy.orm import Session
 
 from . import llm, models
+from .routers.assets import asset_to_dto
 
 
 def _to_source_data(assets):
@@ -58,18 +59,31 @@ _ANSWER_SCHEMA = {
         "relevantAssetIds": {
             "type": "array",
             "items": {"type": "integer"},
-            "description": "답변 근거로 사용된 자산의 id 목록",
+            "description": (
+                "hasFilter가 true일 때만 채우는, 답변의 근거가 된 구체적 자산 id 목록. "
+                "hasFilter가 false면 빈 배열로 둔다."
+            ),
         },
         "hasData": {"type": "boolean", "description": "질문에 답할 수 있는 데이터가 있었는지 여부"},
+        "hasFilter": {
+            "type": "boolean",
+            "description": (
+                "질문이 '3년 이상 사용한 노트북', '유지보수 4건 이상인 장비'처럼 특정 자산 목록을 "
+                "가리키는 경우 true. '총 자산 수는?', '평균 비용은?' 같은 단순 통계/개수 질문이면 false."
+            ),
+        },
     },
-    "required": ["answer", "relevantAssetIds", "hasData"],
+    "required": ["answer", "relevantAssetIds", "hasData", "hasFilter"],
     "additionalProperties": False,
 }
 
 _SYSTEM_PROMPT = (
     "당신은 공공기관 자산관리 시스템의 AI 어시스턴트다. 아래 제공되는 자산 및 유지보수 데이터를 "
     "근거로 관리자의 질문에 답한다. 데이터에 없는 내용은 추측하지 말고 모른다고 답한다. "
-    "금액은 원화 기준으로 표기하고, 가능하면 구체적인 자산명과 수치를 인용한다."
+    "금액은 원화 기준으로 표기하고, 가능하면 구체적인 자산명과 수치를 인용한다. "
+    "질문이 조건에 맞는 자산 목록을 찾는 것이면 hasFilter를 true로 하고 relevantAssetIds에 "
+    "해당 자산들의 id를 모두 넣는다. 단순 통계/개수/일반 질문이면 hasFilter를 false로 하고 "
+    "relevantAssetIds는 빈 배열로 둔다."
 )
 
 
@@ -87,13 +101,16 @@ def answer_question(db: Session, question: str) -> dict:
     except Exception:
         return _fallback_answer(db, question, all_assets)
 
+    has_filter = bool(result.get("hasFilter", False))
     relevant_ids = set(result.get("relevantAssetIds", []))
-    relevant_assets = [a for a in all_assets if a.id in relevant_ids] or all_assets
+    relevant_assets = [a for a in all_assets if a.id in relevant_ids] if has_filter else []
 
     return {
         "answer": result.get("answer", "답변을 생성하지 못했습니다."),
-        "sourceData": _to_source_data(relevant_assets),
+        "sourceData": _to_source_data(relevant_assets or all_assets),
+        "assets": [asset_to_dto(a) for a in relevant_assets],
         "hasData": bool(result.get("hasData", True)),
+        "hasFilter": has_filter,
     }
 
 
@@ -103,18 +120,38 @@ def _fallback_answer(db: Session, question: str, all_assets) -> dict:
 
     if "노트북" in q or "pc" in q or "컴퓨터" in q:
         it_assets = [a for a in all_assets if "it" in a.category.lower()]
-        return {"answer": f"IT 장비는 총 {len(it_assets)}개 있습니다.", "sourceData": _to_source_data(it_assets), "hasData": True}
+        return {
+            "answer": f"IT 장비는 총 {len(it_assets)}개 있습니다.",
+            "sourceData": _to_source_data(it_assets),
+            "assets": [asset_to_dto(a) for a in it_assets],
+            "hasData": True,
+            "hasFilter": True,
+        }
 
     if "가격" in q or "비싸" in q:
         expensive = [a for a in all_assets if float(a.purchase_price) > 1000000]
-        return {"answer": f"100만원 이상인 자산은 총 {len(expensive)}개 있습니다.", "sourceData": _to_source_data(expensive), "hasData": True}
+        return {
+            "answer": f"100만원 이상인 자산은 총 {len(expensive)}개 있습니다.",
+            "sourceData": _to_source_data(expensive),
+            "assets": [asset_to_dto(a) for a in expensive],
+            "hasData": True,
+            "hasFilter": True,
+        }
 
     if "상태" in q or "고장" in q or "교체" in q:
         problematic = [a for a in all_assets if a.status in (models.AssetStatus.REPLACEMENT_NEEDED, models.AssetStatus.INACTIVE)]
-        return {"answer": f"교체나 조치가 필요한 자산은 총 {len(problematic)}개 있습니다.", "sourceData": _to_source_data(problematic), "hasData": True}
+        return {
+            "answer": f"교체나 조치가 필요한 자산은 총 {len(problematic)}개 있습니다.",
+            "sourceData": _to_source_data(problematic),
+            "assets": [asset_to_dto(a) for a in problematic],
+            "hasData": True,
+            "hasFilter": True,
+        }
 
     return {
-        "answer": f"총 {len(all_assets)}개의 자산이 등록되어 있습니다. (AI 기능을 사용하려면 ANTHROPIC_API_KEY를 설정하세요.)",
+        "answer": f"총 {len(all_assets)}개의 자산이 등록되어 있습니다. (AI 기능을 사용하려면 GEMINI_API_KEY를 설정하세요.)",
         "sourceData": _to_source_data(all_assets),
+        "assets": [],
         "hasData": True,
+        "hasFilter": False,
     }

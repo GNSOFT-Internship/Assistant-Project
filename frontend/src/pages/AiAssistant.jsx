@@ -53,15 +53,12 @@ export default function AiAssistant() {
     setLoading(true);
 
     try {
-      const [qaRes, searchRes] = await Promise.all([
-        aiApi.askQuestion(question),
-        aiApi.naturalLanguageSearch(question),
-      ]);
-      const searchData = searchRes.data.data;
+      const qaRes = await aiApi.askQuestion(question);
+      const data = qaRes.data.data;
       setMessages((prev) => [...prev, {
         type: 'ai',
-        content: qaRes.data.data.answer,
-        assets: searchData?.hasFilter ? (searchData.assets || []) : [],
+        content: data.answer,
+        assets: data.hasFilter ? (data.assets || []) : [],
       }]);
     } catch (error) {
       console.error('질문 실패:', error);
