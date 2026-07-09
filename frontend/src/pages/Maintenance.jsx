@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { aiApi } from '../services/api';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+
+const TOP_FAILURE_COUNT = 5;
 
 export default function Maintenance() {
   const [analysis, setAnalysis] = useState(null);
@@ -24,10 +26,16 @@ export default function Maintenance() {
   if (loading) return <div className="card">로딩 중...</div>;
   if (!analysis) return <div className="card">분석 데이터를 불러올 수 없습니다.</div>;
 
-  const failureData = Object.entries(analysis.failurePatterns || {}).map(([name, value]) => ({ name, value }));
-  const costData = Object.entries(analysis.costTrend?.monthlyCosts || {}).map(([name, value]) => ({ name, value }));
+  const failureEntries = Object.entries(analysis.failurePatterns || {}).sort((a, b) => b[1] - a[1]);
+  const totalFailures = failureEntries.reduce((sum, [, v]) => sum + v, 0);
+  const topFailures = failureEntries.slice(0, TOP_FAILURE_COUNT);
+  const otherFailureCount = failureEntries.slice(TOP_FAILURE_COUNT).reduce((sum, [, v]) => sum + v, 0);
+  const failureChartData = [
+    ...topFailures.map(([name, value]) => ({ name, value })),
+    ...(otherFailureCount > 0 ? [{ name: '기타', value: otherFailureCount }] : []),
+  ];
 
-  const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'];
+  const costData = Object.entries(analysis.costTrend?.monthlyCosts || {}).map(([name, value]) => ({ name, value }));
 
   return (
     <div className="space-y-6">
@@ -59,26 +67,25 @@ export default function Maintenance() {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           <div className="border rounded-lg p-4">
-            <h3 className="font-semibold mb-4">고장 유형 분포</h3>
-            <ResponsiveContainer width="100%" height={250}>
-              <PieChart>
-                <Pie
-                  data={failureData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {failureData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
+            <h3 className="font-semibold mb-4">고장 유형 분포 (상위 {TOP_FAILURE_COUNT}개)</h3>
+            {failureChartData.length === 0 ? (
+              <div className="h-[250px] flex items-center justify-center text-gray-400 text-sm">
+                표시할 고장 유형 데이터가 없습니다.
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={250}>
+                <BarChart data={failureChartData} layout="vertical" margin={{ left: 10, right: 30 }}>
+                  <XAxis type="number" hide />
+                  <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 12 }} />
+                  <Tooltip />
+                  <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                    {failureChartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.name === '기타' ? '#9CA3AF' : '#3B82F6'} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </div>
 
           <div className="border rounded-lg p-4">
@@ -94,6 +101,41 @@ export default function Maintenance() {
             </ResponsiveContainer>
           </div>
         </div>
+
+        {failureEntries.length > 0 && (
+          <div className="border rounded-lg p-4 mb-6">
+            <h3 className="font-semibold mb-4">전체 고장 유형 목록</h3>
+            <div className="overflow-x-auto">
+              <table className="table">
+                <thead className="table-header">
+                  <tr>
+                    <th className="table-cell">고장 유형</th>
+                    <th className="table-cell">건수</th>
+                    <th className="table-cell">비율</th>
+                    <th className="table-cell">분포</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {failureEntries.map(([name, value]) => {
+                    const percent = totalFailures ? (value / totalFailures) * 100 : 0;
+                    return (
+                      <tr key={name} className="border-t">
+                        <td className="table-cell">{name}</td>
+                        <td className="table-cell">{value}건</td>
+                        <td className="table-cell">{percent.toFixed(1)}%</td>
+                        <td className="table-cell w-40">
+                          <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                            <div className="h-full bg-blue-500" style={{ width: `${percent}%` }} />
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         {analysis.aiAnalysis && (
           <div className="bg-blue-50 rounded-lg p-4">

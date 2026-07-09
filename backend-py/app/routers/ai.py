@@ -272,10 +272,13 @@ def maintenance_analysis(db: Session = Depends(get_db)):
         if r.maintenance_type == models.MaintenanceType.REPAIR:
             failure_count_by_asset[r.asset_id] = failure_count_by_asset.get(r.asset_id, 0) + 1
 
+    # "없음"은 정기점검/점검 기록에 고장이 없었다는 표시일 뿐 실제 고장
+    # 유형이 아니므로, 고장 패턴 분석에서는 제외한다.
     failure_patterns: dict = {}
     for r in all_records:
-        if r.failure_type and r.failure_type.strip():
-            failure_patterns[r.failure_type] = failure_patterns.get(r.failure_type, 0) + 1
+        failure_type = (r.failure_type or "").strip()
+        if failure_type and failure_type != "없음":
+            failure_patterns[failure_type] = failure_patterns.get(failure_type, 0) + 1
 
     repeated_failure_count = sum(1 for c in failure_count_by_asset.values() if c >= 2)
 
