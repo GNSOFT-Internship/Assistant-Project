@@ -54,9 +54,21 @@ _SEARCH_FILTER_SCHEMA = {
                 "'1번이라도', '한 번이라도'이면 1, '2번 이상'이면 2, 횟수 조건이 없으면 null."
             ),
         },
+        "minMaintenanceCount": {
+            "type": ["integer", "null"],
+            "description": (
+                "고장 유형과 무관하게 전체 유지보수(정기점검+수리+교체+점검) 건수가 최소 몇 건 "
+                "이상이어야 하는지. '유지보수 건수가 4건 이상인 장비', '정비 이력이 3번 넘는 자산' "
+                "처럼 특정 고장 유형이 아니라 전체 정비 횟수를 묻는 경우에 설정하고, 없으면 null. "
+                "failureKeyword가 있는 질문의 minFailureCount와는 다른 필드이니 혼동하지 않는다."
+            ),
+        },
         "explanation": {"type": "string", "description": "검색 조건을 어떻게 해석했는지 한국어로 한 문장 설명"},
     },
-    "required": ["category", "location", "keyword", "minUsedYears", "maxUsedYears", "statusFilter", "failureKeyword", "minFailureCount", "explanation"],
+    "required": [
+        "category", "location", "keyword", "minUsedYears", "maxUsedYears", "statusFilter",
+        "failureKeyword", "minFailureCount", "minMaintenanceCount", "explanation",
+    ],
     "additionalProperties": False,
 }
 
@@ -65,8 +77,10 @@ _SEARCH_SYSTEM_PROMPT = (
     "자산 목록을 필터링할 조건을 JSON으로 추출한다. '3년 이상 사용', '노트북', 'A동' 같은 "
     "표현을 정확히 해석한다. 카테고리는 'IT 장비', '사무기기', '설비', '전기설비', '안전설비', "
     "'보안장비', '가구', '측정장비' 중에서 가장 가까운 것을 선택하되, 확신이 없으면 keyword로 넘긴다. "
-    "'전원고장이 있었던', '배터리 문제가 발생한', 'HDD 오류를 겪은' 등 유지보수 고장 이력과 관련된 "
-    "조건은 failureKeyword에 핵심 키워드를 넣고, 횟수 조건이 있으면 minFailureCount에도 설정한다."
+    "'전원고장이 있었던', '배터리 문제가 발생한', 'HDD 오류를 겪은' 등 특정 고장 유형/정비 내용과 "
+    "관련된 조건은 failureKeyword에 핵심 키워드를 넣고, 횟수 조건이 있으면 minFailureCount에도 "
+    "설정한다. 반면 '유지보수 건수가 4건 이상인 장비'처럼 특정 고장 유형이 아니라 전체 정비 "
+    "횟수를 묻는 경우에는 minMaintenanceCount에 그 숫자를 설정한다 (failureKeyword는 null로 둔다)."
 )
 
 
@@ -102,11 +116,21 @@ def _apply_filter(asset: models.Asset, f: dict, db: "Session" = None) -> bool:
         )
         if matched < min_count:
             return False
+    # 고장 유형과 무관한 전체 유지보수 건수 필터
+    if f.get("minMaintenanceCount") and db is not None:
+        total_count = (
+            db.query(models.MaintenanceRecord)
+            .filter(models.MaintenanceRecord.asset_id == asset.id)
+            .count()
+        )
+        if total_count < f["minMaintenanceCount"]:
+            return False
     return True
 
 
 _FILTER_CRITERIA_FIELDS = [
-    "category", "location", "keyword", "minUsedYears", "maxUsedYears", "statusFilter", "failureKeyword",
+    "category", "location", "keyword", "minUsedYears", "maxUsedYears", "statusFilter",
+    "failureKeyword", "minMaintenanceCount",
 ]
 
 
