@@ -7,9 +7,8 @@ import Dashboard from './pages/Dashboard';
 import Assets from './pages/Assets';
 import AssetDetail from './pages/AssetDetail';
 import Maintenance from './pages/Maintenance';
-import NaturalSearch from './pages/NaturalSearch';
 import Recommendations from './pages/Recommendations';
-import QnA from './pages/QnA';
+import AiAssistant from './pages/AiAssistant';
 import FileUpload from './pages/FileUpload';
 import Reports from './pages/Reports';
 import Budget from './pages/Budget';
@@ -49,9 +48,8 @@ function App() {
               <Route path="assets" element={<Assets />} />
               <Route path="assets/:id" element={<AssetDetail />} />
               <Route path="maintenance" element={<Maintenance />} />
-              <Route path="search" element={<NaturalSearch />} />
               <Route path="recommendations" element={<Recommendations />} />
-              <Route path="qa" element={<QnA />} />
+              <Route path="qa" element={<AiAssistant />} />
               <Route path="files" element={<FileUpload />} />
               <Route path="reports" element={<Reports />} />
               <Route path="budget" element={<Budget />} />

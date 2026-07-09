@@ -100,6 +100,15 @@ def _apply_filter(asset: models.Asset, f: dict, db: "Session" = None) -> bool:
     return True
 
 
+_FILTER_CRITERIA_FIELDS = [
+    "category", "location", "keyword", "minUsedYears", "maxUsedYears", "statusFilter", "failureKeyword",
+]
+
+
+def _has_filter_criteria(filter_result: dict) -> bool:
+    return any(filter_result.get(f) is not None for f in _FILTER_CRITERIA_FIELDS)
+
+
 @router.post("/natural-language-search")
 def natural_language_search(request: NaturalSearchRequest, db: Session = Depends(get_db)):
     all_assets = db.query(models.Asset).all()
@@ -113,6 +122,7 @@ def natural_language_search(request: NaturalSearchRequest, db: Session = Depends
                 "assets": [asset_to_dto(a) for a in all_assets],
                 "explanation": "검색어가 없어 전체 자산을 표시합니다.",
                 "isSimulated": False,
+                "hasFilter": False,
             },
         }
 
@@ -126,6 +136,7 @@ def natural_language_search(request: NaturalSearchRequest, db: Session = Depends
                 "explanation": f"'{query}'에 대한 검색 결과 {len(filtered)}건을 찾았습니다. "
                 "(AI 자연어 해석을 사용하려면 ANTHROPIC_API_KEY를 설정하세요.)",
                 "isSimulated": False,
+                "hasFilter": bool(filtered),
             },
         }
 
@@ -133,9 +144,11 @@ def natural_language_search(request: NaturalSearchRequest, db: Session = Depends
         filter_result = llm.ask_json(_SEARCH_SYSTEM_PROMPT, query, _SEARCH_FILTER_SCHEMA, effort="low")
         filtered = [a for a in all_assets if _apply_filter(a, filter_result, db)]
         explanation = filter_result.get("explanation") or f"'{query}'에 대한 검색 결과 {len(filtered)}건을 찾았습니다."
+        has_filter = _has_filter_criteria(filter_result)
     except Exception:
         filtered = [a for a in all_assets if query.lower() in (a.asset_name or "").lower()]
         explanation = f"'{query}'에 대한 검색 결과 {len(filtered)}건을 찾았습니다."
+        has_filter = bool(filtered)
 
     return {
         "success": True,
@@ -144,6 +157,7 @@ def natural_language_search(request: NaturalSearchRequest, db: Session = Depends
             "assets": [asset_to_dto(a) for a in filtered],
             "explanation": explanation,
             "isSimulated": False,
+            "hasFilter": has_filter,
         },
     }
 
