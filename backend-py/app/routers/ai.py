@@ -37,9 +37,24 @@ _SEARCH_FILTER_SCHEMA = {
             "enum": ["ACTIVE", "INACTIVE", "REPLACEMENT_NEEDED", "UNDER_MAINTENANCE", None],
             "description": "자산 상태 필터, 없으면 null",
         },
+        "failureKeyword": {
+            "type": ["string", "null"],
+            "description": (
+                "유지보수 이력의 고장 유형(failure_type)에서 부분 일치로 찾을 키워드. "
+                "'전원고장', '배터리', 'HDD 오류' 같은 고장 이력 조건이 있으면 설정하고, 없으면 null. "
+                "'~이 있었던', '~을 겪은', '~이 한번이라도 발생한' 등의 표현이 있으면 이 필드를 사용한다."
+            ),
+        },
+        "minFailureCount": {
+            "type": ["integer", "null"],
+            "description": (
+                "해당 고장 유형이 최소 몇 번 이상 발생했어야 하는지. "
+                "'1번이라도', '한 번이라도'이면 1, '2번 이상'이면 2, 횟수 조건이 없으면 null."
+            ),
+        },
         "explanation": {"type": "string", "description": "검색 조건을 어떻게 해석했는지 한국어로 한 문장 설명"},
     },
-    "required": ["category", "location", "keyword", "minUsedYears", "maxUsedYears", "statusFilter", "explanation"],
+    "required": ["category", "location", "keyword", "minUsedYears", "maxUsedYears", "statusFilter", "failureKeyword", "minFailureCount", "explanation"],
     "additionalProperties": False,
 }
 
@@ -47,11 +62,13 @@ _SEARCH_SYSTEM_PROMPT = (
     "당신은 공공기관 자산관리 시스템의 자연어 검색 파서다. 사용자의 한국어 질문을 분석하여 "
     "자산 목록을 필터링할 조건을 JSON으로 추출한다. '3년 이상 사용', '노트북', 'A동' 같은 "
     "표현을 정확히 해석한다. 카테고리는 'IT 장비', '사무기기', '설비', '전기설비', '안전설비', "
-    "'보안장비', '가구', '측정장비' 중에서 가장 가까운 것을 선택하되, 확신이 없으면 keyword로 넘긴다."
+    "'보안장비', '가구', '측정장비' 중에서 가장 가까운 것을 선택하되, 확신이 없으면 keyword로 넘긴다. "
+    "'전원고장이 있었던', '배터리 문제가 발생한', 'HDD 오류를 겪은' 등 유지보수 고장 이력과 관련된 "
+    "조건은 failureKeyword에 핵심 키워드를 넣고, 횟수 조건이 있으면 minFailureCount에도 설정한다."
 )
 
 
-def _apply_filter(asset: models.Asset, f: dict) -> bool:
+def _apply_filter(asset: models.Asset, f: dict, db: "Session" = None) -> bool:
     if f.get("category") and f["category"].lower() not in (asset.category or "").lower():
         return False
     if f.get("location") and f["location"].lower() not in (asset.location or "").lower():
@@ -65,6 +82,21 @@ def _apply_filter(asset: models.Asset, f: dict) -> bool:
         return False
     if f.get("statusFilter") and asset.status.value != f["statusFilter"]:
         return False
+    # 고장 유형 이력 필터: maintenance_record.failure_type 에서 키워드 부분 일치 검색
+    if f.get("failureKeyword") and db is not None:
+        kw = f["failureKeyword"].lower()
+        min_count = f.get("minFailureCount") or 1
+        records = (
+            db.query(models.MaintenanceRecord)
+            .filter(models.MaintenanceRecord.asset_id == asset.id)
+            .all()
+        )
+        matched = sum(
+            1 for r in records
+            if r.failure_type and kw in r.failure_type.lower()
+        )
+        if matched < min_count:
+            return False
     return True
 
 
@@ -99,7 +131,7 @@ def natural_language_search(request: NaturalSearchRequest, db: Session = Depends
 
     try:
         filter_result = llm.ask_json(_SEARCH_SYSTEM_PROMPT, query, _SEARCH_FILTER_SCHEMA, effort="low")
-        filtered = [a for a in all_assets if _apply_filter(a, filter_result)]
+        filtered = [a for a in all_assets if _apply_filter(a, filter_result, db)]
         explanation = filter_result.get("explanation") or f"'{query}'에 대한 검색 결과 {len(filtered)}건을 찾았습니다."
     except Exception:
         filtered = [a for a in all_assets if query.lower() in (a.asset_name or "").lower()]
