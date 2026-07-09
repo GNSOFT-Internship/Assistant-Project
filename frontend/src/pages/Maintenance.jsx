@@ -10,6 +10,8 @@ const TOP_FAILURE_COUNT = 5;
 export default function Maintenance() {
   const [analysis, setAnalysis] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [startMonth, setStartMonth] = useState('');
+  const [endMonth, setEndMonth] = useState('');
   const [selectedFailureType, setSelectedFailureType] = useState(null);
   const [failureAssets, setFailureAssets] = useState([]);
   const [loadingFailureAssets, setLoadingFailureAssets] = useState(false);
@@ -19,11 +21,12 @@ export default function Maintenance() {
 
   useEffect(() => {
     loadAnalysis();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startMonth, endMonth]);
 
   const loadAnalysis = async () => {
     try {
-      const response = await aiApi.getMaintenanceAnalysis();
+      const response = await aiApi.getMaintenanceAnalysis({ startMonth, endMonth });
       setAnalysis(response.data.data);
     } catch (error) {
       console.error('분석 로드 실패:', error);
@@ -32,11 +35,16 @@ export default function Maintenance() {
     }
   };
 
+  const resetRange = () => {
+    setStartMonth('');
+    setEndMonth('');
+  };
+
   const handleFailureTypeClick = async (failureType) => {
     setSelectedFailureType(failureType);
     setLoadingFailureAssets(true);
     try {
-      const response = await aiApi.getAssetsByFailureType(failureType);
+      const response = await aiApi.getAssetsByFailureType(failureType, { startMonth, endMonth });
       setFailureAssets(response.data.data || []);
     } catch (error) {
       console.error('고장 유형별 자산 로드 실패:', error);
@@ -92,7 +100,7 @@ export default function Maintenance() {
     <div className="space-y-6">
       <div className="card">
         <h1 className="text-2xl font-bold mb-4">AI 유지보수 분석</h1>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <div className="bg-blue-50 rounded-lg p-4">
             <div className="text-sm text-gray-600">총 유지보수 건수</div>
@@ -118,7 +126,27 @@ export default function Maintenance() {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           <div className="border rounded-lg p-4">
-            <h3 className="font-semibold mb-4">고장 유형 분포 (상위 {TOP_FAILURE_COUNT}개)</h3>
+            <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
+              <h3 className="font-semibold">고장 유형 분포 (상위 {TOP_FAILURE_COUNT}개)</h3>
+              <div className="flex items-center gap-1.5 text-sm">
+                <input
+                  type="month"
+                  value={startMonth}
+                  onChange={(e) => setStartMonth(e.target.value)}
+                  className="input py-1 text-sm"
+                />
+                <span className="text-gray-400">~</span>
+                <input
+                  type="month"
+                  value={endMonth}
+                  onChange={(e) => setEndMonth(e.target.value)}
+                  className="input py-1 text-sm"
+                />
+                {(startMonth || endMonth) && (
+                  <button onClick={resetRange} className="btn btn-secondary py-1 px-2 text-xs">전체 기간</button>
+                )}
+              </div>
+            </div>
             {failureChartData.length === 0 ? (
               <div className="h-[250px] flex items-center justify-center text-gray-400 text-sm">
                 표시할 고장 유형 데이터가 없습니다.
@@ -158,9 +186,20 @@ export default function Maintenance() {
           </div>
         </div>
 
-        {failureEntries.length > 0 && (
-          <div className="border rounded-lg p-4 mb-6">
-            <h3 className="font-semibold mb-4">전체 고장 유형 목록</h3>
+        <div className="border rounded-lg p-4 mb-6">
+          <h3 className="font-semibold mb-4">
+            전체 고장 유형 목록
+            {(startMonth || endMonth) && (
+              <span className="text-sm text-gray-500 font-normal ml-2">
+                ({startMonth || '처음'} ~ {endMonth || '지금'})
+              </span>
+            )}
+          </h3>
+          {failureEntries.length === 0 ? (
+            <div className="text-center text-gray-400 text-sm py-6">
+              해당 기간에 표시할 고장 유형 데이터가 없습니다.
+            </div>
+          ) : (
             <div className="overflow-x-auto">
               <table className="table">
                 <thead className="table-header">
@@ -194,8 +233,8 @@ export default function Maintenance() {
                 </tbody>
               </table>
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
         {analysis.aiAnalysis && (
           <div className="bg-blue-50 rounded-lg p-4">

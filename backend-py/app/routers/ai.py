@@ -259,8 +259,40 @@ _MAINTENANCE_SYSTEM_PROMPT = (
 )
 
 
+def _parse_year_month(value: Optional[str]):
+    if not value:
+        return None
+    try:
+        year_str, month_str = value.split("-")
+        return int(year_str), int(month_str)
+    except (ValueError, AttributeError):
+        return None
+
+
+def _in_month_range(record: models.MaintenanceRecord, start_month: Optional[str], end_month: Optional[str]) -> bool:
+    if not start_month and not end_month:
+        return True
+    if not record.maintenance_date:
+        return False
+    key = (record.maintenance_date.year, record.maintenance_date.month)
+
+    start = _parse_year_month(start_month)
+    if start and key < start:
+        return False
+
+    end = _parse_year_month(end_month)
+    if end and key > end:
+        return False
+
+    return True
+
+
 @router.get("/maintenance-analysis")
-def maintenance_analysis(db: Session = Depends(get_db)):
+def maintenance_analysis(
+    db: Session = Depends(get_db),
+    startMonth: Optional[str] = None,
+    endMonth: Optional[str] = None,
+):
     all_records = db.query(models.MaintenanceRecord).all()
     all_assets = {a.id: a for a in db.query(models.Asset).all()}
 
@@ -274,8 +306,12 @@ def maintenance_analysis(db: Session = Depends(get_db)):
 
     # "없음"은 정기점검/점검 기록에 고장이 없었다는 표시일 뿐 실제 고장
     # 유형이 아니므로, 고장 패턴 분석에서는 제외한다.
+    # 고장 유형 분포는 startMonth~endMonth 범위로 좁혀볼 수 있고, 나머지
+    # 통계(총 건수/비용 등)는 항상 전체 기간 기준을 유지한다.
     failure_patterns: dict = {}
     for r in all_records:
+        if not _in_month_range(r, startMonth, endMonth):
+            continue
         failure_type = (r.failure_type or "").strip()
         if failure_type and failure_type != "없음":
             failure_patterns[failure_type] = failure_patterns.get(failure_type, 0) + 1
@@ -342,12 +378,18 @@ def maintenance_analysis(db: Session = Depends(get_db)):
 
 
 @router.get("/maintenance-analysis/failure-assets")
-def get_assets_by_failure_type(failureType: str, db: Session = Depends(get_db)):
+def get_assets_by_failure_type(
+    failureType: str,
+    db: Session = Depends(get_db),
+    startMonth: Optional[str] = None,
+    endMonth: Optional[str] = None,
+):
     records = (
         db.query(models.MaintenanceRecord)
         .filter(models.MaintenanceRecord.failure_type == failureType)
         .all()
     )
+    records = [r for r in records if _in_month_range(r, startMonth, endMonth)]
 
     occurrence_count: dict = {}
     for r in records:
