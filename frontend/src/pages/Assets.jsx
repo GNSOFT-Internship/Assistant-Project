@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { assetApi } from '../services/api';
 import { Plus, Edit, Trash2, Eye } from 'lucide-react';
 
 export default function Assets() {
+  const navigate = useNavigate();
   const [assets, setAssets] = useState([]);
   const [filteredAssets, setFilteredAssets] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -163,7 +165,11 @@ export default function Assets() {
             </thead>
             <tbody>
               {filteredAssets.map((asset) => (
-                <tr key={asset.id} className="border-t">
+                <tr
+                  key={asset.id}
+                  className="border-t cursor-pointer hover:bg-gray-50"
+                  onClick={() => navigate(`/assets/${asset.id}`)}
+                >
                   <td className="table-cell font-medium">{asset.assetName}</td>
                   <td className="table-cell">{asset.assetCode}</td>
                   <td className="table-cell">{asset.category}</td>
@@ -179,7 +185,13 @@ export default function Assets() {
                       {asset.status}
                     </span>
                   </td>
-                  <td className="table-cell">
+                  <td className="table-cell" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      onClick={() => navigate(`/assets/${asset.id}`)}
+                      className="p-2 hover:bg-gray-100 rounded"
+                    >
+                      <Eye size={16} />
+                    </button>
                     <button
                       onClick={() => handleEdit(asset)}
                       className="p-2 hover:bg-gray-100 rounded"
