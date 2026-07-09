@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { assetApi } from '../services/api';
 import { Calendar, DollarSign, Clock, MapPin, User, Package } from 'lucide-react';
+import { AssetStatusBadge, MaintenanceTypeBadge } from '../components/StatusBadge';
 
 export default function AssetDetail() {
   const { id } = useParams();
@@ -81,14 +82,8 @@ export default function AssetDetail() {
               <div className="font-medium">{asset.usefulLife}년</div>
             </div>
             <div>
-              <div className="text-sm text-gray-500">상태</div>
-              <div className={`font-medium px-2 py-1 rounded ${
-                asset.status === 'ACTIVE' ? 'bg-green-100 text-green-800' :
-                asset.status === 'REPLACEMENT_NEEDED' ? 'bg-red-100 text-red-800' :
-                'bg-gray-100 text-gray-800'
-              }`}>
-                {asset.status}
-              </div>
+              <div className="text-sm text-gray-500 mb-1">상태</div>
+              <AssetStatusBadge status={asset.status} />
             </div>
           </div>
 
@@ -146,8 +141,8 @@ export default function AssetDetail() {
               <div key={record.id} className="border-l-4 border-blue-500 pl-4 py-2">
                 <div className="flex justify-between items-start">
                   <div>
-                    <div className="font-medium">{record.maintenanceType}</div>
-                    <div className="text-sm text-gray-600">{record.description}</div>
+                    <MaintenanceTypeBadge type={record.maintenanceType} />
+                    <div className="text-sm text-gray-600 mt-1">{record.description}</div>
                   </div>
                   <div className="text-right">
                     <div className="font-medium">{record.cost?.toLocaleString()}원</div>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { assetApi } from '../services/api';
 import { Plus, Edit, Trash2, Eye } from 'lucide-react';
+import { AssetStatusBadge } from '../components/StatusBadge';
 
 export default function Assets() {
   const navigate = useNavigate();
@@ -177,13 +178,7 @@ export default function Assets() {
                   <td className="table-cell">{asset.purchaseDate?.split('T')[0]}</td>
                   <td className="table-cell">{asset.purchasePrice?.toLocaleString()}원</td>
                   <td className="table-cell">
-                    <span className={`px-2 py-1 rounded text-xs ${
-                      asset.status === 'ACTIVE' ? 'bg-green-100 text-green-800' :
-                      asset.status === 'REPLACEMENT_NEEDED' ? 'bg-red-100 text-red-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
-                      {asset.status}
-                    </span>
+                    <AssetStatusBadge status={asset.status} />
                   </td>
                   <td className="table-cell" onClick={(e) => e.stopPropagation()}>
                     <button

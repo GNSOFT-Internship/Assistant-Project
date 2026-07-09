@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { fileApi } from '../services/api';
 import { Upload, FileText, CheckCircle, XCircle, Loader, Play, Download } from 'lucide-react';
+import { FileStatusBadge } from '../components/StatusBadge';
 
 export default function FileUpload() {
   const [files, setFiles] = useState([]);
@@ -72,21 +73,6 @@ export default function FileUpload() {
     }
   };
 
-  const getStatusBadge = (status) => {
-    switch (status) {
-      case 'PENDING':
-        return <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-xs">대기</span>;
-      case 'PROCESSING':
-        return <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">분석중</span>;
-      case 'COMPLETED':
-        return <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">완료</span>;
-      case 'FAILED':
-        return <span className="px-2 py-1 bg-red-100 text-red-800 rounded text-xs">실패</span>;
-      default:
-        return <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded text-xs">{status}</span>;
-    }
-  };
-
   return (
     <div className="space-y-6">
       <div className="card">
@@ -136,12 +122,8 @@ export default function FileUpload() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    {getStatusBadge(file.status)}
-                    {file.applied && (
-                      <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">
-                        적용됨
-                      </span>
-                    )}
+                    <FileStatusBadge status={file.status} />
+                    {file.applied && <span className="badge-blue">적용됨</span>}
                   </div>
                 </div>
                 
