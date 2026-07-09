@@ -258,6 +258,46 @@ def add_asset_maintenance_record(asset_id: int, request: schemas.MaintenanceReco
     return {"success": True, "message": "Maintenance record added", "data": maintenance_to_dto(record)}
 
 
+@router.put("/{asset_id}/maintenance/{record_id}")
+def update_maintenance_record(
+    asset_id: int,
+    record_id: int,
+    request: schemas.MaintenanceRecordRequest,
+    db: Session = Depends(get_db),
+):
+    record = (
+        db.query(models.MaintenanceRecord)
+        .filter(models.MaintenanceRecord.id == record_id, models.MaintenanceRecord.asset_id == asset_id)
+        .first()
+    )
+    if record is None:
+        raise HTTPException(status_code=404, detail="Maintenance record not found")
+
+    record.maintenance_date = date.fromisoformat(request.maintenanceDate)
+    record.maintenance_type = models.MaintenanceType(request.maintenanceType)
+    record.cost = Decimal(str(request.cost)) if request.cost is not None else None
+    record.description = request.description
+    record.technician = request.technician
+    record.failure_type = request.failureType
+
+    db.commit()
+    db.refresh(record)
+    return {"success": True, "message": "Maintenance record updated", "data": maintenance_to_dto(record)}
+
+
+@router.delete("/{asset_id}/maintenance/{record_id}")
+def delete_maintenance_record(asset_id: int, record_id: int, db: Session = Depends(get_db)):
+    record = (
+        db.query(models.MaintenanceRecord)
+        .filter(models.MaintenanceRecord.id == record_id, models.MaintenanceRecord.asset_id == asset_id)
+        .first()
+    )
+    if record is not None:
+        db.delete(record)
+        db.commit()
+    return {"success": True, "message": "Maintenance record deleted", "data": None}
+
+
 @router.get("/{asset_id}/history")
 def get_asset_history(asset_id: int, db: Session = Depends(get_db)):
     logs = (

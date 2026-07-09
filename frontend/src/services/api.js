@@ -52,6 +52,8 @@ export const assetApi = {
   update: (id, data) => api.put(`/assets/${id}`, data),
   delete: (id) => api.delete(`/assets/${id}`),
   getMaintenanceHistory: (id) => api.get(`/assets/${id}/maintenance`),
+  updateMaintenanceRecord: (assetId, recordId, data) => api.put(`/assets/${assetId}/maintenance/${recordId}`, data),
+  deleteMaintenanceRecord: (assetId, recordId) => api.delete(`/assets/${assetId}/maintenance/${recordId}`),
   getHistory: (id) => api.get(`/assets/${id}/history`),
 };
 

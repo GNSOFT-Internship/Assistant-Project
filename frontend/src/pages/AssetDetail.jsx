@@ -1,8 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { assetApi } from '../services/api';
-import { Calendar, DollarSign, Clock, MapPin, User, Package, History } from 'lucide-react';
+import { Calendar, DollarSign, Clock, MapPin, User, Package, History, Edit, Trash2 } from 'lucide-react';
 import { AssetStatusBadge, MaintenanceTypeBadge } from '../components/StatusBadge';
+
+const MAINTENANCE_TYPE_OPTIONS = [
+  { value: 'ROUTINE', label: '정기점검' },
+  { value: 'REPAIR', label: '수리' },
+  { value: 'REPLACEMENT', label: '교체' },
+  { value: 'INSPECTION', label: '점검' },
+];
+
+const EMPTY_RECORD_FORM = {
+  maintenanceDate: '',
+  maintenanceType: 'REPAIR',
+  cost: '',
+  description: '',
+  technician: '',
+  failureType: '',
+};
 
 const FIELD_LABELS = {
   asset_name: '자산명',
@@ -36,6 +52,8 @@ export default function AssetDetail() {
   const [maintenance, setMaintenance] = useState([]);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [editingRecord, setEditingRecord] = useState(null);
+  const [recordForm, setRecordForm] = useState(EMPTY_RECORD_FORM);
 
   useEffect(() => {
     loadAsset();
@@ -69,6 +87,53 @@ export default function AssetDetail() {
       setHistory(response.data.data || []);
     } catch (error) {
       console.error('변경 이력 로드 실패:', error);
+    }
+  };
+
+  const handleEditRecord = (record) => {
+    setEditingRecord(record);
+    setRecordForm({
+      maintenanceDate: record.maintenanceDate ? record.maintenanceDate.split('T')[0] : '',
+      maintenanceType: record.maintenanceType || 'REPAIR',
+      cost: record.cost ?? '',
+      description: record.description || '',
+      technician: record.technician || '',
+      failureType: record.failureType || '',
+    });
+  };
+
+  const closeRecordModal = () => {
+    setEditingRecord(null);
+    setRecordForm(EMPTY_RECORD_FORM);
+  };
+
+  const handleRecordSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await assetApi.updateMaintenanceRecord(id, editingRecord.id, {
+        maintenanceDate: recordForm.maintenanceDate,
+        maintenanceType: recordForm.maintenanceType,
+        cost: recordForm.cost === '' ? null : parseFloat(recordForm.cost),
+        description: recordForm.description || null,
+        technician: recordForm.technician || null,
+        failureType: recordForm.failureType || null,
+      });
+      closeRecordModal();
+      loadMaintenance();
+    } catch (error) {
+      console.error('유지보수 기록 수정 실패:', error);
+      alert('수정 중 오류가 발생했습니다.');
+    }
+  };
+
+  const handleDeleteRecord = async (recordId) => {
+    if (!confirm('이 유지보수 기록을 삭제하시겠습니까?')) return;
+    try {
+      await assetApi.deleteMaintenanceRecord(id, recordId);
+      loadMaintenance();
+    } catch (error) {
+      console.error('유지보수 기록 삭제 실패:', error);
+      alert('삭제 중 오류가 발생했습니다.');
     }
   };
 
@@ -181,9 +246,27 @@ export default function AssetDetail() {
                     <MaintenanceTypeBadge type={record.maintenanceType} />
                     <div className="text-sm text-gray-600 mt-1">{record.description}</div>
                   </div>
-                  <div className="text-right">
-                    <div className="font-medium">{record.cost?.toLocaleString()}원</div>
-                    <div className="text-sm text-gray-500">{record.maintenanceDate?.split('T')[0]}</div>
+                  <div className="text-right flex items-start gap-2">
+                    <div>
+                      <div className="font-medium">{record.cost?.toLocaleString()}원</div>
+                      <div className="text-sm text-gray-500">{record.maintenanceDate?.split('T')[0]}</div>
+                    </div>
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => handleEditRecord(record)}
+                        className="p-1.5 hover:bg-gray-100 rounded text-gray-500"
+                        title="수정"
+                      >
+                        <Edit size={14} />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteRecord(record.id)}
+                        className="p-1.5 hover:bg-red-100 rounded text-red-600"
+                        title="삭제"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   </div>
                 </div>
                 {record.technician && (
@@ -249,6 +332,79 @@ export default function AssetDetail() {
           </div>
         )}
       </div>
+
+      {editingRecord && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <h2 className="text-xl font-bold mb-4">유지보수 기록 수정</h2>
+            <form onSubmit={handleRecordSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">정비일</label>
+                <input
+                  type="date"
+                  required
+                  className="input"
+                  value={recordForm.maintenanceDate}
+                  onChange={(e) => setRecordForm({ ...recordForm, maintenanceDate: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">정비유형</label>
+                <select
+                  className="input"
+                  value={recordForm.maintenanceType}
+                  onChange={(e) => setRecordForm({ ...recordForm, maintenanceType: e.target.value })}
+                >
+                  {MAINTENANCE_TYPE_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">비용 (원)</label>
+                <input
+                  type="number"
+                  min="0"
+                  className="input"
+                  value={recordForm.cost}
+                  onChange={(e) => setRecordForm({ ...recordForm, cost: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">설명</label>
+                <input
+                  type="text"
+                  className="input"
+                  value={recordForm.description}
+                  onChange={(e) => setRecordForm({ ...recordForm, description: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">기술자</label>
+                <input
+                  type="text"
+                  className="input"
+                  value={recordForm.technician}
+                  onChange={(e) => setRecordForm({ ...recordForm, technician: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">고장유형</label>
+                <input
+                  type="text"
+                  className="input"
+                  value={recordForm.failureType}
+                  onChange={(e) => setRecordForm({ ...recordForm, failureType: e.target.value })}
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <button type="button" onClick={closeRecordModal} className="btn btn-secondary">취소</button>
+                <button type="submit" className="btn btn-primary">저장</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
