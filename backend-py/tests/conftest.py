@@ -18,7 +18,6 @@ os.environ["DATABASE_URL"] = f"sqlite:///{_TEST_DB_PATH}"
 os.environ["UPLOAD_DIRECTORY"] = str(_TEST_UPLOAD_DIR)
 os.environ.setdefault("JWT_SECRET", "test-secret-key")
 os.environ["GN_API_KEY"] = ""
-os.environ["GEMINI_API_KEY"] = ""
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 

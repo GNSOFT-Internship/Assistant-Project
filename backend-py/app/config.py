@@ -17,8 +17,8 @@ class Settings:
     DEMO_MODE: bool = os.getenv("DEMO_MODE", "true").lower() == "true"
     GN_API_KEY: str = os.getenv("GN_API_KEY", "")
     GN_MODEL: str = os.getenv("GN_MODEL", "qwen35")
-    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
-    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite")
+    GEMINI_API_KEY: str = "" # Removed
+    GEMINI_MODEL: str = "" # Removed
 
 
 settings = Settings()

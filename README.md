@@ -3,11 +3,11 @@
 본 시스템은 공공시설의 자산 등록/조회/수정/삭제 등의 기본 관리 기능부터, 월별 유지보수 예산 수립, AI 기반의 자연어 검색 및 유지보수 분석, 교체 대상 자산 추천, PDF 견적서 자동 인식 및 자동 등록, AI Q&A 및 월간 보고서 생성 등의 지능형 기능을 제공하는 종합 자산 관리 플랫폼입니다.
 
 ## 아키텍처
-- **Backend**: FastAPI (Python), SQLAlchemy, REST API, Qwen3.5 (사내 GPU 서버) / Gemini (LLM)
+- **Backend**: FastAPI (Python), SQLAlchemy, REST API, Qwen3.5 (사내 GPU 서버)
 - **Frontend**: React (Vite, Tailwind CSS)
 - **DB**: MySQL / MariaDB
 
-백엔드는 Python 단일 서비스로 통일되어 있으며, 자연어 검색 · 교체 우선순위 추천 · 유지보수 분석 · 보고서 서술 · Q&A는 모두 LLM을 호출하여 작동합니다. `GN_API_KEY`가 설정되어 있으면 사내 GPU 서버의 Qwen3.5(OpenAI 호환 엔드포인트)를 우선 사용하고, 없고 `GEMINI_API_KEY`만 설정된 경우 Gemini를 사용합니다. 둘 다 설정되지 않은 경우, 각 기능은 규칙 기반 폴백(Fallback)으로 동작하여 개발 및 데모 환경에서 키 없이도 시스템 기동 및 기본 시뮬레이션이 가능합니다.
+백엔드는 Python 단일 서비스로 통일되어 있으며, 자연어 검색 · 교체 우선순위 추천 · 유지보수 분석 · 보고서 서술 · Q&A는 모두 LLM을 호출하여 작동합니다. `GN_API_KEY`가 설정되어 있으면 사내 GPU 서버의 Qwen3.5(OpenAI 호환 엔드포인트)를 사용합니다. 설정되지 않은 경우, 각 기능은 규칙 기반 폴백(Fallback)으로 동작하여 개발 및 데모 환경에서 키 없이도 시스템 기동 및 기본 시뮬레이션이 가능합니다.
 
 ---
 
@@ -279,7 +279,6 @@ GN_MODEL=qwen35
 - **PyMySQL / cryptography**: MySQL 연결 드라이버 및 보안 모듈
 - **python-jose / passlib[bcrypt]**: JWT 인증 및 암호 해싱 처리
 - **openai**: OpenAI 및 호환 API(사내 Qwen3.5 등) 연동 클라이언트
-- **google-generativeai**: Gemini API 연동 클라이언트 (폴백 프로바이더)
 - **reportlab**: PDF 생성 라이브러리 (한글 폰트 렌더링 대응)
 - **pdfplumber**: PDF 파일의 정밀 텍스트 및 테이블 추출 도구
 - **pandas / openpyxl**: Excel/CSV 파일 분석 및 데이터 가공
