@@ -17,8 +17,8 @@ _TEST_UPLOAD_DIR = Path(__file__).parent / "test_uploads"
 os.environ["DATABASE_URL"] = f"sqlite:///{_TEST_DB_PATH}"
 os.environ["UPLOAD_DIRECTORY"] = str(_TEST_UPLOAD_DIR)
 os.environ.setdefault("JWT_SECRET", "test-secret-key")
-os.environ.setdefault("NVIDIA_API_KEY", "")
-os.environ.setdefault("GEMINI_API_KEY", "")
+os.environ["GN_API_KEY"] = ""
+os.environ["GEMINI_API_KEY"] = ""
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 

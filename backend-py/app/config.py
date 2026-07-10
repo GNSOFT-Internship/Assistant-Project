@@ -15,8 +15,8 @@ class Settings:
     JWT_EXPIRATION_SECONDS: int = int(os.getenv("JWT_EXPIRATION_SECONDS", "86400"))
     UPLOAD_DIRECTORY: str = os.getenv("UPLOAD_DIRECTORY", "./uploads")
     DEMO_MODE: bool = os.getenv("DEMO_MODE", "true").lower() == "true"
-    NVIDIA_API_KEY: str = os.getenv("NVIDIA_API_KEY", "")
-    NVIDIA_MODEL: str = os.getenv("NVIDIA_MODEL", "meta/llama-3.1-70b-instruct")
+    GN_API_KEY: str = os.getenv("GN_API_KEY", "")
+    GN_MODEL: str = os.getenv("GN_MODEL", "qwen35")
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
     GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite")
 
