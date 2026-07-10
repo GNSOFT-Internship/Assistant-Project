@@ -1,3 +1,4 @@
+import logging
 from datetime import date
 from typing import Optional
 
@@ -9,6 +10,8 @@ from .. import llm, models
 from ..database import get_db
 from ..scoring import compute_replacement_metrics
 from .assets import asset_to_dto
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
 
@@ -206,6 +209,7 @@ def natural_language_search(request: NaturalSearchRequest, db: Session = Depends
         explanation = filter_result.get("explanation") or f"'{query}'에 대한 검색 결과 {len(filtered)}건을 찾았습니다."
         has_filter = _has_filter_criteria(filter_result)
     except Exception:
+        logger.warning("자연어 검색 LLM 호출 실패, 단순 키워드 검색으로 전환", exc_info=True)
         filtered = [a for a in all_assets if query.lower() in (a.asset_name or "").lower()]
         explanation = f"'{query}'에 대한 검색 결과 {len(filtered)}건을 찾았습니다."
         has_filter = bool(filtered)
@@ -328,7 +332,7 @@ def replacement_recommendation(request: ReplacementRequest, db: Session = Depend
                     rec["reason"] = reason_by_id[rec["assetId"]]
             ai_analysis = llm_result.get("overallAnalysis", ai_analysis)
         except Exception:
-            pass
+            logger.warning("교체 추천 AI 서술 생성 실패, 규칙 기반 문구 유지", exc_info=True)
 
     return {
         "success": True,
@@ -462,7 +466,7 @@ def maintenance_analysis(
                 llm_result = llm.ask_json(_MAINTENANCE_SYSTEM_PROMPT, summary_input, _MAINTENANCE_ANALYSIS_SCHEMA, effort="medium")
                 ai_analysis = llm_result.get("analysis", ai_analysis)
             except Exception:
-                pass
+                logger.warning("유지보수 분석 AI 서술 생성 실패, 규칙 기반 문구 유지", exc_info=True)
 
     return {
         "success": True,

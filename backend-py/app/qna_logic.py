@@ -1,9 +1,12 @@
+import logging
 from datetime import date
 
 from sqlalchemy.orm import Session
 
 from . import llm, models
 from .routers.assets import asset_to_dto
+
+logger = logging.getLogger(__name__)
 
 
 def _to_source_data(assets):
@@ -111,6 +114,7 @@ def answer_question(db: Session, question: str) -> dict:
     try:
         result = llm.ask_json(_SYSTEM_PROMPT, user_message, _ANSWER_SCHEMA, effort="medium")
     except Exception:
+        logger.warning("Q&A LLM 호출 실패, 규칙 기반 폴백으로 전환", exc_info=True)
         return _fallback_answer(db, question, all_assets)
 
     has_filter = bool(result.get("hasFilter", False))

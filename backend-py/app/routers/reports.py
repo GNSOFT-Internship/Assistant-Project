@@ -1,4 +1,5 @@
 import io
+import logging
 from datetime import date, datetime
 
 from fastapi import APIRouter, Depends
@@ -15,6 +16,8 @@ from sqlalchemy.orm import Session
 from .. import llm, models
 from ..database import get_db
 from ..scoring import compute_replacement_metrics
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/reports", tags=["reports"])
 
@@ -133,6 +136,7 @@ def _generate_narrative(report_data: dict) -> dict:
         )
         return llm.ask_json(_REPORT_SYSTEM_PROMPT, user_message, _REPORT_SCHEMA, effort="high")
     except Exception:
+        logger.warning("월간 보고서 AI 서술 생성 실패, 규칙 기반 문구 유지", exc_info=True)
         return fallback
 
 
