@@ -128,8 +128,7 @@ def seed_data():
             template_list = TEMPLATES[category]
             name, base_price, useful_life = random.choice(template_list)
             
-            # 자산명에 고유 일련번호 추가하여 현실적으로 표현
-            asset_name = f"{name} (#{random.randint(10, 99)})"
+            asset_name = name
             asset_code = f"ASSET-{i:03d}"
             location = random.choice(LOCATIONS)
             responsible = f"{random.choice(['김', '이', '박', '최', '정', '강'])}{random.choice(['민수', '영희', '철수', '동현', '서연', '준우', '혜진'])}"
