@@ -1,10 +1,11 @@
-"""LLM 연동 헬퍼 (GLM-5.2 / Gemini).
+"""LLM 연동 헬퍼 (NVIDIA NIM / Gemini).
 
 자연어 검색, 유지보수 분석, 교체 추천, 보고서 생성, Q&A 등 AI 기능이
 공통으로 사용하는 LLM 호출 래퍼를 제공한다.
 
 `NVIDIA_API_KEY`가 설정되어 있으면 NVIDIA NIM(OpenAI 호환 엔드포인트)을 통해
-Z.ai의 GLM-5.2를, 없고 `GEMINI_API_KEY`가 설정되어 있으면 Gemini를 사용한다.
+meta/llama-3.1-70b-instruct 등의 모델을 사용하고,
+없고 `GEMINI_API_KEY`가 설정되어 있으면 Gemini를 사용한다.
 둘 다 없으면 각 라우터가 규칙 기반 폴백으로 동작하도록 `is_configured()`를
 노출한다.
 """
@@ -16,13 +17,13 @@ from .config import settings
 
 _NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1"
 
-_glm_client = None
+_nvidia_client = None
 _gemini_configured = False
 
 
 def _select_provider() -> Optional[str]:
     if settings.NVIDIA_API_KEY:
-        return "glm"
+        return "nvidia"
     if settings.GEMINI_API_KEY:
         return "gemini"
     return None
@@ -33,19 +34,19 @@ def is_configured() -> bool:
 
 
 # ---------------------------------------------------------------------------
-# GLM-5.2 (Z.ai, NVIDIA NIM 경유 - OpenAI 호환 엔드포인트)
+# NVIDIA NIM (OpenAI 호환 엔드포인트)
 # ---------------------------------------------------------------------------
 
-def _get_glm_client():
-    global _glm_client
-    if _glm_client is None:
+def _get_nvidia_client():
+    global _nvidia_client
+    if _nvidia_client is None:
         from openai import OpenAI
-        _glm_client = OpenAI(api_key=settings.NVIDIA_API_KEY, base_url=_NVIDIA_BASE_URL)
-    return _glm_client
+        _nvidia_client = OpenAI(api_key=settings.NVIDIA_API_KEY, base_url=_NVIDIA_BASE_URL)
+    return _nvidia_client
 
 
-def _glm_ask_text(system: str, user_message: str, max_tokens: int) -> str:
-    client = _get_glm_client()
+def _nvidia_ask_text(system: str, user_message: str, max_tokens: int) -> str:
+    client = _get_nvidia_client()
     response = client.chat.completions.create(
         model=settings.NVIDIA_MODEL,
         max_tokens=max_tokens,
@@ -57,21 +58,22 @@ def _glm_ask_text(system: str, user_message: str, max_tokens: int) -> str:
     return response.choices[0].message.content or ""
 
 
-def _glm_ask_json(system: str, user_message: str, json_schema: dict, max_tokens: int) -> dict:
-    client = _get_glm_client()
-    schema_hint = json.dumps(json_schema, ensure_ascii=False)
-    prompt = (
-        f"{user_message}\n\n"
-        f"아래 JSON 스키마에 맞는 JSON 객체만 응답하라 (다른 설명 텍스트 없이):\n{schema_hint}"
-    )
+def _nvidia_ask_json(system: str, user_message: str, json_schema: dict, max_tokens: int) -> dict:
+    client = _get_nvidia_client()
+    # NVIDIA NIM은 response_format={"type": "json_object"} 대신 extra_body의 guided_json을 사용하는 것이 공식 권장사항입니다.
+    # 이를 통해 스키마에 부합하는 구조적 데이터를 훨씬 더 정확하고 고성능으로 출력할 수 있습니다.
     response = client.chat.completions.create(
         model=settings.NVIDIA_MODEL,
         max_tokens=max_tokens,
-        response_format={"type": "json_object"},
         messages=[
             {"role": "system", "content": system},
-            {"role": "user", "content": prompt},
+            {"role": "user", "content": user_message},
         ],
+        extra_body={
+            "nvext": {
+                "guided_json": json_schema
+            }
+        }
     )
     return json.loads(response.choices[0].message.content or "{}")
 
@@ -128,8 +130,8 @@ def _gemini_ask_json(system: str, user_message: str, json_schema: dict, max_toke
 
 def ask_text(system: str, user_message: str, max_tokens: int = 2048, effort: str = "medium") -> str:
     provider = _select_provider()
-    if provider == "glm":
-        return _glm_ask_text(system, user_message, max_tokens)
+    if provider == "nvidia":
+        return _nvidia_ask_text(system, user_message, max_tokens)
     if provider == "gemini":
         return _gemini_ask_text(system, user_message, max_tokens)
     raise RuntimeError("No LLM provider configured")
@@ -143,8 +145,8 @@ def ask_json(
     effort: str = "medium",
 ) -> dict[str, Any]:
     provider = _select_provider()
-    if provider == "glm":
-        return _glm_ask_json(system, user_message, json_schema, max_tokens)
+    if provider == "nvidia":
+        return _nvidia_ask_json(system, user_message, json_schema, max_tokens)
     if provider == "gemini":
         return _gemini_ask_json(system, user_message, json_schema, max_tokens)
     raise RuntimeError("No LLM provider configured")
