@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from .. import llm, models
 from ..database import get_db
+from ..scoring import compute_replacement_metrics
 from .assets import asset_to_dto
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
@@ -226,35 +227,31 @@ _REASON_SYSTEM_PROMPT = (
 def replacement_recommendation(request: ReplacementRequest, db: Session = Depends(get_db)):
     budget = request.budget
     all_assets = db.query(models.Asset).all()
+    all_records = db.query(models.MaintenanceRecord).all()
+    records_by_asset: dict = {}
+    for r in all_records:
+        records_by_asset.setdefault(r.asset_id, []).append(r)
+
     recommendations = []
 
     for asset in all_assets:
-        records = db.query(models.MaintenanceRecord).filter(models.MaintenanceRecord.asset_id == asset.id).all()
-        maintenance_count = len(records)
-        total_repair_cost = sum(float(r.cost) if r.cost is not None else 0.0 for r in records)
-        used_years = date.today().year - asset.purchase_date.year
-
-        price = float(asset.purchase_price)
-        repair_ratio = (total_repair_cost / price) if price > 0 else 0.0
-
-        score = (used_years / max(asset.useful_life, 1)) * 40 + repair_ratio * 40 + min(maintenance_count, 10) * 2
-        if asset.status == models.AssetStatus.REPLACEMENT_NEEDED:
-            score += 20
+        records = records_by_asset.get(asset.id, [])
+        metrics = compute_replacement_metrics(asset, records)
 
         recommendations.append({
             "assetId": asset.id,
             "assetName": asset.asset_name,
             "assetCode": asset.asset_code,
-            "usedYears": used_years,
+            "usedYears": metrics["usedYears"],
             "usefulLife": asset.useful_life,
-            "maintenanceCount": maintenance_count,
-            "totalRepairCost": total_repair_cost,
-            "purchasePrice": price,
-            "score": round(score, 1),
+            "maintenanceCount": metrics["maintenanceCount"],
+            "totalRepairCost": metrics["repairCost"],
+            "purchasePrice": metrics["price"],
+            "score": metrics["score"],
             "reason": (
-                f"사용기간 {used_years}년(내용연수 {asset.useful_life}년), "
-                f"수리비가 구매가의 {repair_ratio * 100:.0f}% 수준이며 "
-                f"최근 유지보수 {maintenance_count}회가 발생했습니다."
+                f"사용기간 {metrics['usedYears']}년(내용연수 {asset.useful_life}년), "
+                f"수리비가 구매가의 {metrics['repairRatio'] * 100:.0f}% 수준이며 "
+                f"최근 유지보수 {metrics['maintenanceCount']}회가 발생했습니다."
             ),
         })
 

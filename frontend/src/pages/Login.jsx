@@ -89,8 +89,9 @@ export default function Login() {
           </form>
         </div>
 
-        <div className="text-center text-sm text-gray-500 mt-6">
-          <p>데모 계정: admin / admin123</p>
+        <div className="text-center text-sm text-gray-500 mt-6 space-y-1">
+          <p>관리자: admin / admin123</p>
+          <p>일반 사용자: user / user123</p>
         </div>
       </div>
     </div>

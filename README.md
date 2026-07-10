@@ -73,9 +73,8 @@ Assistant-Project/
 │   ├── src/
 │   │   ├── components/      # 네비게이션 레이아웃, 공용 Badge 등 공통 컴포넌트
 │   │   ├── context/         # AuthContext (인증 및 전역 로그인 상태 관리)
-│   │   ├── pages/           # 개별 화면 (대시보드, 자산 상세, 예산 설정, 파일 분석 등)
+│   │   ├── pages/           # 개별 화면 (대시보드, 자산 상세, 예산 설정, 파일 분석 등. React.lazy로 코드 스플리팅)
 │   │   ├── services/        # Axios 기반 API 연동 모듈 (api.js)
-│   │   ├── utils/           # 유틸리티 함수
 │   │   ├── App.jsx          # 프론트엔드 라우팅 및 렌더링 루트
 │   │   └── index.css        # 스타일 시트 (네비게이션 화살표 스타일 추가)
 │   └── package.json         # 프론트엔드 패키지 의존성 파일
@@ -120,8 +119,24 @@ npm run dev
 ---
 
 ## 데모 계정
-- **관리자 계정**: admin / admin123
-- **일반 계정**: user / user123
+- **관리자 계정**: admin / admin123 — 자산/예산/유지보수 이력/파일업로드 등록·수정·삭제 등 모든 기능 사용 가능
+- **일반 계정**: user / user123 — 조회 전용. 등록/수정/삭제 등 쓰기 작업은 서버에서 403으로 차단되며, 프론트엔드에서도 관련 버튼이 노출되지 않음
+
+---
+
+## 역할 기반 권한(RBAC)
+`app_user.role`이 `ADMIN`/`USER` 두 등급으로 나뉘며, 자산·예산·유지보수 이력·파일 업로드의 생성/수정/삭제 엔드포인트는 `require_admin` 의존성으로 보호됩니다. `USER` 역할은 조회(GET) 엔드포인트만 호출할 수 있고, 쓰기 요청은 403 Forbidden으로 거부됩니다.
+
+---
+
+## 테스트
+
+```bash
+cd backend-py
+pytest
+```
+
+pytest + FastAPI TestClient + SQLite 인메모리 DB 기반으로 인증, 자산 CRUD, 파일 업로드, 권한 분리, AI 게이팅, 챗봇 이력 저장 등을 검증하는 자동화 테스트가 `backend-py/tests/`에 있습니다. 각 테스트는 트랜잭션 롤백으로 격리되어 서로 영향을 주지 않습니다.
 
 ---
 
@@ -152,7 +167,8 @@ npm run dev
 - `POST /api/ai/replacement-recommendation` - 교체 우선순위 추천 (예산 제약 조건 대응)
 - `GET /api/ai/maintenance-analysis` - 유지보수 비용/고장 유형 AI 종합 분석 (기간 범위 필터 지원)
 - `GET /api/ai/maintenance-analysis/failure-assets` - 특정 고장 유형이 발생한 자산 목록 및 발생 빈도 조회
-- `POST /api/ai/qa` / `POST /api/qa/ask` - 자산/유지보수 데이터 컨텍스트 기반 AI 챗봇 질의응답
+- `POST /api/qa/ask` - 자산/유지보수 데이터 컨텍스트 기반 AI 챗봇 질의응답 (대화 내용은 계정별로 저장되어 탭 이동 후에도 유지)
+- `GET /api/chat/history` / `DELETE /api/chat/history` - AI 챗봇 대화 이력 조회 및 초기화
 - `GET /api/reports/monthly` - 월간 종합 분석 보고서 데이터 조회
 - `GET /api/reports/monthly/pdf` - 월간 보고서 PDF 다운로드 (한글 폰트 내장)
 - `GET /api/dashboard` - 대시보드 통계 및 실시간 예산 대비 소진율 현황 조회
@@ -176,7 +192,7 @@ UPLOAD_DIRECTORY=./uploads
 DEMO_MODE=true
 # Anthropic API Key (AI 기능 실구동 시 필수 입력)
 ANTHROPIC_API_KEY=
-ANTHROPIC_MODEL=claude-3-5-sonnet
+ANTHROPIC_MODEL=claude-opus-4-8
 ```
 ---
 

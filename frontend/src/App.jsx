@@ -1,18 +1,19 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import ErrorBoundary from './components/ErrorBoundary';
 import Login from './pages/Login';
-import Dashboard from './pages/Dashboard';
-import Assets from './pages/Assets';
-import AssetDetail from './pages/AssetDetail';
-import Maintenance from './pages/Maintenance';
-import Recommendations from './pages/Recommendations';
-import AiAssistant from './pages/AiAssistant';
-import FileUpload from './pages/FileUpload';
-import Reports from './pages/Reports';
-import Budget from './pages/Budget';
 import Layout from './components/Layout';
+
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Assets = lazy(() => import('./pages/Assets'));
+const AssetDetail = lazy(() => import('./pages/AssetDetail'));
+const Maintenance = lazy(() => import('./pages/Maintenance'));
+const Recommendations = lazy(() => import('./pages/Recommendations'));
+const AiAssistant = lazy(() => import('./pages/AiAssistant'));
+const FileUpload = lazy(() => import('./pages/FileUpload'));
+const Reports = lazy(() => import('./pages/Reports'));
+const Budget = lazy(() => import('./pages/Budget'));
 
 function RequireAuth({ children }) {
   const { isAuthenticated, loading } = useAuth();
@@ -44,15 +45,78 @@ function App() {
               }
             >
               <Route index element={<Navigate to="/dashboard" replace />} />
-              <Route path="dashboard" element={<Dashboard />} />
-              <Route path="assets" element={<Assets />} />
-              <Route path="assets/:id" element={<AssetDetail />} />
-              <Route path="maintenance" element={<Maintenance />} />
-              <Route path="recommendations" element={<Recommendations />} />
-              <Route path="qa" element={<AiAssistant />} />
-              <Route path="files" element={<FileUpload />} />
-              <Route path="reports" element={<Reports />} />
-              <Route path="budget" element={<Budget />} />
+              <Route
+                path="dashboard"
+                element={
+                  <Suspense fallback={null}>
+                    <Dashboard />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="assets"
+                element={
+                  <Suspense fallback={null}>
+                    <Assets />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="assets/:id"
+                element={
+                  <Suspense fallback={null}>
+                    <AssetDetail />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="maintenance"
+                element={
+                  <Suspense fallback={null}>
+                    <Maintenance />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="recommendations"
+                element={
+                  <Suspense fallback={null}>
+                    <Recommendations />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="qa"
+                element={
+                  <Suspense fallback={null}>
+                    <AiAssistant />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="files"
+                element={
+                  <Suspense fallback={null}>
+                    <FileUpload />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="reports"
+                element={
+                  <Suspense fallback={null}>
+                    <Reports />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="budget"
+                element={
+                  <Suspense fallback={null}>
+                    <Budget />
+                  </Suspense>
+                }
+              />
             </Route>
           </Routes>
         </AuthProvider>

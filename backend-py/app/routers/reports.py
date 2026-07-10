@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from .. import llm, models
 from ..database import get_db
+from ..scoring import compute_replacement_metrics
 
 router = APIRouter(prefix="/api/reports", tags=["reports"])
 
@@ -71,20 +72,14 @@ def _build_report_data(db: Session) -> dict:
     replacement_candidates = []
     for a in all_assets:
         records = records_by_asset.get(a.id, [])
-        used_years = today.year - a.purchase_date.year
-        price = float(a.purchase_price)
-        repair_cost = sum(float(r.cost) if r.cost is not None else 0.0 for r in records)
-        repair_ratio = (repair_cost / price) if price > 0 else 0.0
-        score = (used_years / max(a.useful_life, 1)) * 40 + repair_ratio * 40 + min(len(records), 10) * 2
-        if a.status == models.AssetStatus.REPLACEMENT_NEEDED:
-            score += 20
+        metrics = compute_replacement_metrics(a, records, today=today)
         replacement_candidates.append({
             "assetName": a.asset_name,
             "assetCode": a.asset_code,
-            "usedYears": used_years,
+            "usedYears": metrics["usedYears"],
             "usefulLife": a.useful_life,
-            "repairRatio": repair_ratio,
-            "score": round(score, 1),
+            "repairRatio": metrics["repairRatio"],
+            "score": metrics["score"],
         })
     replacement_candidates.sort(key=lambda r: r["score"], reverse=True)
     top_candidates = replacement_candidates[:5]

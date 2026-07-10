@@ -41,11 +41,14 @@ def get_dashboard_data(db: Session = Depends(get_db)):
     else:
         budget_consumption_rate = None
 
-    if settings.DEMO_MODE:
+    # DEMO_MODE의 지터는 실제 데이터가 없을 때만 적용한다. 실제 자산/유지보수
+    # 데이터가 있으면 그대로 보여주고, 데이터가 전혀 없는 빈 데모 환경에서만
+    # 화면이 밋밋해 보이지 않도록 약간의 변동을 더한다.
+    if settings.DEMO_MODE and total_assets == 0:
         factor = 1.0 + (random.random() * 0.2 - 0.1)
         current_month_cost *= factor
         operation_rate = max(0.0, min(100.0, operation_rate + random.random() * 4 - 2))
-        if current_budget is None:
+        if current_budget is None and budget_consumption_rate is not None:
             budget_consumption_rate *= factor
 
     data = {
