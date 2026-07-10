@@ -125,15 +125,15 @@ export default function FileUpload() {
           <div className="space-y-4">
             {files.map((file) => (
               <div key={file.id} className="border rounded-lg p-4">
-                <div className="flex justify-between items-start mb-2">
-                  <div className="flex items-center gap-2">
-                    <FileText className="text-blue-600" size={20} />
-                    <div>
-                      <div className="font-medium">{file.originalFilename}</div>
+                <div className="flex justify-between items-start mb-2 flex-wrap gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <FileText className="text-blue-600 flex-shrink-0" size={20} />
+                    <div className="min-w-0">
+                      <div className="font-medium break-all">{file.originalFilename}</div>
                       <div className="text-sm text-gray-500">{file.fileType}</div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-shrink-0">
                     <FileStatusBadge status={file.status} />
                     {file.applied && <span className="badge-blue">적용됨</span>}
                   </div>

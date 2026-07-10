@@ -31,13 +31,19 @@ export default function Maintenance() {
 
   const startMonth = buildYearMonth(startYear, startMonthNum);
   const endMonth = buildYearMonth(endYear, endMonthNum);
+  const rangeInvalid = Boolean(startMonth && endMonth && startMonth > endMonth);
 
   useEffect(() => {
+    if (rangeInvalid) {
+      setLoading(false);
+      return;
+    }
     loadAnalysis();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [startMonth, endMonth]);
+  }, [startMonth, endMonth, rangeInvalid]);
 
   const loadAnalysis = async () => {
+    setLoading(true);
     try {
       const response = await aiApi.getMaintenanceAnalysis({ startMonth, endMonth });
       setAnalysis(response.data.data);
@@ -182,7 +188,12 @@ export default function Maintenance() {
                 )}
               </div>
             </div>
-            {failureChartData.length === 0 ? (
+            {rangeInvalid && (
+              <div className="mb-3 text-sm text-red-600 bg-red-50 rounded px-3 py-2">
+                종료월이 시작월보다 빠릅니다. 범위를 다시 선택해주세요.
+              </div>
+            )}
+            {rangeInvalid ? null : failureChartData.length === 0 ? (
               <div className="h-[250px] flex items-center justify-center text-gray-400 text-sm">
                 표시할 고장 유형 데이터가 없습니다.
               </div>
@@ -234,7 +245,11 @@ export default function Maintenance() {
               </span>
             )}
           </h3>
-          {failureEntries.length === 0 ? (
+          {rangeInvalid ? (
+            <div className="text-center text-red-600 text-sm py-6">
+              종료월이 시작월보다 빠릅니다. 범위를 다시 선택해주세요.
+            </div>
+          ) : failureEntries.length === 0 ? (
             <div className="text-center text-gray-400 text-sm py-6">
               해당 기간에 표시할 고장 유형 데이터가 없습니다.
             </div>

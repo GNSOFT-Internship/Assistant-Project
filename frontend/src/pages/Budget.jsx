@@ -9,6 +9,7 @@ export default function Budget() {
   const [inputs, setInputs] = useState({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(null);
+  const [savingAll, setSavingAll] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -54,21 +55,56 @@ export default function Budget() {
     }
   };
 
+  const handleSaveAll = async () => {
+    const entries = Object.entries(inputs).filter(([, raw]) => raw !== '' && raw != null);
+    if (entries.length === 0) {
+      alert('저장할 예산이 없습니다. 최소 한 달 이상 금액을 입력하세요.');
+      return;
+    }
+    const invalid = entries.find(([, raw]) => Number.isNaN(parseFloat(raw)) || parseFloat(raw) < 0);
+    if (invalid) {
+      alert(`${invalid[0]}월 금액이 올바르지 않습니다.`);
+      return;
+    }
+
+    setSavingAll(true);
+    try {
+      await Promise.all(
+        entries.map(([month, raw]) => budgetApi.set(year, Number(month), parseFloat(raw)))
+      );
+      await load();
+    } catch (error) {
+      console.error('일괄 저장 실패:', error);
+      alert('일괄 저장 중 오류가 발생했습니다.');
+    } finally {
+      setSavingAll(false);
+    }
+  };
+
   if (loading) return <div className="card">로딩 중...</div>;
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center flex-wrap gap-2">
         <h1 className="text-2xl font-bold">예산 관리</h1>
-        <select
-          value={year}
-          onChange={(e) => setYear(parseInt(e.target.value, 10))}
-          className="input w-32"
-        >
-          {[year - 1, year, year + 1].map((y) => (
-            <option key={y} value={y}>{y}년</option>
-          ))}
-        </select>
+        <div className="flex items-center gap-2">
+          <select
+            value={year}
+            onChange={(e) => setYear(parseInt(e.target.value, 10))}
+            className="input w-32"
+          >
+            {[year - 1, year, year + 1].map((y) => (
+              <option key={y} value={y}>{y}년</option>
+            ))}
+          </select>
+          <button
+            onClick={handleSaveAll}
+            disabled={savingAll}
+            className="btn btn-primary flex items-center gap-1"
+          >
+            <Save size={14} /> {savingAll ? '저장 중...' : '전체 저장'}
+          </button>
+        </div>
       </div>
 
       <div className="card">
