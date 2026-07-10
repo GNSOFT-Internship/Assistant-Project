@@ -44,12 +44,17 @@ def get_dashboard_data(db: Session = Depends(get_db)):
     # DEMO_MODE의 지터는 실제 데이터가 없을 때만 적용한다. 실제 자산/유지보수
     # 데이터가 있으면 그대로 보여주고, 데이터가 전혀 없는 빈 데모 환경에서만
     # 화면이 밋밋해 보이지 않도록 약간의 변동을 더한다.
+    is_simulated = False
     if settings.DEMO_MODE and total_assets == 0:
         factor = 1.0 + (random.random() * 0.2 - 0.1)
         current_month_cost *= factor
         operation_rate = max(0.0, min(100.0, operation_rate + random.random() * 4 - 2))
         if current_budget is None and budget_consumption_rate is not None:
             budget_consumption_rate *= factor
+        is_simulated = True
+    elif current_budget is None and budget_consumption_rate is not None:
+        # 예산 소진율만 실제 예산이 없어 임의 기본값(45%)을 쓰는 경우
+        is_simulated = True
 
     data = {
         "currentMonthMaintenanceCost": current_month_cost,
@@ -60,6 +65,6 @@ def get_dashboard_data(db: Session = Depends(get_db)):
         "totalAssets": total_assets,
         "activeAssets": active_assets,
         "replacementNeededAssets": replacement_needed_assets,
-        "isSimulated": settings.DEMO_MODE,
+        "isSimulated": is_simulated,
     }
     return {"success": True, "message": None, "data": data}
