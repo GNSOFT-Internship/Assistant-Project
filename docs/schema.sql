@@ -3,8 +3,8 @@
 CREATE DATABASE IF NOT EXISTS asset_management;
 USE asset_management;
 
--- User 테이블 (권한 관리)
-CREATE TABLE `user` (
+-- User 테이블 (권한 관리 - 기존 user에서 app_user로 테이블명 동기화)
+CREATE TABLE `app_user` (
     `id` BIGINT PRIMARY KEY AUTO_INCREMENT,
     `username` VARCHAR(50) NOT NULL UNIQUE,
     `password` VARCHAR(255) NOT NULL,
@@ -42,7 +42,7 @@ CREATE TABLE `maintenance_record` (
     `maintenance_type` ENUM('ROUTINE', 'REPAIR', 'REPLACEMENT', 'INSPECTION') NOT NULL,
     `cost` DECIMAL(15, 2) NOT NULL,
     `description` TEXT,
-    ` technician` VARCHAR(100),
+    `technician` VARCHAR(100),
     `failure_type` VARCHAR(200),
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -66,19 +66,47 @@ CREATE TABLE `file_upload` (
     `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
--- Q&A History 테이블 (질문-답변 이력)
-CREATE TABLE `qa_history` (
+-- AssetAuditLog 테이블 (자산 변경 로그)
+CREATE TABLE `asset_audit_log` (
     `id` BIGINT PRIMARY KEY AUTO_INCREMENT,
-    `question` TEXT NOT NULL,
-    `answer` TEXT NOT NULL,
-    `source_data` JSON,
-    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    `asset_id` BIGINT NOT NULL,
+    `asset_code` VARCHAR(50),
+    `action` ENUM('CREATE', 'UPDATE', 'DELETE') NOT NULL,
+    `changed_by` VARCHAR(50),
+    `changes` TEXT,
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX `idx_audit_asset_id` (`asset_id`)
+);
+
+-- ChatMessage 테이블 (대화 기록)
+CREATE TABLE `chat_message` (
+    `id` BIGINT PRIMARY KEY AUTO_INCREMENT,
+    `user_id` BIGINT NOT NULL,
+    `role` ENUM('USER', 'AI') NOT NULL,
+    `content` TEXT NOT NULL,
+    `assets` TEXT,
+    `has_filter` BOOLEAN DEFAULT FALSE,
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (`user_id`) REFERENCES `app_user`(`id`) ON DELETE CASCADE,
+    INDEX `idx_chat_user_id` (`user_id`),
+    INDEX `idx_chat_created_at` (`created_at`)
+);
+
+-- Budget 테이블 (월별 예산 배정)
+CREATE TABLE `budget` (
+    `id` BIGINT PRIMARY KEY AUTO_INCREMENT,
+    `year` INT NOT NULL,
+    `month` INT NOT NULL,
+    `allocated_amount` DECIMAL(15, 2) NOT NULL,
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY `uq_budget_year_month` (`year`, `month`)
 );
 
 -- 더미 데이터 삽입
 
--- 관리자 계정 (password: admin123)
-INSERT INTO `user` (`username`, `password`, `role`, `email`) VALUES
+-- 관리자/사용자 계정 (password: admin123)
+INSERT INTO `app_user` (`username`, `password`, `role`, `email`) VALUES
 ('admin', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', 'ADMIN', 'admin@example.com'),
 ('user1', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', 'USER', 'user1@example.com');
 

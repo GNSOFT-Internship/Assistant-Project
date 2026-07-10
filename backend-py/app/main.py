@@ -37,6 +37,19 @@ app.include_router(reports.router, dependencies=_auth_dep)
 def on_startup():
     Base.metadata.create_all(bind=engine)
     seed_initial_users()
+    
+    from .config import settings
+    # JWT_SECRET 보안성 경고 검증
+    if not settings.DEMO_MODE and settings.JWT_SECRET == "asset-management-secret-key-for-development":
+        import warnings
+        warnings.warn(
+            "SECURITY WARNING: JWT_SECRET is set to the default development key. "
+            "Please configure a secure JWT_SECRET in your production .env file to prevent token forgery.",
+            UserWarning
+        )
+        print("\n" + "=" * 80)
+        print("[WARNING] SECURITY RISK: Default JWT_SECRET is active in non-demo mode!")
+        print("=" * 80 + "\n")
 
 
 def seed_initial_users():
