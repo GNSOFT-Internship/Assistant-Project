@@ -230,9 +230,7 @@ export default function Assets() {
                 <th className="table-cell cursor-pointer select-none" onClick={() => handleSort('assetCode')}>
                   <span className="flex items-center gap-1">자산번호 <SortIcon column="assetCode" /></span>
                 </th>
-                <th className="table-cell cursor-pointer select-none" onClick={() => handleSort('category')}>
-                  <span className="flex items-center gap-1">카테고리 <SortIcon column="category" /></span>
-                </th>
+                <th className="table-cell">카테고리</th>
                 <th className="table-cell">위치</th>
                 <th className="table-cell cursor-pointer select-none" onClick={() => handleSort('purchaseDate')}>
                   <span className="flex items-center gap-1">구매일 <SortIcon column="purchaseDate" /></span>

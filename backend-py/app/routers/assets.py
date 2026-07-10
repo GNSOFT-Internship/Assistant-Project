@@ -119,7 +119,6 @@ def _log_change(
 _ASSET_SORT_COLUMNS = {
     "assetName": models.Asset.asset_name,
     "assetCode": models.Asset.asset_code,
-    "category": models.Asset.category,
     "purchaseDate": models.Asset.purchase_date,
     "purchasePrice": models.Asset.purchase_price,
     "status": models.Asset.status,
