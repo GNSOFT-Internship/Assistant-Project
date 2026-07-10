@@ -138,6 +138,25 @@ class AssetAuditLog(Base):
     created_at = Column(DateTime, server_default=func.now())
 
 
+class ChatRole(str, enum.Enum):
+    USER = "USER"
+    AI = "AI"
+
+
+class ChatMessage(Base):
+    """AI 어시스턴트 대화 기록. 계정별로 남겨서 탭을 이동하거나 새로고침해도
+    다시 질문할 필요 없이 이전 대화를 이어볼 수 있게 한다."""
+    __tablename__ = "chat_message"
+
+    id = Column(BigIntegerPK, primary_key=True, autoincrement=True)
+    user_id = Column(BigInteger, ForeignKey("app_user.id", ondelete="CASCADE"), nullable=False, index=True)
+    role = Column(Enum(ChatRole), nullable=False)
+    content = Column(Text, nullable=False)
+    assets = Column(Text, nullable=True)  # AI 답변에 연관된 자산 목록(JSON), 없으면 null
+    has_filter = Column(Boolean, default=False)
+    created_at = Column(DateTime, server_default=func.now(), index=True)
+
+
 class Budget(Base):
     __tablename__ = "budget"
     __table_args__ = (UniqueConstraint("year", "month", name="uq_budget_year_month"),)

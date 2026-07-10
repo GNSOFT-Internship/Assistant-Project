@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Send, Bot, User } from 'lucide-react';
-import { aiApi, assetApi } from '../services/api';
+import { Send, Bot, User, Trash2 } from 'lucide-react';
+import { aiApi, assetApi, chatApi } from '../services/api';
 import { AssetStatusBadge, MaintenanceTypeBadge } from '../components/StatusBadge';
 
 export default function AiAssistant() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(true);
   const [viewingAsset, setViewingAsset] = useState(null);
   const [viewingMaintenance, setViewingMaintenance] = useState([]);
   const [loadingAssetDetail, setLoadingAssetDetail] = useState(false);
@@ -20,6 +21,36 @@ export default function AiAssistant() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  useEffect(() => {
+    const loadHistory = async () => {
+      try {
+        const res = await chatApi.getHistory();
+        const history = (res.data.data || []).map((m) => ({
+          type: m.role === 'USER' ? 'user' : 'ai',
+          content: m.content,
+          assets: m.assets || [],
+        }));
+        setMessages(history);
+      } catch (error) {
+        console.error('대화 기록 로드 실패:', error);
+      } finally {
+        setLoadingHistory(false);
+      }
+    };
+    loadHistory();
+  }, []);
+
+  const handleClearHistory = async () => {
+    if (!confirm('대화 기록을 모두 삭제하시겠습니까?')) return;
+    try {
+      await chatApi.clearHistory();
+      setMessages([]);
+    } catch (error) {
+      console.error('대화 기록 삭제 실패:', error);
+      alert('대화 기록 삭제 중 오류가 발생했습니다.');
+    }
+  };
 
   const handleAssetClick = async (assetId) => {
     setViewingAsset({});
@@ -82,9 +113,20 @@ export default function AiAssistant() {
   return (
     <div className="space-y-6">
       <div className="card">
-        <h1 className="text-2xl font-bold mb-4">AI 어시스턴트</h1>
+        <div className="flex items-start justify-between gap-2 mb-4">
+          <h1 className="text-2xl font-bold">AI 어시스턴트</h1>
+          {messages.length > 0 && (
+            <button
+              onClick={handleClearHistory}
+              className="btn btn-secondary flex items-center gap-1 text-sm flex-shrink-0"
+            >
+              <Trash2 size={14} /> 대화 초기화
+            </button>
+          )}
+        </div>
         <p className="text-sm text-gray-500 mb-4">
           자산 현황을 질문하거나, 조건에 맞는 자산을 자연어로 찾아보세요. 필요하면 관련 자산 목록도 함께 보여드립니다.
+          대화 내용은 계정에 저장되어 다른 페이지에 다녀와도 이어집니다.
         </p>
 
         <div className="bg-gray-50 rounded-lg p-4 mb-4">
@@ -103,7 +145,11 @@ export default function AiAssistant() {
         </div>
 
         <div className="border rounded-lg h-[28rem] overflow-y-auto p-4 bg-white space-y-4">
-          {messages.length === 0 && (
+          {loadingHistory ? (
+            <div className="h-full flex items-center justify-center text-gray-500">
+              대화 기록을 불러오는 중...
+            </div>
+          ) : messages.length === 0 && (
             <div className="h-full flex items-center justify-center text-gray-500">
               질문을 입력하세요.
             </div>

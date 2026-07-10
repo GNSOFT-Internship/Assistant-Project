@@ -82,6 +82,11 @@ export const fileApi = {
   delete: (id) => api.delete(`/files/${id}`),
 };
 
+export const chatApi = {
+  getHistory: () => api.get('/chat/history'),
+  clearHistory: () => api.delete('/chat/history'),
+};
+
 export const reportApi = {
   getMonthly: () => api.get('/reports/monthly'),
   downloadPdf: () => api.get('/reports/monthly/pdf', { responseType: 'blob' }),
