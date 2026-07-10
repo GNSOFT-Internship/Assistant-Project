@@ -60,22 +60,29 @@ def _nvidia_ask_text(system: str, user_message: str, max_tokens: int) -> str:
 
 def _nvidia_ask_json(system: str, user_message: str, json_schema: dict, max_tokens: int) -> dict:
     client = _get_nvidia_client()
-    # NVIDIA NIM은 response_format={"type": "json_object"} 대신 extra_body의 guided_json을 사용하는 것이 공식 권장사항입니다.
-    # 이를 통해 스키마에 부합하는 구조적 데이터를 훨씬 더 정확하고 고성능으로 출력할 수 있습니다.
+    # nvext.guided_json은 모델에 따라 무시될 수 있어(예: meta/llama-3.1-70b-instruct는
+    # 스키마를 강제하지 않고 일반 산문으로 응답), Gemini와 동일하게 프롬프트에 스키마를
+    # 명시해 요청하고 응답 텍스트를 JSON으로 파싱하는 방식을 사용한다.
+    schema_hint = json.dumps(json_schema, ensure_ascii=False)
+    prompt = (
+        f"{user_message}\n\n"
+        f"아래 JSON 스키마에 맞는 JSON 객체만 응답하라 (다른 설명 텍스트나 마크다운 코드블록 없이):\n{schema_hint}"
+    )
     response = client.chat.completions.create(
         model=settings.NVIDIA_MODEL,
         max_tokens=max_tokens,
         messages=[
             {"role": "system", "content": system},
-            {"role": "user", "content": user_message},
+            {"role": "user", "content": prompt},
         ],
-        extra_body={
-            "nvext": {
-                "guided_json": json_schema
-            }
-        }
     )
-    return json.loads(response.choices[0].message.content or "{}")
+    content = (response.choices[0].message.content or "").strip()
+    if content.startswith("```"):
+        content = content.strip("`")
+        if content.lower().startswith("json"):
+            content = content[4:]
+        content = content.strip()
+    return json.loads(content)
 
 
 # ---------------------------------------------------------------------------
