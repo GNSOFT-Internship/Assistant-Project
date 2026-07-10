@@ -46,6 +46,32 @@ def test_maintenance_analysis_includes_ai_when_requested(client, admin_headers):
     assert isinstance(data["aiAnalysis"], str) and len(data["aiAnalysis"]) > 0
 
 
+def test_maintenance_analysis_ai_text_respects_selected_range(client, admin_headers):
+    """전체 기간에 기록이 많아도, 범위를 좁히면 AI 서술은 그 범위 건수만 반영해야 한다."""
+    asset = client.post("/api/assets", json=ASSET_PAYLOAD, headers=admin_headers).json()["data"]
+    asset_id = asset["id"]
+    # 범위 밖(2023년)에 3건, 범위 안(2024-05)에 1건을 심는다.
+    for month in ("2023-01-15", "2023-03-15", "2023-06-15"):
+        client.post(
+            f"/api/assets/{asset_id}/maintenance",
+            json={**MAINTENANCE_PAYLOAD, "maintenanceDate": month},
+            headers=admin_headers,
+        )
+    client.post(f"/api/assets/{asset_id}/maintenance", json=MAINTENANCE_PAYLOAD, headers=admin_headers)
+
+    resp = client.get(
+        "/api/ai/maintenance-analysis?startMonth=2024-05&endMonth=2024-05&includeAi=true",
+        headers=admin_headers,
+    )
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    # 상단 통계 카드는 의도적으로 전체 기간 기준이라 4건 전부 잡힌다.
+    assert data["statistics"]["totalRecords"] == 4
+    # 하지만 AI 서술은 선택 범위(2024-05)의 1건만 반영해야 한다.
+    assert "1건" in data["aiAnalysis"]
+    assert "4건" not in data["aiAnalysis"]
+
+
 def test_monthly_report_skips_ai_narrative_by_default(client, admin_headers):
     resp = client.get("/api/reports/monthly", headers=admin_headers)
     assert resp.status_code == 200

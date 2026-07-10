@@ -440,26 +440,50 @@ def maintenance_analysis(
 
     ai_analysis = None
     if includeAi:
+        # AI 서술은 화면 상단의 "전체 기간" 통계 카드와 달리, 사용자가 선택한
+        # startMonth~endMonth 범위를 실제로 반영해야 한다. 그렇지 않으면
+        # 범위를 좁혀도 AI가 전체 기간 기준으로 답하는 것처럼 보인다.
+        ai_records = [r for r in all_records if _in_month_range(r, startMonth, endMonth)]
+        ai_total_records = len(ai_records)
+        ai_total_cost = sum(float(r.cost) if r.cost is not None else 0.0 for r in ai_records)
+
+        ai_failure_count_by_asset: dict = {}
+        for r in ai_records:
+            if r.maintenance_type == models.MaintenanceType.REPAIR:
+                ai_failure_count_by_asset[r.asset_id] = ai_failure_count_by_asset.get(r.asset_id, 0) + 1
+        ai_repeated_failure_count = sum(1 for c in ai_failure_count_by_asset.values() if c >= 2)
+
+        ai_monthly_costs: dict = {}
+        for r in ai_records:
+            key = f"{r.maintenance_date.year}-{r.maintenance_date.month:02d}"
+            ai_monthly_costs[key] = ai_monthly_costs.get(key, 0.0) + (float(r.cost) if r.cost is not None else 0.0)
+        ai_monthly_costs = dict(sorted(ai_monthly_costs.items()))
+
         ai_analysis = (
             "분석할 유지보수 데이터가 없습니다."
-            if total_records == 0
+            if ai_total_records == 0
             else (
-                f"총 {total_records}건의 유지보수 기록이 있으며, 누적 비용은 {total_cost:,.0f}원입니다. "
-                f"반복 고장 자산은 {repeated_failure_count}건입니다."
+                f"총 {ai_total_records}건의 유지보수 기록이 있으며, 누적 비용은 {ai_total_cost:,.0f}원입니다. "
+                f"반복 고장 자산은 {ai_repeated_failure_count}건입니다."
             )
         )
 
-        if total_records > 0 and llm.is_configured():
+        if ai_total_records > 0 and llm.is_configured():
             try:
                 repeated_names = [
                     f"{all_assets[aid].asset_name}({cnt}회)"
-                    for aid, cnt in sorted(failure_count_by_asset.items(), key=lambda x: -x[1])
+                    for aid, cnt in sorted(ai_failure_count_by_asset.items(), key=lambda x: -x[1])
                     if aid in all_assets and cnt >= 2
                 ]
+                period_line = (
+                    f"분석 대상 기간: {startMonth or '전체'} ~ {endMonth or '전체'}\n"
+                    if (startMonth or endMonth) else ""
+                )
                 summary_input = (
-                    f"총 유지보수 건수: {total_records}\n"
-                    f"누적 비용: {total_cost:,.0f}원\n"
-                    f"월별 비용: {monthly_costs}\n"
+                    f"{period_line}"
+                    f"총 유지보수 건수: {ai_total_records}\n"
+                    f"누적 비용: {ai_total_cost:,.0f}원\n"
+                    f"월별 비용: {ai_monthly_costs}\n"
                     f"반복 고장 자산: {', '.join(repeated_names) if repeated_names else '없음'}\n"
                     f"고장 유형 빈도: {failure_patterns}"
                 )
