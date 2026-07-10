@@ -211,7 +211,11 @@ def get_all_files(db: Session = Depends(get_db)):
 
 
 @router.post("/upload")
-async def upload_file(file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def upload_file(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(auth.require_admin),
+):
     try:
         os.makedirs(settings.UPLOAD_DIRECTORY, exist_ok=True)
         original_filename = file.filename
@@ -240,7 +244,11 @@ async def upload_file(file: UploadFile = File(...), db: Session = Depends(get_db
 
 
 @router.post("/{file_id}/process")
-def process_file(file_id: int, db: Session = Depends(get_db)):
+def process_file(
+    file_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(auth.require_admin),
+):
     file_upload = db.query(models.FileUpload).filter(models.FileUpload.id == file_id).first()
     if file_upload is None:
         raise HTTPException(status_code=400, detail="File not found")
@@ -313,7 +321,7 @@ def process_file(file_id: int, db: Session = Depends(get_db)):
 def apply_file(
     file_id: int,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(auth.get_current_user),
+    current_user: dict = Depends(auth.require_admin),
 ):
     file_upload = db.query(models.FileUpload).filter(models.FileUpload.id == file_id).first()
     if file_upload is None:
@@ -428,7 +436,7 @@ def apply_file(
 def unapply_file(
     file_id: int,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(auth.get_current_user),
+    current_user: dict = Depends(auth.require_admin),
 ):
     file_upload = db.query(models.FileUpload).filter(models.FileUpload.id == file_id).first()
     if file_upload is None:
@@ -494,7 +502,11 @@ def unapply_file(
 
 
 @router.delete("/{file_id}")
-def delete_file(file_id: int, db: Session = Depends(get_db)):
+def delete_file(
+    file_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(auth.require_admin),
+):
     file_upload = db.query(models.FileUpload).filter(models.FileUpload.id == file_id).first()
     if file_upload is None:
         raise HTTPException(status_code=400, detail="File not found")

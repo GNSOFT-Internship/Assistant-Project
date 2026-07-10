@@ -2,8 +2,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import { fileApi } from '../services/api';
 import { Upload, FileText, CheckCircle, XCircle, Loader, Play, Download } from 'lucide-react';
 import { FileStatusBadge } from '../components/StatusBadge';
+import { useAuth } from '../context/AuthContext';
 
 export default function FileUpload() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
   const [files, setFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
@@ -89,29 +92,35 @@ export default function FileUpload() {
     <div className="space-y-6">
       <div className="card">
         <h1 className="text-2xl font-bold mb-4">파일 업로드 및 AI 분석</h1>
-        
-        <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".csv,.xlsx,.xls,.pdf"
-            onChange={handleUpload}
-            className="hidden"
-          />
-          
-          <Upload className="mx-auto text-gray-400 mb-4" size={48} />
-          <div className="text-gray-600 mb-4">
-            유지보수 내역서 (엑셀/CSV) 나 수리 견적서 (PDF) 를 업로드하세요.
+
+        {isAdmin ? (
+          <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv,.xlsx,.xls,.pdf"
+              onChange={handleUpload}
+              className="hidden"
+            />
+
+            <Upload className="mx-auto text-gray-400 mb-4" size={48} />
+            <div className="text-gray-600 mb-4">
+              유지보수 내역서 (엑셀/CSV) 나 수리 견적서 (PDF) 를 업로드하세요.
+            </div>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="btn btn-primary flex items-center gap-2 mx-auto"
+            >
+              <Upload size={16} />
+              {uploading ? '업로드 중...' : '파일 선택'}
+            </button>
           </div>
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-            className="btn btn-primary flex items-center gap-2 mx-auto"
-          >
-            <Upload size={16} />
-            {uploading ? '업로드 중...' : '파일 선택'}
-          </button>
-        </div>
+        ) : (
+          <div className="text-center text-gray-500 py-4">
+            파일 업로드는 관리자만 가능합니다. 아래에서 업로드된 파일을 조회할 수 있습니다.
+          </div>
+        )}
       </div>
 
       <div className="card">
@@ -139,38 +148,40 @@ export default function FileUpload() {
                   </div>
                 </div>
                 
-                <div className="flex gap-2 mt-3">
-                  {file.status === 'PENDING' && (
+                {isAdmin && (
+                  <div className="flex gap-2 mt-3">
+                    {file.status === 'PENDING' && (
+                      <button
+                        onClick={() => handleProcess(file.id)}
+                        className="btn btn-secondary flex items-center gap-2"
+                      >
+                        <Play size={14} /> 분석
+                      </button>
+                    )}
+                    {file.status === 'COMPLETED' && !file.applied && (
+                      <button
+                        onClick={() => handleApply(file.id)}
+                        className="btn btn-primary flex items-center gap-2"
+                      >
+                        <CheckCircle size={14} /> 적용
+                      </button>
+                    )}
+                    {file.applied && (
+                      <button
+                        onClick={() => handleUnapply(file.id)}
+                        className="btn btn-secondary flex items-center gap-2"
+                      >
+                        <XCircle size={14} /> 적용 취소
+                      </button>
+                    )}
                     <button
-                      onClick={() => handleProcess(file.id)}
-                      className="btn btn-secondary flex items-center gap-2"
+                      onClick={() => handleDelete(file.id)}
+                      className="btn btn-danger flex items-center gap-2"
                     >
-                      <Play size={14} /> 분석
+                      <XCircle size={14} /> 삭제
                     </button>
-                  )}
-                  {file.status === 'COMPLETED' && !file.applied && (
-                    <button
-                      onClick={() => handleApply(file.id)}
-                      className="btn btn-primary flex items-center gap-2"
-                    >
-                      <CheckCircle size={14} /> 적용
-                    </button>
-                  )}
-                  {file.applied && (
-                    <button
-                      onClick={() => handleUnapply(file.id)}
-                      className="btn btn-secondary flex items-center gap-2"
-                    >
-                      <XCircle size={14} /> 적용 취소
-                    </button>
-                  )}
-                  <button
-                    onClick={() => handleDelete(file.id)}
-                    className="btn btn-danger flex items-center gap-2"
-                  >
-                    <XCircle size={14} /> 삭제
-                  </button>
-                </div>
+                  </div>
+                )}
                 
                 {file.status === 'FAILED' && file.errorMessage && (
                   <div className="mt-2 text-sm text-red-600">

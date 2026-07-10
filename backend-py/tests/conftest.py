@@ -96,3 +96,10 @@ def admin_headers(client):
     resp = client.post("/api/auth/login", json={"username": "admin", "password": "admin123"})
     token = resp.json()["data"]["token"]
     return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture()
+def user_headers(client):
+    resp = client.post("/api/auth/login", json={"username": "user", "password": "user123"})
+    token = resp.json()["data"]["token"]
+    return {"Authorization": f"Bearer {token}"}

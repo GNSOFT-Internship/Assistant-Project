@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from .. import models, schemas
+from .. import auth, models, schemas
 from ..database import get_db
 
 router = APIRouter(prefix="/api/budgets", tags=["budgets"])
@@ -27,7 +27,13 @@ def get_all_budgets(db: Session = Depends(get_db)):
 
 
 @router.put("/{year}/{month}")
-def set_budget(year: int, month: int, request: schemas.BudgetRequest, db: Session = Depends(get_db)):
+def set_budget(
+    year: int,
+    month: int,
+    request: schemas.BudgetRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(auth.require_admin),
+):
     budget = (
         db.query(models.Budget)
         .filter(models.Budget.year == year, models.Budget.month == month)
@@ -45,7 +51,12 @@ def set_budget(year: int, month: int, request: schemas.BudgetRequest, db: Sessio
 
 
 @router.delete("/{year}/{month}")
-def delete_budget(year: int, month: int, db: Session = Depends(get_db)):
+def delete_budget(
+    year: int,
+    month: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(auth.require_admin),
+):
     budget = (
         db.query(models.Budget)
         .filter(models.Budget.year == year, models.Budget.month == month)

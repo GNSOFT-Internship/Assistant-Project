@@ -3,11 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { assetApi } from '../services/api';
 import { Plus, Edit, Trash2, Eye, ChevronLeft, ChevronRight } from 'lucide-react';
 import { AssetStatusBadge } from '../components/StatusBadge';
+import { useAuth } from '../context/AuthContext';
 
 const PAGE_SIZE = 20;
 
 export default function Assets() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
   const [assets, setAssets] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -124,12 +127,14 @@ export default function Assets() {
     <div className="space-y-6">
       <div className="flex justify-between items-center flex-wrap gap-2">
         <h1 className="text-2xl font-bold">자산 관리</h1>
-        <button
-          onClick={() => { resetForm(); setShowModal(true); }}
-          className="btn btn-primary flex items-center gap-2"
-        >
-          <Plus size={16} /> 자산 등록
-        </button>
+        {isAdmin && (
+          <button
+            onClick={() => { resetForm(); setShowModal(true); }}
+            className="btn btn-primary flex items-center gap-2"
+          >
+            <Plus size={16} /> 자산 등록
+          </button>
+        )}
       </div>
 
       <div className="card">
@@ -200,18 +205,22 @@ export default function Assets() {
                     >
                       <Eye size={16} />
                     </button>
-                    <button
-                      onClick={() => handleEdit(asset)}
-                      className="p-2 hover:bg-gray-100 rounded"
-                    >
-                      <Edit size={16} />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(asset.id)}
-                      className="p-2 hover:bg-red-100 rounded text-red-600"
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    {isAdmin && (
+                      <>
+                        <button
+                          onClick={() => handleEdit(asset)}
+                          className="p-2 hover:bg-gray-100 rounded"
+                        >
+                          <Edit size={16} />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(asset.id)}
+                          className="p-2 hover:bg-red-100 rounded text-red-600"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </>
+                    )}
                   </td>
                 </tr>
               ))}

@@ -165,7 +165,7 @@ def get_asset(asset_id: int, db: Session = Depends(get_db)):
 def create_asset(
     request: schemas.AssetRequest,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(auth.get_current_user),
+    current_user: dict = Depends(auth.require_admin),
 ):
     asset = models.Asset(
         asset_name=request.assetName,
@@ -200,7 +200,7 @@ def update_asset(
     asset_id: int,
     request: schemas.AssetRequest,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(auth.get_current_user),
+    current_user: dict = Depends(auth.require_admin),
 ):
     asset = db.query(models.Asset).filter(models.Asset.id == asset_id).first()
     if asset is None:
@@ -254,7 +254,7 @@ def add_asset_maintenance_record(
     asset_id: int,
     request: schemas.MaintenanceRecordRequest,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(auth.get_current_user),
+    current_user: dict = Depends(auth.require_admin),
 ):
     asset = db.query(models.Asset).filter(models.Asset.id == asset_id).first()
     if asset is None:
@@ -286,7 +286,7 @@ def update_maintenance_record(
     record_id: int,
     request: schemas.MaintenanceRecordRequest,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(auth.get_current_user),
+    current_user: dict = Depends(auth.require_admin),
 ):
     asset = db.query(models.Asset).filter(models.Asset.id == asset_id).first()
     if asset is None:
@@ -327,7 +327,7 @@ def delete_maintenance_record(
     asset_id: int,
     record_id: int,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(auth.get_current_user),
+    current_user: dict = Depends(auth.require_admin),
 ):
     asset = db.query(models.Asset).filter(models.Asset.id == asset_id).first()
     record = (
@@ -362,7 +362,7 @@ def get_asset_history(asset_id: int, db: Session = Depends(get_db)):
 def delete_asset(
     asset_id: int,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(auth.get_current_user),
+    current_user: dict = Depends(auth.require_admin),
 ):
     asset = db.query(models.Asset).filter(models.Asset.id == asset_id).first()
     if asset is not None:

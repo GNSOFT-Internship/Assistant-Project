@@ -57,3 +57,11 @@ def get_current_user(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
 
     return payload
+
+
+def require_admin(current_user: dict = Depends(get_current_user)) -> dict:
+    """자산/유지보수/예산/파일을 등록·수정·삭제하는 엔드포인트에 붙여서
+    USER 역할은 조회만 가능하고 변경은 ADMIN만 가능하도록 제한한다."""
+    if current_user.get("role") != "ADMIN":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="관리자만 사용할 수 있는 기능입니다.")
+    return current_user

@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { assetApi } from '../services/api';
 import { Calendar, DollarSign, Clock, MapPin, User, Package, History, Edit, Trash2 } from 'lucide-react';
 import { AssetStatusBadge, MaintenanceTypeBadge } from '../components/StatusBadge';
+import { useAuth } from '../context/AuthContext';
 
 const MAINTENANCE_TYPE_OPTIONS = [
   { value: 'ROUTINE', label: '정기점검' },
@@ -50,6 +51,8 @@ function formatValue(field, value) {
 
 export default function AssetDetail() {
   const { id } = useParams();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
   const [asset, setAsset] = useState(null);
   const [maintenance, setMaintenance] = useState([]);
   const [history, setHistory] = useState([]);
@@ -253,22 +256,24 @@ export default function AssetDetail() {
                       <div className="font-medium">{record.cost?.toLocaleString()}원</div>
                       <div className="text-sm text-gray-500">{record.maintenanceDate?.split('T')[0]}</div>
                     </div>
-                    <div className="flex gap-1">
-                      <button
-                        onClick={() => handleEditRecord(record)}
-                        className="p-1.5 hover:bg-gray-100 rounded text-gray-500"
-                        title="수정"
-                      >
-                        <Edit size={14} />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteRecord(record.id)}
-                        className="p-1.5 hover:bg-red-100 rounded text-red-600"
-                        title="삭제"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
+                    {isAdmin && (
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => handleEditRecord(record)}
+                          className="p-1.5 hover:bg-gray-100 rounded text-gray-500"
+                          title="수정"
+                        >
+                          <Edit size={14} />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteRecord(record.id)}
+                          className="p-1.5 hover:bg-red-100 rounded text-red-600"
+                          title="삭제"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
                 {record.technician && (

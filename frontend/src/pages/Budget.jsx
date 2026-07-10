@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { budgetApi, aiApi } from '../services/api';
 import { Save } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 export default function Budget() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
   const [year, setYear] = useState(new Date().getFullYear());
   const [budgets, setBudgets] = useState({});
   const [monthlyCosts, setMonthlyCosts] = useState({});
@@ -97,13 +100,15 @@ export default function Budget() {
               <option key={y} value={y}>{y}년</option>
             ))}
           </select>
-          <button
-            onClick={handleSaveAll}
-            disabled={savingAll}
-            className="btn btn-primary flex items-center gap-1"
-          >
-            <Save size={14} /> {savingAll ? '저장 중...' : '전체 저장'}
-          </button>
+          {isAdmin && (
+            <button
+              onClick={handleSaveAll}
+              disabled={savingAll}
+              className="btn btn-primary flex items-center gap-1"
+            >
+              <Save size={14} /> {savingAll ? '저장 중...' : '전체 저장'}
+            </button>
+          )}
         </div>
       </div>
 
@@ -119,7 +124,7 @@ export default function Budget() {
                 <th className="table-cell">배정 예산 (원)</th>
                 <th className="table-cell">실제 사용액</th>
                 <th className="table-cell">소진율</th>
-                <th className="table-cell">저장</th>
+                {isAdmin && <th className="table-cell">저장</th>}
               </tr>
             </thead>
             <tbody>
@@ -132,14 +137,18 @@ export default function Budget() {
                   <tr key={month} className="border-t">
                     <td className="table-cell font-medium">{month}월</td>
                     <td className="table-cell">
-                      <input
-                        type="number"
-                        min="0"
-                        className="input w-36"
-                        value={inputs[month] ?? ''}
-                        onChange={(e) => setInputs({ ...inputs, [month]: e.target.value })}
-                        placeholder="미설정"
-                      />
+                      {isAdmin ? (
+                        <input
+                          type="number"
+                          min="0"
+                          className="input w-36"
+                          value={inputs[month] ?? ''}
+                          onChange={(e) => setInputs({ ...inputs, [month]: e.target.value })}
+                          placeholder="미설정"
+                        />
+                      ) : (
+                        <span>{allocated != null ? `${allocated.toLocaleString()}원` : '-'}</span>
+                      )}
                     </td>
                     <td className="table-cell">{spent.toLocaleString()}원</td>
                     <td className="table-cell">
@@ -151,15 +160,17 @@ export default function Budget() {
                         <span className="text-gray-400">-</span>
                       )}
                     </td>
-                    <td className="table-cell">
-                      <button
-                        onClick={() => handleSave(month)}
-                        disabled={saving === month}
-                        className="btn btn-secondary flex items-center gap-1"
-                      >
-                        <Save size={14} /> 저장
-                      </button>
-                    </td>
+                    {isAdmin && (
+                      <td className="table-cell">
+                        <button
+                          onClick={() => handleSave(month)}
+                          disabled={saving === month}
+                          className="btn btn-secondary flex items-center gap-1"
+                        >
+                          <Save size={14} /> 저장
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 );
               })}
