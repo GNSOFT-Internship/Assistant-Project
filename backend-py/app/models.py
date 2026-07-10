@@ -18,6 +18,12 @@ from sqlalchemy.sql import func
 
 from .database import Base
 
+# SQLite는 BIGINT 기본 키에 rowid 자동증가를 부여하지 않고 정확히
+# "INTEGER PRIMARY KEY"일 때만 지원한다. MySQL(운영)에서는 그대로 BIGINT를
+# 쓰고 SQLite(테스트)에서만 INTEGER를 쓰도록 해서 두 환경 모두에서
+# autoincrement가 정상 동작하게 한다.
+BigIntegerPK = BigInteger().with_variant(Integer, "sqlite")
+
 
 class UserRole(str, enum.Enum):
     ADMIN = "ADMIN"
@@ -30,7 +36,7 @@ class User(Base):
     # 동작하던 스키마 기준으로 통일했다 (MySQL 예약어 충돌 회피 목적도 있음).
     __tablename__ = "app_user"
 
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    id = Column(BigIntegerPK, primary_key=True, autoincrement=True)
     username = Column(String(50), unique=True, nullable=False)
     password = Column(String(255), nullable=False)
     role = Column(Enum(UserRole), nullable=False)
@@ -48,7 +54,7 @@ class AssetStatus(str, enum.Enum):
 class Asset(Base):
     __tablename__ = "asset"
 
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    id = Column(BigIntegerPK, primary_key=True, autoincrement=True)
     asset_name = Column(String(200), nullable=False)
     asset_code = Column(String(50), unique=True, nullable=False)
     category = Column(String(100), nullable=False)
@@ -73,7 +79,7 @@ class MaintenanceType(str, enum.Enum):
 class MaintenanceRecord(Base):
     __tablename__ = "maintenance_record"
 
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    id = Column(BigIntegerPK, primary_key=True, autoincrement=True)
     asset_id = Column(BigInteger, ForeignKey("asset.id", ondelete="CASCADE"), nullable=False)
     maintenance_date = Column(Date, nullable=False)
     maintenance_type = Column(Enum(MaintenanceType), nullable=False)
@@ -100,7 +106,7 @@ class UploadStatus(str, enum.Enum):
 class FileUpload(Base):
     __tablename__ = "file_upload"
 
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    id = Column(BigIntegerPK, primary_key=True, autoincrement=True)
     filename = Column(String(255), nullable=True)
     original_filename = Column(String(255), nullable=True)
     file_type = Column(Enum(FileType), nullable=True)
@@ -123,7 +129,7 @@ class AssetAuditLog(Base):
     __tablename__ = "asset_audit_log"
 
     # asset_id는 자산이 삭제된 뒤에도 이력이 남아야 하므로 FK를 걸지 않는다.
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    id = Column(BigIntegerPK, primary_key=True, autoincrement=True)
     asset_id = Column(BigInteger, nullable=False, index=True)
     asset_code = Column(String(50), nullable=True)
     action = Column(Enum(AuditAction), nullable=False)
@@ -136,7 +142,7 @@ class Budget(Base):
     __tablename__ = "budget"
     __table_args__ = (UniqueConstraint("year", "month", name="uq_budget_year_month"),)
 
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    id = Column(BigIntegerPK, primary_key=True, autoincrement=True)
     year = Column(Integer, nullable=False)
     month = Column(Integer, nullable=False)
     allocated_amount = Column(DECIMAL(15, 2), nullable=False)
