@@ -57,12 +57,16 @@ export const assetApi = {
   getHistory: (id) => api.get(`/assets/${id}/history`),
 };
 
+// LLM 응답(GLM-5.2)은 수십 초가 걸릴 수 있어, AI 서술을 실제로 호출하는
+// 요청은 기본 타임아웃(30초)보다 훨씬 넉넉하게 잡는다.
+const AI_TIMEOUT = 150000;
+
 export const aiApi = {
-  naturalLanguageSearch: (query) => api.post('/ai/natural-language-search', { query }),
-  getReplacementRecommendation: (budget) => api.post('/ai/replacement-recommendation', { budget }),
-  getMaintenanceAnalysis: (params) => api.get('/ai/maintenance-analysis', { params }),
+  naturalLanguageSearch: (query) => api.post('/ai/natural-language-search', { query }, { timeout: AI_TIMEOUT }),
+  getReplacementRecommendation: (budget) => api.post('/ai/replacement-recommendation', { budget }, { timeout: AI_TIMEOUT }),
+  getMaintenanceAnalysis: (params) => api.get('/ai/maintenance-analysis', { params, timeout: AI_TIMEOUT }),
   getAssetsByFailureType: (failureType, params) => api.get('/ai/maintenance-analysis/failure-assets', { params: { failureType, ...params } }),
-  askQuestion: (question) => api.post('/qa/ask', { question }),
+  askQuestion: (question) => api.post('/qa/ask', { question }, { timeout: AI_TIMEOUT }),
   getDashboardData: () => api.get('/dashboard'),
 };
 
@@ -88,8 +92,8 @@ export const chatApi = {
 };
 
 export const reportApi = {
-  getMonthly: (params) => api.get('/reports/monthly', { params }),
-  downloadPdf: () => api.get('/reports/monthly/pdf', { responseType: 'blob' }),
+  getMonthly: (params) => api.get('/reports/monthly', { params, timeout: params?.includeAi ? AI_TIMEOUT : undefined }),
+  downloadPdf: () => api.get('/reports/monthly/pdf', { responseType: 'blob', timeout: AI_TIMEOUT }),
 };
 
 export const budgetApi = {

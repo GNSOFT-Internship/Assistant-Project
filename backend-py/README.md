@@ -34,7 +34,8 @@
 - `docs/schema.sql`의 테이블명은 `user`이지만, 실제 Java 엔티티는 `app_user`로 매핑되어 있었습니다(MySQL 예약어
   회피 목적으로 추정). 이 Python 버전도 `app_user`를 그대로 사용합니다.
 - `/api/ai/*` 엔드포인트(자연어 검색, 교체 우선순위 추천, 유지보수 분석)와 `/api/reports/monthly`는
-  `ANTHROPIC_API_KEY`가 설정된 경우 Claude API를 호출해 한국어 서술을 생성합니다. 키가 없으면 규칙 기반
+  `NVIDIA_API_KEY`가 설정된 경우 NVIDIA NIM 경유 GLM-5.2를, 없고 `GEMINI_API_KEY`만 있으면 Gemini를
+  호출해 한국어 서술을 생성합니다. 둘 다 없으면 규칙 기반
   폴백 문구로 동작합니다. 유지보수 분석의 AI 서술과 보고서의 AI 요약/문제점/권장사항은 토큰 절약을 위해
   `includeAi=true` 파라미터(프론트엔드의 "AI 분석하기"/"AI 요약 보기" 버튼)를 명시했을 때만 생성됩니다.
 - 자산/예산/유지보수 이력/파일 업로드의 쓰기(생성·수정·삭제) 엔드포인트는 `require_admin` 의존성으로 보호되어

@@ -3,11 +3,11 @@
 본 시스템은 공공시설의 자산 등록/조회/수정/삭제 등의 기본 관리 기능부터, 월별 유지보수 예산 수립, AI 기반의 자연어 검색 및 유지보수 분석, 교체 대상 자산 추천, PDF 견적서 자동 인식 및 자동 등록, AI Q&A 및 월간 보고서 생성 등의 지능형 기능을 제공하는 종합 자산 관리 플랫폼입니다.
 
 ## 아키텍처
-- **Backend**: FastAPI (Python), SQLAlchemy, REST API, Anthropic Claude API (LLM)
+- **Backend**: FastAPI (Python), SQLAlchemy, REST API, GLM-5.2 (Z.ai, NVIDIA NIM) / Gemini (LLM)
 - **Frontend**: React (Vite, Tailwind CSS)
 - **DB**: MySQL / MariaDB
 
-백엔드는 Python 단일 서비스로 통일되어 있으며, 자연어 검색 · 교체 우선순위 추천 · 유지보수 분석 · 보고서 서술 · Q&A는 모두 Claude API (`claude-3-5-sonnet` / `claude-opus-4-8` 등)를 호출하여 작동합니다. `ANTHROPIC_API_KEY`가 설정되지 않은 경우, 각 기능은 규칙 기반 폴백(Fallback)으로 동작하여 개발 및 데모 환경에서 키 없이도 시스템 기동 및 기본 시뮬레이션이 가능합니다.
+백엔드는 Python 단일 서비스로 통일되어 있으며, 자연어 검색 · 교체 우선순위 추천 · 유지보수 분석 · 보고서 서술 · Q&A는 모두 LLM을 호출하여 작동합니다. `NVIDIA_API_KEY`가 설정되어 있으면 NVIDIA NIM(OpenAI 호환 엔드포인트)을 통해 Z.ai의 GLM-5.2를 우선 사용하고, 없고 `GEMINI_API_KEY`만 설정된 경우 Gemini를 사용합니다. 둘 다 설정되지 않은 경우, 각 기능은 규칙 기반 폴백(Fallback)으로 동작하여 개발 및 데모 환경에서 키 없이도 시스템 기동 및 기본 시뮬레이션이 가능합니다.
 
 ---
 
@@ -64,7 +64,7 @@ Assistant-Project/
 │   │   ├── auth.py          # JWT 토큰 처리 및 로그인 실패 IP 잠금 로직
 │   │   ├── config.py        # 환경변수 로딩 및 설정
 │   │   ├── database.py      # 데이터베이스 커넥션/세션 풀 설정
-│   │   ├── llm.py           # Anthropic Claude API 연동 클라이언트
+│   │   ├── llm.py           # GLM-5.2(NVIDIA NIM) / Gemini LLM 연동 클라이언트
 │   │   ├── qna_logic.py     # AI Q&A 지식 베이스 검색/컨텍스트 로직
 │   │   └── main.py          # 애플리케이션 진입점 (FastAPI 인스턴스 기동 및 미들웨어 설정)
 │   ├── requirements.txt     # Python 라이브러리 의존성 파일
@@ -190,9 +190,9 @@ JWT_SECRET=asset-management-secret-key-for-development
 JWT_EXPIRATION_SECONDS=86400
 UPLOAD_DIRECTORY=./uploads
 DEMO_MODE=true
-# Anthropic API Key (AI 기능 실구동 시 필수 입력)
-ANTHROPIC_API_KEY=
-ANTHROPIC_MODEL=claude-opus-4-8
+# NVIDIA NIM API Key - GLM-5.2 (AI 기능 실구동 시 필수 입력)
+NVIDIA_API_KEY=
+NVIDIA_MODEL=z-ai/glm-5.2
 ```
 ---
 
@@ -278,7 +278,8 @@ ANTHROPIC_MODEL=claude-opus-4-8
 - **SQLAlchemy**: 강력한 Python SQL 툴킷 및 ORM
 - **PyMySQL / cryptography**: MySQL 연결 드라이버 및 보안 모듈
 - **python-jose / passlib[bcrypt]**: JWT 인증 및 암호 해싱 처리
-- **anthropic**: Anthropic Claude API 연동 클라이언트
+- **openai**: NVIDIA NIM(OpenAI 호환 엔드포인트)을 통한 GLM-5.2 연동 클라이언트
+- **google-generativeai**: Gemini API 연동 클라이언트 (폴백 프로바이더)
 - **reportlab**: PDF 생성 라이브러리 (한글 폰트 렌더링 대응)
 - **pdfplumber**: PDF 파일의 정밀 텍스트 및 테이블 추출 도구
 - **pandas / openpyxl**: Excel/CSV 파일 분석 및 데이터 가공
