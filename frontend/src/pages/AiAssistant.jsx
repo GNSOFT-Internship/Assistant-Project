@@ -61,7 +61,7 @@ export default function AiAssistant() {
         assetApi.getMaintenanceHistory(assetId),
       ]);
       setViewingAsset(assetRes.data.data);
-      setViewingMaintenance(maintenanceRes.data.data || []);
+      setViewingMaintenance(maintenanceRes.data.data?.items || []);
     } catch (error) {
       console.error('자산 상세 로드 실패:', error);
     } finally {

@@ -54,7 +54,7 @@ def test_apply_only_creates_records_for_matched_assets(client, admin_headers):
     assert apply_resp.json()["data"]["extractedSummary"]["appliedRecordCount"] == 1
     assert apply_resp.json()["data"]["applied"] is True
 
-    maintenance = client.get(f"/api/assets/{asset['id']}/maintenance", headers=admin_headers).json()["data"]
+    maintenance = client.get(f"/api/assets/{asset['id']}/maintenance", headers=admin_headers).json()["data"]["items"]
     assert len(maintenance) == 1
     assert maintenance[0]["description"] == "테스트 수리 A"
 
@@ -69,7 +69,7 @@ def test_apply_logs_history_grouped_by_asset(client, admin_headers):
     client.post(f"/api/files/{file_id}/process", headers=admin_headers)
     client.post(f"/api/files/{file_id}/apply", headers=admin_headers)
 
-    history = client.get(f"/api/assets/{asset['id']}/history", headers=admin_headers).json()["data"]
+    history = client.get(f"/api/assets/{asset['id']}/history", headers=admin_headers).json()["data"]["items"]
     create_entry = next(h for h in history if h["action"] == "CREATE" and "source" in (h["changes"] or {}))
     assert "엑셀 업로드" in create_entry["changes"]["source"]["new"]
     assert create_entry["changes"]["maintenance_record"]["new"] == "1건 등록됨"
@@ -81,13 +81,13 @@ def test_unapply_removes_exactly_the_created_records(client, admin_headers):
     client.post(f"/api/files/{file_id}/process", headers=admin_headers)
     client.post(f"/api/files/{file_id}/apply", headers=admin_headers)
 
-    assert len(client.get(f"/api/assets/{asset['id']}/maintenance", headers=admin_headers).json()["data"]) == 1
+    assert len(client.get(f"/api/assets/{asset['id']}/maintenance", headers=admin_headers).json()["data"]["items"]) == 1
 
     unapply_resp = client.post(f"/api/files/{file_id}/unapply", headers=admin_headers)
     assert unapply_resp.status_code == 200
     assert unapply_resp.json()["data"]["applied"] is False
 
-    assert client.get(f"/api/assets/{asset['id']}/maintenance", headers=admin_headers).json()["data"] == []
+    assert client.get(f"/api/assets/{asset['id']}/maintenance", headers=admin_headers).json()["data"]["items"] == []
 
     # applied가 아닌 파일은 다시 unapply할 수 없다
     second_unapply = client.post(f"/api/files/{file_id}/unapply", headers=admin_headers)

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { assetApi } from '../services/api';
-import { Plus, Edit, Trash2, Eye, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Edit, Trash2, Eye, ChevronLeft, ChevronRight, Download } from 'lucide-react';
 import { AssetStatusBadge } from '../components/StatusBadge';
 import { useAuth } from '../context/AuthContext';
 
@@ -18,6 +18,7 @@ export default function Assets() {
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editingAsset, setEditingAsset] = useState(null);
   const [formData, setFormData] = useState({
@@ -123,18 +124,50 @@ export default function Assets() {
     resetForm();
   };
 
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const response = await assetApi.exportExcel({ search: searchTerm, category: categoryFilter });
+      const blob = new Blob([response.data], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `자산목록_${new Date().toISOString().split('T')[0]}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('자산 목록 내보내기 실패:', error);
+      alert('엑셀 내보내기 중 오류가 발생했습니다.');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center flex-wrap gap-2">
         <h1 className="text-2xl font-bold">자산 관리</h1>
-        {isAdmin && (
+        <div className="flex items-center gap-2">
           <button
-            onClick={() => { resetForm(); setShowModal(true); }}
-            className="btn btn-primary flex items-center gap-2"
+            onClick={handleExport}
+            disabled={exporting}
+            className="btn btn-secondary flex items-center gap-2"
           >
-            <Plus size={16} /> 자산 등록
+            <Download size={16} /> {exporting ? '내보내는 중...' : '엑셀 내보내기'}
           </button>
-        )}
+          {isAdmin && (
+            <button
+              onClick={() => { resetForm(); setShowModal(true); }}
+              className="btn btn-primary flex items-center gap-2"
+            >
+              <Plus size={16} /> 자산 등록
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="card">

@@ -78,7 +78,7 @@ export default function AssetDetail() {
   const loadMaintenance = async () => {
     try {
       const response = await assetApi.getMaintenanceHistory(id);
-      setMaintenance(response.data.data);
+      setMaintenance(response.data.data?.items || []);
     } catch (error) {
       console.error('유지보수 이력 로드 실패:', error);
     } finally {
@@ -89,7 +89,7 @@ export default function AssetDetail() {
   const loadHistory = async () => {
     try {
       const response = await assetApi.getHistory(id);
-      setHistory(response.data.data || []);
+      setHistory(response.data.data?.items || []);
     } catch (error) {
       console.error('변경 이력 로드 실패:', error);
     }

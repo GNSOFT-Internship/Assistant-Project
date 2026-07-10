@@ -47,6 +47,7 @@ api.interceptors.response.use(
 
 export const assetApi = {
   getAll: (params) => api.get('/assets', { params }),
+  exportExcel: (params) => api.get('/assets/export', { params, responseType: 'blob' }),
   getById: (id) => api.get(`/assets/${id}`),
   create: (data) => api.post('/assets', data),
   update: (id, data) => api.put(`/assets/${id}`, data),

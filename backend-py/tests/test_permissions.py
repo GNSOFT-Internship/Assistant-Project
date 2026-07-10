@@ -62,7 +62,7 @@ def test_user_cannot_add_update_delete_maintenance_record(client, admin_headers,
     assert delete_resp.status_code == 403
 
     # user 요청이 거부된 뒤에도 기록은 그대로 남아있어야 한다
-    still_there = client.get(f"/api/assets/{asset_id}/maintenance", headers=admin_headers).json()["data"]
+    still_there = client.get(f"/api/assets/{asset_id}/maintenance", headers=admin_headers).json()["data"]["items"]
     assert len(still_there) == 1
 
 

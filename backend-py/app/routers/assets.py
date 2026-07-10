@@ -1,9 +1,12 @@
+import io
 import json
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Optional
 
+import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
@@ -153,6 +156,54 @@ def get_all_assets(
     }
 
 
+@router.get("/export")
+def export_assets(
+    db: Session = Depends(get_db),
+    search: str = "",
+    category: str = "",
+):
+    """현재 목록 화면의 검색어/카테고리 필터를 그대로 반영해 자산 목록을 엑셀로 내려받는다."""
+    query = db.query(models.Asset)
+    if search:
+        like = f"%{search}%"
+        query = query.filter(
+            or_(models.Asset.asset_name.like(like), models.Asset.asset_code.like(like))
+        )
+    if category:
+        query = query.filter(models.Asset.category == category)
+
+    assets = query.order_by(models.Asset.id).all()
+
+    rows = [
+        {
+            "자산번호": a.asset_code,
+            "자산명": a.asset_name,
+            "카테고리": a.category,
+            "위치": a.location,
+            "담당자": a.responsible_person,
+            "구매일": a.purchase_date.isoformat() if a.purchase_date else None,
+            "구매가": float(a.purchase_price) if a.purchase_price is not None else 0.0,
+            "내용연수(년)": a.useful_life,
+            "상태": a.status.value if a.status else "ACTIVE",
+            "설명": a.description,
+        }
+        for a in assets
+    ]
+    df = pd.DataFrame(rows)
+
+    buffer = io.BytesIO()
+    with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name="자산목록")
+    buffer.seek(0)
+
+    filename = f"asset-list-{datetime.now().strftime('%Y%m%d')}.xlsx"
+    return StreamingResponse(
+        buffer,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @router.get("/{asset_id}")
 def get_asset(asset_id: int, db: Session = Depends(get_db)):
     asset = db.query(models.Asset).filter(models.Asset.id == asset_id).first()
@@ -235,18 +286,36 @@ def update_asset(
 
 
 @router.get("/{asset_id}/maintenance")
-def get_asset_maintenance_history(asset_id: int, db: Session = Depends(get_db)):
+def get_asset_maintenance_history(
+    asset_id: int,
+    db: Session = Depends(get_db),
+    page: int = 1,
+    pageSize: int = 100,
+):
     asset = db.query(models.Asset).filter(models.Asset.id == asset_id).first()
     if asset is None:
         raise HTTPException(status_code=404, detail="Asset not found")
 
-    records = (
+    query = (
         db.query(models.MaintenanceRecord)
         .filter(models.MaintenanceRecord.asset_id == asset_id)
         .order_by(models.MaintenanceRecord.maintenance_date.desc())
-        .all()
     )
-    return {"success": True, "message": None, "data": [maintenance_to_dto(r) for r in records]}
+    total = query.count()
+    page = max(1, page)
+    page_size = max(1, min(pageSize, 200))
+    records = query.offset((page - 1) * page_size).limit(page_size).all()
+
+    return {
+        "success": True,
+        "message": None,
+        "data": {
+            "items": [maintenance_to_dto(r) for r in records],
+            "total": total,
+            "page": page,
+            "pageSize": page_size,
+        },
+    }
 
 
 @router.post("/{asset_id}/maintenance")
@@ -348,14 +417,32 @@ def delete_maintenance_record(
 
 
 @router.get("/{asset_id}/history")
-def get_asset_history(asset_id: int, db: Session = Depends(get_db)):
-    logs = (
+def get_asset_history(
+    asset_id: int,
+    db: Session = Depends(get_db),
+    page: int = 1,
+    pageSize: int = 100,
+):
+    query = (
         db.query(models.AssetAuditLog)
         .filter(models.AssetAuditLog.asset_id == asset_id)
         .order_by(models.AssetAuditLog.created_at.desc())
-        .all()
     )
-    return {"success": True, "message": None, "data": [audit_to_dto(l) for l in logs]}
+    total = query.count()
+    page = max(1, page)
+    page_size = max(1, min(pageSize, 200))
+    logs = query.offset((page - 1) * page_size).limit(page_size).all()
+
+    return {
+        "success": True,
+        "message": None,
+        "data": {
+            "items": [audit_to_dto(l) for l in logs],
+            "total": total,
+            "page": page,
+            "pageSize": page_size,
+        },
+    }
 
 
 @router.delete("/{asset_id}")
