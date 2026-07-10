@@ -149,7 +149,7 @@ def _fallback_answer(db: Session, question: str, all_assets) -> dict:
         }
 
     return {
-        "answer": f"총 {len(all_assets)}개의 자산이 등록되어 있습니다. (AI 기능을 사용하려면 GEMINI_API_KEY를 설정하세요.)",
+        "answer": f"총 {len(all_assets)}개의 자산이 등록되어 있습니다. (AI 기능을 사용하려면 GN_API_KEY를 설정하세요.)",
         "sourceData": _to_source_data(all_assets),
         "assets": [],
         "hasData": True,

@@ -114,7 +114,7 @@ def _generate_narrative(report_data: dict) -> dict:
         "recommendations": ["정기 점검 주기를 단축하고 노후 장비 예산을 우선 편성하는 것을 권장합니다."],
     }
     if not llm.is_configured():
-        fallback["executiveSummary"] += " (AI 서술 생성을 사용하려면 NVIDIA_API_KEY 또는 GEMINI_API_KEY를 설정하세요.)"
+        fallback["executiveSummary"] += " (AI 서술 생성을 사용하려면 GN_API_KEY를 설정하세요.)"
         return fallback
 
     try:

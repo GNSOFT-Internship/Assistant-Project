@@ -164,7 +164,7 @@ def natural_language_search(request: NaturalSearchRequest, db: Session = Depends
             "data": {
                 "assets": [asset_to_dto(a) for a in (filtered or all_assets)],
                 "explanation": f"'{query}'에 대한 검색 결과 {len(filtered)}건을 찾았습니다. "
-                "(AI 자연어 해석을 사용하려면 NVIDIA_API_KEY 또는 GEMINI_API_KEY를 설정하세요.)",
+                "(AI 자연어 해석을 사용하려면 GN_API_KEY를 설정하세요.)",
                 "isSimulated": False,
                 "hasFilter": bool(filtered),
             },
