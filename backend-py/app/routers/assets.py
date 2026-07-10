@@ -116,6 +116,16 @@ def _log_change(
     db.add(entry)
 
 
+_ASSET_SORT_COLUMNS = {
+    "assetName": models.Asset.asset_name,
+    "assetCode": models.Asset.asset_code,
+    "category": models.Asset.category,
+    "purchaseDate": models.Asset.purchase_date,
+    "purchasePrice": models.Asset.purchase_price,
+    "status": models.Asset.status,
+}
+
+
 @router.get("")
 def get_all_assets(
     db: Session = Depends(get_db),
@@ -123,6 +133,8 @@ def get_all_assets(
     pageSize: int = 20,
     search: str = "",
     category: str = "",
+    sortBy: str = "",
+    sortOrder: str = "asc",
 ):
     query = db.query(models.Asset)
 
@@ -137,12 +149,15 @@ def get_all_assets(
     total = query.count()
     page = max(1, page)
     page_size = max(1, min(pageSize, 200))
-    assets = (
-        query.order_by(models.Asset.id)
-        .offset((page - 1) * page_size)
-        .limit(page_size)
-        .all()
-    )
+
+    sort_column = _ASSET_SORT_COLUMNS.get(sortBy)
+    if sort_column is not None:
+        order_clause = sort_column.desc() if sortOrder == "desc" else sort_column.asc()
+        query = query.order_by(order_clause, models.Asset.id)
+    else:
+        query = query.order_by(models.Asset.id)
+
+    assets = query.offset((page - 1) * page_size).limit(page_size).all()
 
     return {
         "success": True,
@@ -161,8 +176,10 @@ def export_assets(
     db: Session = Depends(get_db),
     search: str = "",
     category: str = "",
+    sortBy: str = "",
+    sortOrder: str = "asc",
 ):
-    """현재 목록 화면의 검색어/카테고리 필터를 그대로 반영해 자산 목록을 엑셀로 내려받는다."""
+    """현재 목록 화면의 검색어/카테고리 필터와 정렬 순서를 그대로 반영해 자산 목록을 엑셀로 내려받는다."""
     query = db.query(models.Asset)
     if search:
         like = f"%{search}%"
@@ -172,7 +189,14 @@ def export_assets(
     if category:
         query = query.filter(models.Asset.category == category)
 
-    assets = query.order_by(models.Asset.id).all()
+    sort_column = _ASSET_SORT_COLUMNS.get(sortBy)
+    if sort_column is not None:
+        order_clause = sort_column.desc() if sortOrder == "desc" else sort_column.asc()
+        query = query.order_by(order_clause, models.Asset.id)
+    else:
+        query = query.order_by(models.Asset.id)
+
+    assets = query.all()
 
     rows = [
         {

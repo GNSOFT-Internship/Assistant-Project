@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { assetApi } from '../services/api';
-import { Plus, Edit, Trash2, Eye, ChevronLeft, ChevronRight, Download } from 'lucide-react';
+import { Plus, Edit, Trash2, Eye, ChevronLeft, ChevronRight, Download, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import { AssetStatusBadge } from '../components/StatusBadge';
 import { useAuth } from '../context/AuthContext';
 
@@ -17,6 +17,8 @@ export default function Assets() {
   const [searchInput, setSearchInput] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
+  const [sortBy, setSortBy] = useState('');
+  const [sortOrder, setSortOrder] = useState('asc');
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -48,6 +50,8 @@ export default function Assets() {
         pageSize: PAGE_SIZE,
         search: searchTerm,
         category: categoryFilter,
+        sortBy,
+        sortOrder,
       });
       const data = response.data.data;
       setAssets(data.items || []);
@@ -57,7 +61,22 @@ export default function Assets() {
     } finally {
       setLoading(false);
     }
-  }, [page, searchTerm, categoryFilter]);
+  }, [page, searchTerm, categoryFilter, sortBy, sortOrder]);
+
+  const handleSort = (column) => {
+    if (sortBy === column) {
+      setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortBy(column);
+      setSortOrder('asc');
+    }
+    setPage(1);
+  };
+
+  const SortIcon = ({ column }) => {
+    if (sortBy !== column) return <ArrowUpDown size={12} className="text-gray-300" />;
+    return sortOrder === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />;
+  };
 
   useEffect(() => {
     loadAssets();
@@ -127,7 +146,7 @@ export default function Assets() {
   const handleExport = async () => {
     setExporting(true);
     try {
-      const response = await assetApi.exportExcel({ search: searchTerm, category: categoryFilter });
+      const response = await assetApi.exportExcel({ search: searchTerm, category: categoryFilter, sortBy, sortOrder });
       const blob = new Blob([response.data], {
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       });
@@ -205,13 +224,25 @@ export default function Assets() {
           <table className="table">
             <thead className="table-header">
               <tr>
-                <th className="table-cell">자산명</th>
-                <th className="table-cell">자산번호</th>
-                <th className="table-cell">카테고리</th>
+                <th className="table-cell cursor-pointer select-none" onClick={() => handleSort('assetName')}>
+                  <span className="flex items-center gap-1">자산명 <SortIcon column="assetName" /></span>
+                </th>
+                <th className="table-cell cursor-pointer select-none" onClick={() => handleSort('assetCode')}>
+                  <span className="flex items-center gap-1">자산번호 <SortIcon column="assetCode" /></span>
+                </th>
+                <th className="table-cell cursor-pointer select-none" onClick={() => handleSort('category')}>
+                  <span className="flex items-center gap-1">카테고리 <SortIcon column="category" /></span>
+                </th>
                 <th className="table-cell">위치</th>
-                <th className="table-cell">구매일</th>
-                <th className="table-cell">구매가</th>
-                <th className="table-cell">상태</th>
+                <th className="table-cell cursor-pointer select-none" onClick={() => handleSort('purchaseDate')}>
+                  <span className="flex items-center gap-1">구매일 <SortIcon column="purchaseDate" /></span>
+                </th>
+                <th className="table-cell cursor-pointer select-none" onClick={() => handleSort('purchasePrice')}>
+                  <span className="flex items-center gap-1">구매가 <SortIcon column="purchasePrice" /></span>
+                </th>
+                <th className="table-cell cursor-pointer select-none" onClick={() => handleSort('status')}>
+                  <span className="flex items-center gap-1">상태 <SortIcon column="status" /></span>
+                </th>
                 <th className="table-cell">관리</th>
               </tr>
             </thead>

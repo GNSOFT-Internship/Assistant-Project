@@ -162,3 +162,26 @@ def test_export_assets_respects_search_filter(client, admin_headers):
     resp = client.get("/api/assets/export?search=유니크검색어자산", headers=admin_headers)
     assert resp.status_code == 200
     assert len(resp.content) > 0
+
+
+def test_get_all_assets_sorts_by_purchase_price(client, admin_headers):
+    _create_asset(client, admin_headers, assetCode="TEST-ASSET-014", purchasePrice=500000)
+    _create_asset(client, admin_headers, assetCode="TEST-ASSET-015", purchasePrice=100000)
+    _create_asset(client, admin_headers, assetCode="TEST-ASSET-016", purchasePrice=900000)
+
+    resp = client.get(
+        "/api/assets?search=TEST-ASSET-01&pageSize=10&sortBy=purchasePrice&sortOrder=asc",
+        headers=admin_headers,
+    )
+    assert resp.status_code == 200
+    items = resp.json()["data"]["items"]
+    codes = [i["assetCode"] for i in items if i["assetCode"] in ("TEST-ASSET-014", "TEST-ASSET-015", "TEST-ASSET-016")]
+    assert codes == ["TEST-ASSET-015", "TEST-ASSET-014", "TEST-ASSET-016"]
+
+    resp_desc = client.get(
+        "/api/assets?search=TEST-ASSET-01&pageSize=10&sortBy=purchasePrice&sortOrder=desc",
+        headers=admin_headers,
+    )
+    items_desc = resp_desc.json()["data"]["items"]
+    codes_desc = [i["assetCode"] for i in items_desc if i["assetCode"] in ("TEST-ASSET-014", "TEST-ASSET-015", "TEST-ASSET-016")]
+    assert codes_desc == ["TEST-ASSET-016", "TEST-ASSET-014", "TEST-ASSET-015"]
