@@ -64,11 +64,28 @@ _SEARCH_FILTER_SCHEMA = {
                 "failureKeyword가 있는 질문의 minFailureCount와는 다른 필드이니 혼동하지 않는다."
             ),
         },
+        "noRepairHistory": {
+            "type": ["boolean", "null"],
+            "description": (
+                "'수리 이력이 없는', '고장난 적 없는', '한 번도 고장나지 않은'처럼 수리(REPAIR)/"
+                "교체(REPLACEMENT) 이력이 전혀 없어야 하는 조건이면 true. 정기점검(ROUTINE/"
+                "INSPECTION) 기록만 있거나 아예 이력이 없는 자산 모두 여기 해당한다. 조건이 없으면 null."
+            ),
+        },
+        "noMaintenanceHistory": {
+            "type": ["boolean", "null"],
+            "description": (
+                "'유지보수 이력이 전혀 없는', '한 번도 점검받은 적 없는'처럼 정기점검을 포함한 "
+                "모든 종류의 유지보수 기록이 단 한 건도 없어야 하는 조건이면 true. "
+                "noRepairHistory보다 더 엄격한 조건이며, 조건이 없으면 null."
+            ),
+        },
         "explanation": {"type": "string", "description": "검색 조건을 어떻게 해석했는지 한국어로 한 문장 설명"},
     },
     "required": [
         "category", "location", "keyword", "minUsedYears", "maxUsedYears", "statusFilter",
-        "failureKeyword", "minFailureCount", "minMaintenanceCount", "explanation",
+        "failureKeyword", "minFailureCount", "minMaintenanceCount", "noRepairHistory",
+        "noMaintenanceHistory", "explanation",
     ],
     "additionalProperties": False,
 }
@@ -81,11 +98,17 @@ _SEARCH_SYSTEM_PROMPT = (
     "'전원고장이 있었던', '배터리 문제가 발생한', 'HDD 오류를 겪은' 등 특정 고장 유형/정비 내용과 "
     "관련된 조건은 failureKeyword에 핵심 키워드를 넣고, 횟수 조건이 있으면 minFailureCount에도 "
     "설정한다. 반면 '유지보수 건수가 4건 이상인 장비'처럼 특정 고장 유형이 아니라 전체 정비 "
-    "횟수를 묻는 경우에는 minMaintenanceCount에 그 숫자를 설정한다 (failureKeyword는 null로 둔다)."
+    "횟수를 묻는 경우에는 minMaintenanceCount에 그 숫자를 설정한다 (failureKeyword는 null로 둔다). "
+    "'수리 이력이 없는', '고장난 적 없는'처럼 부정/결여형 조건이면 noRepairHistory를 true로, "
+    "'유지보수 이력이 아예 없는'처럼 정기점검까지 포함해 어떤 기록도 없어야 하면 "
+    "noMaintenanceHistory를 true로 설정한다."
 )
 
 
-def _apply_filter(asset: models.Asset, f: dict, db: "Session" = None) -> bool:
+_REPAIR_TYPES = (models.MaintenanceType.REPAIR, models.MaintenanceType.REPLACEMENT)
+
+
+def _apply_filter(asset: models.Asset, f: dict, records: Optional[list] = None) -> bool:
     if f.get("category") and f["category"].lower() not in (asset.category or "").lower():
         return False
     if f.get("location") and f["location"].lower() not in (asset.location or "").lower():
@@ -99,39 +122,43 @@ def _apply_filter(asset: models.Asset, f: dict, db: "Session" = None) -> bool:
         return False
     if f.get("statusFilter") and asset.status.value != f["statusFilter"]:
         return False
-    # 고장/정비 이력 필터: failure_type뿐 아니라 정비 설명(description)에서도
-    # 키워드를 찾는다 ("하드디스크를 교체한 장비"처럼 고장유형이 아닌 정비
-    # 내용으로 질문하는 경우를 포함하기 위함).
-    if f.get("failureKeyword") and db is not None:
-        kw = f["failureKeyword"].lower()
-        min_count = f.get("minFailureCount") or 1
-        records = (
-            db.query(models.MaintenanceRecord)
-            .filter(models.MaintenanceRecord.asset_id == asset.id)
-            .all()
-        )
-        matched = sum(
-            1 for r in records
-            if (r.failure_type and kw in r.failure_type.lower())
-            or (r.description and kw in r.description.lower())
-        )
-        if matched < min_count:
+
+    needs_records = any(
+        f.get(key) for key in ("failureKeyword", "minMaintenanceCount", "noRepairHistory", "noMaintenanceHistory")
+    )
+    if needs_records:
+        records = records or []
+
+        if f.get("noMaintenanceHistory") and len(records) > 0:
             return False
-    # 고장 유형과 무관한 전체 유지보수 건수 필터
-    if f.get("minMaintenanceCount") and db is not None:
-        total_count = (
-            db.query(models.MaintenanceRecord)
-            .filter(models.MaintenanceRecord.asset_id == asset.id)
-            .count()
-        )
-        if total_count < f["minMaintenanceCount"]:
+
+        if f.get("noRepairHistory") and any(r.maintenance_type in _REPAIR_TYPES for r in records):
             return False
+
+        # 고장/정비 이력 필터: failure_type뿐 아니라 정비 설명(description)에서도
+        # 키워드를 찾는다 ("하드디스크를 교체한 장비"처럼 고장유형이 아닌 정비
+        # 내용으로 질문하는 경우를 포함하기 위함).
+        if f.get("failureKeyword"):
+            kw = f["failureKeyword"].lower()
+            min_count = f.get("minFailureCount") or 1
+            matched = sum(
+                1 for r in records
+                if (r.failure_type and kw in r.failure_type.lower())
+                or (r.description and kw in r.description.lower())
+            )
+            if matched < min_count:
+                return False
+
+        # 고장 유형과 무관한 전체 유지보수 건수 필터
+        if f.get("minMaintenanceCount") and len(records) < f["minMaintenanceCount"]:
+            return False
+
     return True
 
 
 _FILTER_CRITERIA_FIELDS = [
     "category", "location", "keyword", "minUsedYears", "maxUsedYears", "statusFilter",
-    "failureKeyword", "minMaintenanceCount",
+    "failureKeyword", "minMaintenanceCount", "noRepairHistory", "noMaintenanceHistory",
 ]
 
 
@@ -172,7 +199,10 @@ def natural_language_search(request: NaturalSearchRequest, db: Session = Depends
 
     try:
         filter_result = llm.ask_json(_SEARCH_SYSTEM_PROMPT, query, _SEARCH_FILTER_SCHEMA, effort="low")
-        filtered = [a for a in all_assets if _apply_filter(a, filter_result, db)]
+        records_by_asset: dict = {}
+        for r in db.query(models.MaintenanceRecord).all():
+            records_by_asset.setdefault(r.asset_id, []).append(r)
+        filtered = [a for a in all_assets if _apply_filter(a, filter_result, records_by_asset.get(a.id, []))]
         explanation = filter_result.get("explanation") or f"'{query}'에 대한 검색 결과 {len(filtered)}건을 찾았습니다."
         has_filter = _has_filter_criteria(filter_result)
     except Exception:
