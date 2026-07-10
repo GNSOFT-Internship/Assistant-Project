@@ -28,6 +28,8 @@ export default function Maintenance() {
   const [viewingAsset, setViewingAsset] = useState(null);
   const [viewingMaintenance, setViewingMaintenance] = useState([]);
   const [loadingAssetDetail, setLoadingAssetDetail] = useState(false);
+  const [aiAnalysis, setAiAnalysis] = useState(null);
+  const [loadingAiAnalysis, setLoadingAiAnalysis] = useState(false);
 
   const startMonth = buildYearMonth(startYear, startMonthNum);
   const endMonth = buildYearMonth(endYear, endMonthNum);
@@ -39,6 +41,7 @@ export default function Maintenance() {
       return;
     }
     loadAnalysis();
+    setAiAnalysis(null); // 기간이 바뀌면 이전 AI 분석은 더 이상 맞지 않으므로 비운다
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startMonth, endMonth, rangeInvalid]);
 
@@ -51,6 +54,19 @@ export default function Maintenance() {
       console.error('분석 로드 실패:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleLoadAiAnalysis = async () => {
+    setLoadingAiAnalysis(true);
+    try {
+      const response = await aiApi.getMaintenanceAnalysis({ startMonth, endMonth, includeAi: true });
+      setAiAnalysis(response.data.data?.aiAnalysis || 'AI 분석 결과를 가져오지 못했습니다.');
+    } catch (error) {
+      console.error('AI 분석 로드 실패:', error);
+      setAiAnalysis('AI 분석 중 오류가 발생했습니다.');
+    } finally {
+      setLoadingAiAnalysis(false);
     }
   };
 
@@ -290,12 +306,27 @@ export default function Maintenance() {
           )}
         </div>
 
-        {analysis.aiAnalysis && (
-          <div className="bg-blue-50 rounded-lg p-4">
-            <h3 className="font-semibold text-blue-900 mb-2">AI 분석 결과</h3>
-            <div className="text-sm text-blue-800 whitespace-pre-line">{analysis.aiAnalysis}</div>
+        <div className="bg-blue-50 rounded-lg p-4">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="font-semibold text-blue-900">AI 분석 결과</h3>
+            {!aiAnalysis && (
+              <button
+                onClick={handleLoadAiAnalysis}
+                disabled={loadingAiAnalysis}
+                className="btn btn-primary text-sm py-1"
+              >
+                {loadingAiAnalysis ? '분석 중...' : 'AI 분석하기'}
+              </button>
+            )}
           </div>
-        )}
+          {aiAnalysis ? (
+            <div className="text-sm text-blue-800 whitespace-pre-line">{aiAnalysis}</div>
+          ) : (
+            <div className="text-sm text-blue-700">
+              버튼을 누르면 현재 기간 데이터를 바탕으로 AI가 분석해드립니다.
+            </div>
+          )}
+        </div>
       </div>
 
       {selectedFailureType && (

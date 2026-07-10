@@ -6,6 +6,7 @@ export default function Reports() {
   const [generating, setGenerating] = React.useState(false);
   const [loading, setLoading] = React.useState(true);
   const [report, setReport] = React.useState(null);
+  const [loadingAiSummary, setLoadingAiSummary] = React.useState(false);
 
   const loadPreview = React.useCallback(async () => {
     setLoading(true);
@@ -22,6 +23,19 @@ export default function Reports() {
   React.useEffect(() => {
     loadPreview();
   }, [loadPreview]);
+
+  const handleLoadAiSummary = async () => {
+    setLoadingAiSummary(true);
+    try {
+      const response = await reportApi.getMonthly({ includeAi: true });
+      setReport(response.data.data);
+    } catch (error) {
+      console.error('AI 요약 로드 실패:', error);
+      alert('AI 요약을 불러오는 중 오류가 발생했습니다.');
+    } finally {
+      setLoadingAiSummary(false);
+    }
+  };
 
   const handleGenerate = async () => {
     setGenerating(true);
@@ -113,29 +127,46 @@ export default function Reports() {
         </div>
 
         {!loading && report && (
-          <div className="mt-6 space-y-4">
-            <div className="border rounded-lg p-4">
-              <h3 className="font-semibold mb-2">AI 요약</h3>
-              <p className="text-sm text-gray-700">{report.executiveSummary}</p>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="border rounded-lg p-4">
-                <h3 className="font-semibold mb-2">주요 문제점</h3>
-                <ul className="text-sm text-gray-700 space-y-1 list-disc list-inside">
-                  {(report.keyIssues || []).map((issue, i) => (
-                    <li key={i}>{issue}</li>
-                  ))}
-                </ul>
+          <div className="mt-6">
+            {report.executiveSummary == null ? (
+              <div className="border rounded-lg p-6 text-center">
+                <p className="text-sm text-gray-500 mb-3">
+                  AI 요약, 주요 문제점, 향후 관리 권장사항은 버튼을 눌러야 생성됩니다.
+                </p>
+                <button
+                  onClick={handleLoadAiSummary}
+                  disabled={loadingAiSummary}
+                  className="btn btn-primary"
+                >
+                  {loadingAiSummary ? '생성 중...' : 'AI 요약 보기'}
+                </button>
               </div>
-              <div className="border rounded-lg p-4">
-                <h3 className="font-semibold mb-2">향후 관리 권장사항</h3>
-                <ul className="text-sm text-gray-700 space-y-1 list-disc list-inside">
-                  {(report.recommendations || []).map((rec, i) => (
-                    <li key={i}>{rec}</li>
-                  ))}
-                </ul>
+            ) : (
+              <div className="space-y-4">
+                <div className="border rounded-lg p-4">
+                  <h3 className="font-semibold mb-2">AI 요약</h3>
+                  <p className="text-sm text-gray-700">{report.executiveSummary}</p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="border rounded-lg p-4">
+                    <h3 className="font-semibold mb-2">주요 문제점</h3>
+                    <ul className="text-sm text-gray-700 space-y-1 list-disc list-inside">
+                      {(report.keyIssues || []).map((issue, i) => (
+                        <li key={i}>{issue}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div className="border rounded-lg p-4">
+                    <h3 className="font-semibold mb-2">향후 관리 권장사항</h3>
+                    <ul className="text-sm text-gray-700 space-y-1 list-disc list-inside">
+                      {(report.recommendations || []).map((rec, i) => (
+                        <li key={i}>{rec}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
       </div>

@@ -367,6 +367,7 @@ def maintenance_analysis(
     db: Session = Depends(get_db),
     startMonth: Optional[str] = None,
     endMonth: Optional[str] = None,
+    includeAi: bool = False,
 ):
     all_records = db.query(models.MaintenanceRecord).all()
     all_assets = {a.id: a for a in db.query(models.Asset).all()}
@@ -406,33 +407,35 @@ def maintenance_analysis(
         monthly_costs[key] = monthly_costs.get(key, 0.0) + (float(r.cost) if r.cost is not None else 0.0)
     monthly_costs = dict(sorted(monthly_costs.items()))
 
-    ai_analysis = (
-        "분석할 유지보수 데이터가 없습니다."
-        if total_records == 0
-        else (
-            f"총 {total_records}건의 유지보수 기록이 있으며, 누적 비용은 {total_cost:,.0f}원입니다. "
-            f"반복 고장 자산은 {repeated_failure_count}건입니다."
-        )
-    )
-
-    if total_records > 0 and llm.is_configured():
-        try:
-            repeated_names = [
-                f"{all_assets[aid].asset_name}({cnt}회)"
-                for aid, cnt in sorted(failure_count_by_asset.items(), key=lambda x: -x[1])
-                if aid in all_assets and cnt >= 2
-            ]
-            summary_input = (
-                f"총 유지보수 건수: {total_records}\n"
-                f"누적 비용: {total_cost:,.0f}원\n"
-                f"월별 비용: {monthly_costs}\n"
-                f"반복 고장 자산: {', '.join(repeated_names) if repeated_names else '없음'}\n"
-                f"고장 유형 빈도: {failure_patterns}"
+    ai_analysis = None
+    if includeAi:
+        ai_analysis = (
+            "분석할 유지보수 데이터가 없습니다."
+            if total_records == 0
+            else (
+                f"총 {total_records}건의 유지보수 기록이 있으며, 누적 비용은 {total_cost:,.0f}원입니다. "
+                f"반복 고장 자산은 {repeated_failure_count}건입니다."
             )
-            llm_result = llm.ask_json(_MAINTENANCE_SYSTEM_PROMPT, summary_input, _MAINTENANCE_ANALYSIS_SCHEMA, effort="medium")
-            ai_analysis = llm_result.get("analysis", ai_analysis)
-        except Exception:
-            pass
+        )
+
+        if total_records > 0 and llm.is_configured():
+            try:
+                repeated_names = [
+                    f"{all_assets[aid].asset_name}({cnt}회)"
+                    for aid, cnt in sorted(failure_count_by_asset.items(), key=lambda x: -x[1])
+                    if aid in all_assets and cnt >= 2
+                ]
+                summary_input = (
+                    f"총 유지보수 건수: {total_records}\n"
+                    f"누적 비용: {total_cost:,.0f}원\n"
+                    f"월별 비용: {monthly_costs}\n"
+                    f"반복 고장 자산: {', '.join(repeated_names) if repeated_names else '없음'}\n"
+                    f"고장 유형 빈도: {failure_patterns}"
+                )
+                llm_result = llm.ask_json(_MAINTENANCE_SYSTEM_PROMPT, summary_input, _MAINTENANCE_ANALYSIS_SCHEMA, effort="medium")
+                ai_analysis = llm_result.get("analysis", ai_analysis)
+            except Exception:
+                pass
 
     return {
         "success": True,

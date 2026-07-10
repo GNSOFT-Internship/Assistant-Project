@@ -88,7 +88,7 @@ export const chatApi = {
 };
 
 export const reportApi = {
-  getMonthly: () => api.get('/reports/monthly'),
+  getMonthly: (params) => api.get('/reports/monthly', { params }),
   downloadPdf: () => api.get('/reports/monthly/pdf', { responseType: 'blob' }),
 };
 

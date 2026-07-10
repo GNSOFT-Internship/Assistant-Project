@@ -142,9 +142,13 @@ def _generate_narrative(report_data: dict) -> dict:
 
 
 @router.get("/monthly")
-def get_monthly_report(db: Session = Depends(get_db)):
+def get_monthly_report(db: Session = Depends(get_db), includeAi: bool = False):
     report_data = _build_report_data(db)
-    narrative = _generate_narrative(report_data)
+    narrative = _generate_narrative(report_data) if includeAi else {
+        "executiveSummary": None,
+        "keyIssues": None,
+        "recommendations": None,
+    }
     return {
         "success": True,
         "message": None,
