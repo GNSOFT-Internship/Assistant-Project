@@ -1,9 +1,11 @@
+import json
 import logging
 from datetime import date
 from typing import Optional
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .. import llm, models, schemas
@@ -580,7 +582,6 @@ _WORK_ORDER_SYSTEM_PROMPT = (
 
 @router.get("/work-orders/{maintenance_record_id}", response_model=schemas.WorkOrderResponse)
 def get_or_create_work_order(maintenance_record_id: int, db: Session = Depends(get_db)):
-    import json
     # 1. 기존 지시서가 있는지 조회
     wo = db.query(models.WorkOrder).filter(models.WorkOrder.maintenance_record_id == maintenance_record_id).first()
     if wo:
@@ -649,7 +650,24 @@ def get_or_create_work_order(maintenance_record_id: int, db: Session = Depends(g
         estimated_time=wo_time
     )
     db.add(wo_obj)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # 동시에 같은 유지보수 기록에 대해 두 요청이 들어와 둘 다 "없음"으로 확인하고
+        # 생성을 시도한 경우: 먼저 커밋된 쪽을 그대로 반환한다 (unique 제약 위반은 500이 아니라
+        # 이미 생성된 지시서를 조회해 정상 응답하도록 처리).
+        db.rollback()
+        wo = db.query(models.WorkOrder).filter(models.WorkOrder.maintenance_record_id == maintenance_record_id).first()
+        return schemas.WorkOrderResponse(
+            id=wo.id,
+            maintenanceRecordId=wo.maintenance_record_id,
+            title=wo.title,
+            steps=json.loads(wo.steps),
+            requiredTools=json.loads(wo.required_tools) if wo.required_tools else [],
+            safetyPrecautions=json.loads(wo.safety_precautions) if wo.safety_precautions else [],
+            estimatedTime=wo.estimated_time,
+            createdAt=wo.created_at
+        )
     db.refresh(wo_obj)
 
     return schemas.WorkOrderResponse(
@@ -697,6 +715,30 @@ _FORECAST_SYSTEM_PROMPT = (
 )
 
 
+def _fallback_monthly_forecast(cost_by_month: dict) -> list:
+    """월별 과거 데이터가 1건뿐이라 그 값이 그대로 예측치가 되어버리는 것을 막기 위해,
+    전체 월 평균을 기준선으로 삼고 각 월의 실적이 있으면 기준선과 절반씩 섞어 완만하게 반영한다."""
+    all_costs = list(cost_by_month.values())
+    overall_avg = sum(all_costs) / len(all_costs) if all_costs else 1000000.0
+
+    monthly_items = []
+    for m in range(1, 13):
+        past_months_costs = [v for k, v in cost_by_month.items() if k.endswith(f"-{m:02d}")]
+        if len(past_months_costs) >= 2:
+            base = sum(past_months_costs) / len(past_months_costs)
+            reason = f"과거 {m}월 지출 실적 평균 대비 인플레이션 및 장비 노후화 보정"
+        elif len(past_months_costs) == 1:
+            # 표본이 1건뿐이면 그 값에 전체 요구치를 매몰시키지 않도록 전체 평균과 절반씩 섞는다.
+            base = (past_months_costs[0] + overall_avg) / 2
+            reason = f"{m}월 과거 실적이 1건뿐이라 전체 평균과 절반씩 반영해 이상치 영향을 완화"
+        else:
+            base = overall_avg
+            reason = f"{m}월 과거 실적이 없어 전체 월평균 지출을 기준으로 산정"
+        amount = round(base * 1.05, -4)  # 5% 상승 및 만원단위 반올림
+        monthly_items.append(schemas.BudgetForecastItem(month=m, amount=amount, reason=reason))
+    return monthly_items
+
+
 @router.get("/budgets/forecast", response_model=schemas.BudgetForecastResponse)
 def get_budget_forecast(db: Session = Depends(get_db)):
     all_records = db.query(models.MaintenanceRecord).all()
@@ -709,28 +751,23 @@ def get_budget_forecast(db: Session = Depends(get_db)):
         cost_by_month[key] = cost_by_month.get(key, 0.0) + (float(r.cost) if r.cost is not None else 0.0)
     cost_by_month = dict(sorted(cost_by_month.items()))
 
-    # 자산 카테고리 정보
+    # 자산 카테고리 정보 및 노후도(내용연수 초과 대수) - simulate_budget과 동일한 방식으로 집계
+    today = date.today()
     asset_summary = {}
+    expired_by_cat = {}
     for a in all_assets:
         asset_summary[a.category] = asset_summary.get(a.category, 0) + 1
+        used_years = today.year - a.purchase_date.year
+        if used_years > a.useful_life:
+            expired_by_cat[a.category] = expired_by_cat.get(a.category, 0) + 1
 
     forecast_year = date.today().year + 1
 
     if not llm.is_configured() or not all_records:
         # LLM 미설정 또는 과거 이력 부재 시의 폴백 규칙 기반 계산
-        monthly_items = []
-        for m in range(1, 13):
-            past_months_costs = [v for k, v in cost_by_month.items() if k.endswith(f"-{m:02d}")]
-            avg_cost = sum(past_months_costs) / len(past_months_costs) if past_months_costs else 1000000.0
-            amount = round(avg_cost * 1.05, -4)  # 5% 상승 및 만원단위 반올림
-            monthly_items.append(schemas.BudgetForecastItem(
-                month=m,
-                amount=amount,
-                reason=f"과거 {m}월 지출 실적 평균 대비 인플레이션 및 장비 노후화 보정"
-            ))
         return schemas.BudgetForecastResponse(
             forecastYear=forecast_year,
-            monthlyForecast=monthly_items,
+            monthlyForecast=_fallback_monthly_forecast(cost_by_month),
             rationale="과거 데이터 실적을 기반으로 5%의 안전율을 적용해 수립한 예측안입니다."
         )
 
@@ -738,18 +775,27 @@ def get_budget_forecast(db: Session = Depends(get_db)):
         prompt = (
             f"과거 월별 지출 현황: {cost_by_month}\n"
             f"카테고리별 자산 보유 대수: {asset_summary}\n"
+            f"카테고리별 내용연수 초과(노후) 자산 대수: {expired_by_cat}\n"
             f"예측 대상 연도: {forecast_year}년"
         )
         res = llm.ask_json(_FORECAST_SYSTEM_PROMPT, prompt, _FORECAST_SCHEMA, effort="medium")
-        monthly_forecast = [
-            schemas.BudgetForecastItem(
+        by_month = {
+            item["month"]: schemas.BudgetForecastItem(
                 month=item["month"],
                 amount=round(item["amount"], -4),
-                reason=item["reason"]
+                reason=item["reason"],
             )
             for item in res.get("monthlyForecast", [])
-        ]
-        monthly_forecast.sort(key=lambda x: x.month)
+            if isinstance(item.get("month"), int) and 1 <= item["month"] <= 12
+        }
+        # LLM이 12개월 중 일부를 누락하면, 그 달만 규칙 기반 값으로 채워 넣는다
+        # (전체를 폐기하고 폴백으로 되돌리는 대신, 실제로 온 데이터는 최대한 살린다).
+        if len(by_month) < 12:
+            fallback_by_month = {item.month: item for item in _fallback_monthly_forecast(cost_by_month)}
+            for m in range(1, 13):
+                if m not in by_month:
+                    by_month[m] = fallback_by_month[m]
+        monthly_forecast = [by_month[m] for m in range(1, 13)]
         return schemas.BudgetForecastResponse(
             forecastYear=res.get("forecastYear") or forecast_year,
             monthlyForecast=monthly_forecast,
@@ -757,18 +803,9 @@ def get_budget_forecast(db: Session = Depends(get_db)):
         )
     except Exception:
         logger.warning("AI 예산 예측 생성 실패, 폴백 규칙 적용", exc_info=True)
-        monthly_items = []
-        for m in range(1, 13):
-            past_months_costs = [v for k, v in cost_by_month.items() if k.endswith(f"-{m:02d}")]
-            avg_cost = sum(past_months_costs) / len(past_months_costs) if past_months_costs else 1000000.0
-            monthly_items.append(schemas.BudgetForecastItem(
-                month=m,
-                amount=round(avg_cost * 1.05, -4),
-                reason=f"과거 {m}월 지출 실적 평균 대비 장비 노후화 보정"
-            ))
         return schemas.BudgetForecastResponse(
             forecastYear=forecast_year,
-            monthlyForecast=monthly_items,
+            monthlyForecast=_fallback_monthly_forecast(cost_by_month),
             rationale="AI 예측 API 실패로 인해 과거 실적 평균 기반 5% 상승분을 적용해 산출한 백업용 예산 예측 결과입니다."
         )
 
@@ -800,6 +837,24 @@ _SIMULATE_SCHEMA = {
     "required": ["allocations", "totalAllocated", "summary"],
     "additionalProperties": False
 }
+
+def _clamp_allocations_to_budget(allocations: list, total_budget: float) -> list:
+    """LLM/폴백 계산 결과의 합이 total_budget을 넘는 경우를 대비한 최종 안전장치.
+
+    LLM은 "상한액을 넘지 마라"는 지시를 프롬프트로만 전달해도 자주 어기므로,
+    코드 레벨에서 총합이 상한액을 초과하면 비율을 유지한 채로 전체를 비례 축소한다.
+    """
+    if total_budget <= 0 or not allocations:
+        return allocations
+    current_total = sum(item.allocatedAmount for item in allocations)
+    if current_total <= total_budget or current_total <= 0:
+        return allocations
+    scale = total_budget / current_total
+    for item in allocations:
+        item.allocatedAmount = round(item.allocatedAmount * scale, -4)
+        item.ratio = item.allocatedAmount / total_budget if total_budget > 0 else 0.0
+    return allocations
+
 
 _SIMULATE_SYSTEM_PROMPT = (
     "당신은 공공기관 자산 예산 기획 AI다. 주어진 전체 예산 상한액과 카테고리별 자산 보유량, 내용연수 도달율, "
@@ -835,8 +890,9 @@ def simulate_budget(request: schemas.BudgetSimulationRequest, db: Session = Depe
             if used_years > a.useful_life:
                 expired_by_cat[a.category] += 1
 
+    asset_by_id = {a.id: a for a in all_assets}
     for r in all_records:
-        asset = db.query(models.Asset).filter(models.Asset.id == r.asset_id).first()
+        asset = asset_by_id.get(r.asset_id)
         if asset and asset.category in cost_by_cat:
             cost_by_cat[asset.category] += float(r.cost or 0.0)
 
@@ -851,20 +907,19 @@ def simulate_budget(request: schemas.BudgetSimulationRequest, db: Session = Depe
             weights[cat] = w
             total_weight += w
 
-        total_allocated = 0.0
         for cat in categories:
             ratio = weights[cat] / total_weight if total_weight > 0 else (1.0 / len(categories))
             amount = round(total_budget * ratio, -4)
-            total_allocated += amount
             allocations.append(schemas.CategoryAllocation(
                 category=cat,
                 allocatedAmount=amount,
                 ratio=ratio,
                 reason=f"보유 기기 {asset_by_cat[cat]}대(노후 {expired_by_cat[cat]}대) 및 과거 누적 수리비 {cost_by_cat[cat]:,.0f}원에 근거한 최적 배분"
             ))
+        allocations = _clamp_allocations_to_budget(allocations, total_budget)
         return schemas.BudgetSimulationResponse(
             allocations=allocations,
-            totalAllocated=total_allocated,
+            totalAllocated=sum(item.allocatedAmount for item in allocations),
             summary=f"과거 지출 가중치 및 내용연수 초과 기기 현황을 기준으로 총 {total_budget:,.0f}원을 합리적으로 자동 배분한 시뮬레이션입니다."
         )
 
@@ -885,6 +940,7 @@ def simulate_budget(request: schemas.BudgetSimulationRequest, db: Session = Depe
             )
             for item in res.get("allocations", [])
         ]
+        allocations = _clamp_allocations_to_budget(allocations, total_budget)
         return schemas.BudgetSimulationResponse(
             allocations=allocations,
             totalAllocated=sum(item.allocatedAmount for item in allocations),
@@ -908,6 +964,7 @@ def simulate_budget(request: schemas.BudgetSimulationRequest, db: Session = Depe
                 ratio=ratio,
                 reason=f"과거 수리비 지출 및 노후 장비 비율에 따른 비율 배정 ({ratio*100:.1f}%)"
             ))
+        allocations = _clamp_allocations_to_budget(allocations, total_budget)
         return schemas.BudgetSimulationResponse(
             allocations=allocations,
             totalAllocated=sum(item.allocatedAmount for item in allocations),

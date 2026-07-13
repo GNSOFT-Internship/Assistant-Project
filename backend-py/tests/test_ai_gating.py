@@ -129,6 +129,16 @@ def test_simulate_budget(client, admin_headers):
     assert "summary" in data
 
 
+def test_simulate_budget_never_exceeds_total_budget(client, admin_headers):
+    """반올림(만원 단위) 등으로 배분 합계가 상한액을 넘지 않도록 클램프되어야 한다."""
+    total_budget = 1234567.0
+    resp = client.post("/api/ai/budgets/simulate", json={"totalBudget": total_budget}, headers=admin_headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["totalAllocated"] <= total_budget
+    assert sum(a["allocatedAmount"] for a in data["allocations"]) <= total_budget
+
+
 def test_generate_procurement_spec(client, admin_headers):
     asset = client.post("/api/assets", json=ASSET_PAYLOAD, headers=admin_headers).json()["data"]
     resp = client.get(f"/api/ai/procurement-spec/{asset['id']}", headers=admin_headers)
