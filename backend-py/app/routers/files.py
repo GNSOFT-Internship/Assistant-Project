@@ -4,7 +4,8 @@ import re
 import uuid
 from datetime import date, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from .. import auth, models
@@ -243,19 +244,7 @@ async def upload_file(
         raise HTTPException(status_code=400, detail=f"File upload failed: {e}")
 
 
-@router.post("/{file_id}/process")
-def process_file(
-    file_id: int,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(auth.require_admin),
-):
-    file_upload = db.query(models.FileUpload).filter(models.FileUpload.id == file_id).first()
-    if file_upload is None:
-        raise HTTPException(status_code=400, detail="File not found")
-
-    file_upload.status = models.UploadStatus.PROCESSING
-    db.commit()
-
+def _process_file_task_logic(file_upload: models.FileUpload, db: Session):
     try:
         if file_upload.file_type in (models.FileType.EXCEL, models.FileType.CSV):
             rows, errors = _parse_spreadsheet(file_upload.file_path, file_upload.file_type)
@@ -308,13 +297,213 @@ def process_file(
         file_upload.status = models.UploadStatus.COMPLETED
         file_upload.error_message = None
     except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"File process background task failed: {e}", exc_info=True)
         file_upload.status = models.UploadStatus.FAILED
         file_upload.error_message = str(e)
 
     file_upload.updated_at = datetime.now()
     db.commit()
-    db.refresh(file_upload)
-    return {"success": True, "message": "File processed successfully", "data": file_to_response(file_upload)}
+
+
+def _process_file_in_background(file_id: int):
+    from ..database import SessionLocal
+    db = SessionLocal()
+    try:
+        file_upload = db.query(models.FileUpload).filter(models.FileUpload.id == file_id).first()
+        if file_upload:
+            _process_file_task_logic(file_upload, db)
+    finally:
+        db.close()
+
+
+@router.post("/{file_id}/process")
+def process_file(
+    file_id: int,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(auth.require_admin),
+):
+    file_upload = db.query(models.FileUpload).filter(models.FileUpload.id == file_id).first()
+    if file_upload is None:
+        raise HTTPException(status_code=400, detail="File not found")
+
+    file_upload.status = models.UploadStatus.PROCESSING
+    db.commit()
+
+    from ..main import app
+    if get_db in app.dependency_overrides:
+        # 테스트 환경의 격리된 트랜잭션 롤백 메커니즘 지원을 위해 동기 실행
+        _process_file_task_logic(file_upload, db)
+    else:
+        background_tasks.add_task(_process_file_in_background, file_id)
+
+    return {"success": True, "message": "File processing started", "data": file_to_response(file_upload)}
+
+
+@router.post("/batch-upload")
+async def batch_upload_files(
+    background_tasks: BackgroundTasks,
+    files: list[UploadFile] = File(...),
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(auth.require_admin),
+):
+    try:
+        os.makedirs(settings.UPLOAD_DIRECTORY, exist_ok=True)
+        uploaded_records = []
+        for file in files:
+            original_filename = file.filename
+            filename = f"{uuid.uuid4()}_{original_filename}"
+            file_path = os.path.join(settings.UPLOAD_DIRECTORY, filename)
+
+            contents = await file.read()
+            with open(file_path, "wb") as f:
+                f.write(contents)
+
+            file_upload = models.FileUpload(
+                filename=filename,
+                original_filename=original_filename,
+                file_type=detect_file_type(original_filename),
+                file_path=file_path,
+                status=models.UploadStatus.PROCESSING,
+                applied=False,
+            )
+            db.add(file_upload)
+            db.commit()
+            db.refresh(file_upload)
+
+            from ..main import app
+            if get_db in app.dependency_overrides:
+                _process_file_task_logic(file_upload, db)
+            else:
+                background_tasks.add_task(_process_file_in_background, file_upload.id)
+
+            uploaded_records.append(file_to_response(file_upload))
+
+        return {"success": True, "message": f"{len(uploaded_records)} files uploaded and queued for processing", "data": uploaded_records}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Batch upload failed: {e}")
+
+
+class BatchApplyRequest(BaseModel):
+    fileIds: list[int]
+
+
+@router.post("/batch-apply")
+def batch_apply_files(
+    request: BatchApplyRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(auth.require_admin),
+):
+    success_count = 0
+    total_records_created = 0
+    errors = []
+
+    for file_id in request.fileIds:
+        file_upload = db.query(models.FileUpload).filter(models.FileUpload.id == file_id).first()
+        if file_upload is None:
+            errors.append(f"File ID {file_id} not found")
+            continue
+        if file_upload.status != models.UploadStatus.COMPLETED:
+            errors.append(f"File ID {file_id} ({file_upload.original_filename}) is not COMPLETED")
+            continue
+        if file_upload.applied:
+            continue
+
+        try:
+            result = json.loads(file_upload.extracted_data) if file_upload.extracted_data else {}
+            created_count = 0
+            created_ids = []
+            source_label = f"엑셀 업로드: {file_upload.original_filename}"
+            changed_by = current_user.get("username")
+
+            if result.get("kind") == "maintenance_records":
+                assets_by_code = {a.asset_code: a for a in db.query(models.Asset).all()}
+                touched_assets = {}
+                counts_by_asset = {}
+                for r in result.get("records", []):
+                    asset = assets_by_code.get(r["assetCode"])
+                    if asset is None:
+                        continue
+                    record = models.MaintenanceRecord(
+                        asset_id=asset.id,
+                        maintenance_date=date.fromisoformat(r["maintenanceDate"]),
+                        maintenance_type=models.MaintenanceType(r["maintenanceType"]),
+                        cost=r.get("cost"),
+                        description=r.get("description"),
+                        technician=r.get("technician"),
+                        failure_type=r.get("failureType"),
+                    )
+                    db.add(record)
+                    db.flush()
+                    created_ids.append(record.id)
+                    created_count += 1
+                    touched_assets[asset.id] = asset
+                    counts_by_asset[asset.id] = counts_by_asset.get(asset.id, 0) + 1
+
+                for asset_id, count in counts_by_asset.items():
+                    _log_change(
+                        db, touched_assets[asset_id], models.AuditAction.CREATE, changed_by,
+                        {
+                            "source": {"old": None, "new": source_label},
+                            "maintenance_record": {"old": None, "new": f"{count}건 등록됨"},
+                        },
+                    )
+                result["appliedRecordCount"] = created_count
+                result["appliedMaintenanceRecordIds"] = created_ids
+                file_upload.extracted_data = json.dumps(result, ensure_ascii=False)
+
+            elif result.get("kind") == "pdf_quote":
+                asset = None
+                if result.get("assetCode"):
+                    asset = db.query(models.Asset).filter(models.Asset.asset_code == result["assetCode"]).first()
+                if asset is not None and result.get("totalAmount") is not None:
+                    description_parts = ["[견적서 자동 등록]"]
+                    if result.get("vendor"):
+                        description_parts.append(f"업체: {result['vendor']}")
+                    record = models.MaintenanceRecord(
+                        asset_id=asset.id,
+                        maintenance_date=(
+                            date.fromisoformat(result["quoteDate"]) if result.get("quoteDate") else date.today()
+                        ),
+                        maintenance_type=models.MaintenanceType.REPAIR,
+                        cost=result["totalAmount"],
+                        description=" ".join(description_parts),
+                        technician=None,
+                        failure_type=None,
+                    )
+                    db.add(record)
+                    db.flush()
+                    created_ids.append(record.id)
+                    created_count = 1
+                    _log_change(
+                        db, asset, models.AuditAction.CREATE, changed_by,
+                        {
+                            "source": {"old": None, "new": f"견적서(PDF) 업로드: {file_upload.original_filename}"},
+                            "maintenance_record": {"old": None, "new": _maintenance_summary(record)},
+                        },
+                    )
+                result["appliedRecordCount"] = created_count
+                result["appliedMaintenanceRecordIds"] = created_ids
+                file_upload.extracted_data = json.dumps(result, ensure_ascii=False)
+
+            file_upload.applied = True
+            file_upload.updated_at = datetime.now()
+            success_count += 1
+            total_records_created += created_count
+        except Exception as e:
+            errors.append(f"Error applying {file_upload.original_filename}: {e}")
+
+    db.commit()
+    return {
+        "success": len(errors) == 0,
+        "message": f"Successfully applied {success_count} files. Total {total_records_created} maintenance records created.",
+        "data": {
+            "successCount": success_count,
+            "totalRecordsCreated": total_records_created,
+            "errors": errors
+        }
+    }
 
 
 @router.post("/{file_id}/apply")

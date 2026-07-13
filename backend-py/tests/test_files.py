@@ -97,3 +97,34 @@ def test_unapply_removes_exactly_the_created_records(client, admin_headers):
     reapply = client.post(f"/api/files/{file_id}/apply", headers=admin_headers)
     assert reapply.status_code == 200
     assert reapply.json()["data"]["extractedSummary"]["appliedRecordCount"] == 1
+
+
+def test_batch_upload_and_batch_apply(client, admin_headers):
+    # 1. 자산 생성
+    asset = client.post("/api/assets", json=ASSET_PAYLOAD, headers=admin_headers).json()["data"]
+
+    # 2. 다중 파일 업로드 API 호출
+    files = [
+        ("files", ("batch_1.csv", io.BytesIO(CSV_CONTENT.encode("utf-8")), "text/csv")),
+        ("files", ("batch_2.csv", io.BytesIO(CSV_CONTENT.encode("utf-8")), "text/csv"))
+    ]
+    resp = client.post("/api/files/batch-upload", files=files, headers=admin_headers)
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert len(data) == 2
+    file_ids = [f["id"] for f in data]
+
+    # 3. 비동기 백그라운드 처리가 테스트 환경에서 완료될 수 있도록 순차 파싱
+    for fid in file_ids:
+        client.post(f"/api/files/{fid}/process", headers=admin_headers)
+
+    # 4. 일괄 적용 API 호출
+    apply_resp = client.post("/api/files/batch-apply", json={"fileIds": file_ids}, headers=admin_headers)
+    assert apply_resp.status_code == 200
+    apply_data = apply_resp.json()["data"]
+    assert apply_data["successCount"] == 2
+    assert apply_data["totalRecordsCreated"] == 2
+
+    # 유지보수 기록 건수 확인 (각 파일당 1건씩 총 2건 등록 완료 확인)
+    maintenance = client.get(f"/api/assets/{asset['id']}/maintenance", headers=admin_headers).json()["data"]["items"]
+    assert len(maintenance) == 2

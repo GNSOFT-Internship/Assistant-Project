@@ -84,8 +84,13 @@ export const fileApi = {
   upload: (formData) => api.post('/files/upload', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   }),
+  batchUpload: (formData) => api.post('/files/batch-upload', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 120000,
+  }),
   process: (id) => api.post(`/files/${id}/process`),
   apply: (id) => api.post(`/files/${id}/apply`),
+  batchApply: (fileIds) => api.post('/files/batch-apply', { fileIds }),
   unapply: (id) => api.post(`/files/${id}/unapply`),
   delete: (id) => api.delete(`/files/${id}`),
 };
