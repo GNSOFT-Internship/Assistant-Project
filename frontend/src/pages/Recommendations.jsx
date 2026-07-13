@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { aiApi } from '../services/api';
-import { TrendingUp, FileText } from 'lucide-react';
+import { FileText } from 'lucide-react';
+import { useToast } from '../context/ToastContext';
+import LoadingState from '../components/LoadingState';
 
 export default function Recommendations() {
+  const toast = useToast();
   const [recommendations, setRecommendations] = useState([]);
   const [budget, setBudget] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -20,7 +23,7 @@ export default function Recommendations() {
       setSpecData(response.data);
     } catch (error) {
       console.error('조달 규격서 생성 실패:', error);
-      alert('조달 규격서 생성에 실패했습니다.');
+      toast.error('조달 규격서 생성에 실패했습니다.');
       setShowSpecModal(false);
     } finally {
       setLoadingSpec(false);
@@ -54,7 +57,7 @@ export default function Recommendations() {
     }
   };
 
-  if (loading) return <div className="card">로딩 중...</div>;
+  if (loading) return <div className="card"><LoadingState /></div>;
 
   return (
     <div className="space-y-6">
@@ -82,7 +85,7 @@ export default function Recommendations() {
 
         {recommendations.length > 0 && (
           <div className="space-y-4">
-            {recommendations.map((rec, index) => (
+            {recommendations.map((rec) => (
               <div key={rec.assetId} className="border rounded-lg p-4">
                 <div className="flex justify-between items-start mb-2">
                   <div>

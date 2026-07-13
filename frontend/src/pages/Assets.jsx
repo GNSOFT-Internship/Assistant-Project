@@ -3,13 +3,18 @@ import { useNavigate } from 'react-router-dom';
 import { assetApi } from '../services/api';
 import { Plus, Edit, Trash2, Eye, ChevronLeft, ChevronRight, Download, Upload, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import { AssetStatusBadge } from '../components/StatusBadge';
+import LoadingState from '../components/LoadingState';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
+import { useConfirm } from '../context/ConfirmContext';
 
 const PAGE_SIZE = 20;
 
 export default function Assets() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const toast = useToast();
+  const confirmDialog = useConfirm();
   const isAdmin = user?.role === 'ADMIN';
   const [assets, setAssets] = useState([]);
   const [total, setTotal] = useState(0);
@@ -99,18 +104,18 @@ export default function Assets() {
       resetForm();
     } catch (error) {
       console.error('저장 실패:', error);
-      alert('저장 중 오류가 발생했습니다.');
+      toast.error('저장 중 오류가 발생했습니다.');
     }
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('정말 삭제하시겠습니까?')) return;
+    if (!(await confirmDialog('정말 삭제하시겠습니까?', { danger: true, confirmLabel: '삭제' }))) return;
     try {
       await assetApi.delete(id);
       loadAssets();
     } catch (error) {
       console.error('삭제 실패:', error);
-      alert('삭제 중 오류가 발생했습니다.');
+      toast.error('삭제 중 오류가 발생했습니다.');
     }
   };
 
@@ -162,7 +167,7 @@ export default function Assets() {
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error('자산 목록 내보내기 실패:', error);
-      alert('엑셀 내보내기 중 오류가 발생했습니다.');
+      toast.error('엑셀 내보내기 중 오류가 발생했습니다.');
     } finally {
       setExporting(false);
     }
@@ -186,11 +191,15 @@ export default function Assets() {
         const detail = failed.slice(0, 5).map((f) => `${f.row}행: ${f.error}`).join('\n');
         msg += `\n${failed.length}건 실패\n${detail}${failed.length > 5 ? '\n...' : ''}`;
       }
-      alert(msg);
+      if (failed.length > 0) {
+        toast.error(msg, 8000);
+      } else {
+        toast.success(msg);
+      }
       loadAssets();
     } catch (error) {
       console.error('엑셀 가져오기 실패:', error);
-      alert(error.response?.data?.detail || '엑셀 가져오기 중 오류가 발생했습니다.');
+      toast.error(error.response?.data?.detail || '엑셀 가져오기 중 오류가 발생했습니다.');
     } finally {
       setImporting(false);
     }
@@ -262,7 +271,7 @@ export default function Assets() {
         </div>
 
         {loading ? (
-          <div className="text-center text-gray-500 py-8">로딩 중...</div>
+          <LoadingState className="py-8" />
         ) : assets.length === 0 ? (
           <div className="text-center text-gray-500 py-8">일치하는 자산이 없습니다.</div>
         ) : (

@@ -1,8 +1,10 @@
 import React from 'react';
 import { reportApi } from '../services/api';
 import { FileText, Download, RefreshCw } from 'lucide-react';
+import { useToast } from '../context/ToastContext';
 
 export default function Reports() {
+  const toast = useToast();
   const [generating, setGenerating] = React.useState(false);
   const [loading, setLoading] = React.useState(true);
   const [report, setReport] = React.useState(null);
@@ -31,7 +33,7 @@ export default function Reports() {
       setReport(response.data.data);
     } catch (error) {
       console.error('AI 요약 로드 실패:', error);
-      alert('AI 요약을 불러오는 중 오류가 발생했습니다.');
+      toast.error('AI 요약을 불러오는 중 오류가 발생했습니다.');
     } finally {
       setLoadingAiSummary(false);
     }
@@ -53,7 +55,7 @@ export default function Reports() {
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error('보고서 생성 실패:', error);
-      alert('보고서 생성 실패');
+      toast.error('보고서 생성 실패');
     } finally {
       setGenerating(false);
     }

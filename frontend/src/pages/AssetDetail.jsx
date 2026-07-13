@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { assetApi, aiApi } from '../services/api';
-import { Calendar, DollarSign, Clock, MapPin, User, Package, History, Edit, Trash2, FileText, Send, MessageSquare, Loader } from 'lucide-react';
+import { Calendar, DollarSign, Clock, Package, History, Edit, Trash2, FileText, Send, MessageSquare, Loader } from 'lucide-react';
 import { AssetStatusBadge, MaintenanceTypeBadge } from '../components/StatusBadge';
+import LoadingState from '../components/LoadingState';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
+import { useConfirm } from '../context/ConfirmContext';
 
 const MAINTENANCE_TYPE_OPTIONS = [
   { value: 'ROUTINE', label: '정기점검' },
@@ -52,6 +55,8 @@ function formatValue(field, value) {
 export default function AssetDetail() {
   const { id } = useParams();
   const { user } = useAuth();
+  const toast = useToast();
+  const confirmDialog = useConfirm();
   const isAdmin = user?.role === 'ADMIN';
   const [asset, setAsset] = useState(null);
   const [maintenance, setMaintenance] = useState([]);
@@ -99,7 +104,7 @@ export default function AssetDetail() {
       setSpecData(response.data);
     } catch (error) {
       console.error('조달 규격서 생성 실패:', error);
-      alert('조달 규격서 생성에 실패했습니다.');
+      toast.error('조달 규격서 생성에 실패했습니다.');
       setShowSpecModal(false);
     } finally {
       setLoadingSpec(false);
@@ -134,7 +139,7 @@ export default function AssetDetail() {
       setActiveWorkOrder(response.data);
     } catch (error) {
       console.error('AI 작업 지시서 로드 실패:', error);
-      alert('AI 작업 지시서를 불러오거나 생성하는 데 실패했습니다.');
+      toast.error('AI 작업 지시서를 불러오거나 생성하는 데 실패했습니다.');
     } finally {
       setLoadingWO(false);
     }
@@ -207,22 +212,22 @@ export default function AssetDetail() {
       loadMaintenance();
     } catch (error) {
       console.error('유지보수 기록 수정 실패:', error);
-      alert('수정 중 오류가 발생했습니다.');
+      toast.error('수정 중 오류가 발생했습니다.');
     }
   };
 
   const handleDeleteRecord = async (recordId) => {
-    if (!confirm('이 유지보수 기록을 삭제하시겠습니까?')) return;
+    if (!(await confirmDialog('이 유지보수 기록을 삭제하시겠습니까?', { danger: true, confirmLabel: '삭제' }))) return;
     try {
       await assetApi.deleteMaintenanceRecord(id, recordId);
       loadMaintenance();
     } catch (error) {
       console.error('유지보수 기록 삭제 실패:', error);
-      alert('삭제 중 오류가 발생했습니다.');
+      toast.error('삭제 중 오류가 발생했습니다.');
     }
   };
 
-  if (loading || !asset) return <div className="card">로딩 중...</div>;
+  if (loading || !asset) return <div className="card"><LoadingState /></div>;
 
   const usageYears = asset.purchaseDate ? 
     Math.floor((new Date() - new Date(asset.purchaseDate)) / (1000 * 60 * 60 * 24 * 365)) : 0;
@@ -393,7 +398,7 @@ export default function AssetDetail() {
           <div className="text-center text-gray-500 py-8">유지보수 이력이 없습니다.</div>
         ) : (
           <div className="space-y-4">
-            {maintenance.map((record, index) => (
+            {maintenance.map((record) => (
               <div key={record.id} className="border-l-4 border-blue-500 pl-4 py-2">
                 <div className="flex justify-between items-start">
                   <div>

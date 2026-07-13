@@ -1,11 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { fileApi } from '../services/api';
-import { Upload, FileText, CheckCircle, XCircle, Loader, Play, Download } from 'lucide-react';
+import { Upload, FileText, CheckCircle, XCircle, Loader, Play } from 'lucide-react';
 import { FileStatusBadge } from '../components/StatusBadge';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
+import { useConfirm } from '../context/ConfirmContext';
 
 export default function FileUpload() {
   const { user } = useAuth();
+  const toast = useToast();
+  const confirmDialog = useConfirm();
   const isAdmin = user?.role === 'ADMIN';
   const [files, setFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
@@ -59,7 +63,7 @@ export default function FileUpload() {
       loadFiles();
     } catch (error) {
       console.error('업로드 실패:', error);
-      alert('파일 대량 업로드 및 비동기 배치 등록 실패');
+      toast.error('파일 대량 업로드 및 비동기 배치 등록 실패');
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -92,18 +96,18 @@ export default function FileUpload() {
       loadFiles();
     } catch (error) {
       console.error('분석 실패:', error);
-      alert('파일 분석 실패');
+      toast.error('파일 분석 실패');
     }
   };
 
   const handleApply = async (id) => {
-    if (!confirm('적용하시겠습니까?')) return;
+    if (!(await confirmDialog('적용하시겠습니까?'))) return;
     try {
       await fileApi.apply(id);
       loadFiles();
     } catch (error) {
       console.error('적용 실패:', error);
-      alert('파일 적용 실패');
+      toast.error('파일 적용 실패');
     }
   };
 
@@ -113,20 +117,20 @@ export default function FileUpload() {
       .map((f) => f.id);
 
     if (applicableIds.length === 0) {
-      alert('일괄 적용 가능한 분석 완료 파일이 없습니다.');
+      toast.error('일괄 적용 가능한 분석 완료 파일이 없습니다.');
       return;
     }
 
-    if (!confirm(`선택한 ${applicableIds.length}개 파일의 분석 데이터를 DB에 일괄 적용하시겠습니까?`)) return;
+    if (!(await confirmDialog(`선택한 ${applicableIds.length}개 파일의 분석 데이터를 DB에 일괄 적용하시겠습니까?`))) return;
 
     setApplyingAll(true);
     try {
       await fileApi.batchApply(applicableIds);
-      alert('일괄 적용이 완료되었습니다.');
+      toast.success('일괄 적용이 완료되었습니다.');
       loadFiles();
     } catch (error) {
       console.error('일괄 적용 실패:', error);
-      alert('일괄 적용 중 오류가 발생했습니다.');
+      toast.error('일괄 적용 중 오류가 발생했습니다.');
     } finally {
       setApplyingAll(false);
     }
@@ -135,40 +139,41 @@ export default function FileUpload() {
   const handleBatchDelete = async () => {
     const deletableFiles = files.filter((f) => !f.applied);
     if (deletableFiles.length === 0) {
-      alert('삭제할 수 있는 미적용 파일이 없습니다.');
+      toast.error('삭제할 수 있는 미적용 파일이 없습니다.');
       return;
     }
 
-    if (!confirm(`아직 DB에 적용되지 않은 ${deletableFiles.length}개 파일을 모두 삭제하시겠습니까?`)) return;
+    if (!(await confirmDialog(`아직 DB에 적용되지 않은 ${deletableFiles.length}개 파일을 모두 삭제하시겠습니까?`, { danger: true, confirmLabel: '삭제' }))) return;
 
     try {
       await Promise.all(deletableFiles.map((f) => fileApi.delete(f.id)));
       loadFiles();
     } catch (error) {
       console.error('일괄 삭제 실패:', error);
-      alert('일괄 삭제 중 일부 파일이 실패했습니다.');
+      toast.error('일괄 삭제 중 일부 파일이 실패했습니다.');
     }
   };
 
   const handleUnapply = async (id) => {
-    if (!confirm('적용을 취소하면 이 파일로 등록된 유지보수 기록이 모두 삭제됩니다. 계속할까요?')) return;
+    if (!(await confirmDialog('적용을 취소하면 이 파일로 등록된 유지보수 기록이 모두 삭제됩니다. 계속할까요?', { danger: true, confirmLabel: '적용 취소' }))) return;
     try {
       const response = await fileApi.unapply(id);
-      alert(response.data.message);
+      toast.success(response.data.message);
       loadFiles();
     } catch (error) {
       console.error('적용 취소 실패:', error);
-      alert('적용 취소 실패');
+      toast.error('적용 취소 실패');
     }
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('삭제하시겠습니까?')) return;
+    if (!(await confirmDialog('삭제하시겠습니까?', { danger: true, confirmLabel: '삭제' }))) return;
     try {
       await fileApi.delete(id);
       loadFiles();
     } catch (error) {
       console.error('삭제 실패:', error);
+      toast.error('삭제 중 오류가 발생했습니다.');
     }
   };
 

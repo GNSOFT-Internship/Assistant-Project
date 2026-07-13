@@ -3,8 +3,13 @@ import { Link } from 'react-router-dom';
 import { Send, Bot, User, Trash2 } from 'lucide-react';
 import { aiApi, assetApi, chatApi } from '../services/api';
 import { AssetStatusBadge, MaintenanceTypeBadge } from '../components/StatusBadge';
+import LoadingState from '../components/LoadingState';
+import { useToast } from '../context/ToastContext';
+import { useConfirm } from '../context/ConfirmContext';
 
 export default function AiAssistant() {
+  const toast = useToast();
+  const confirmDialog = useConfirm();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -42,13 +47,13 @@ export default function AiAssistant() {
   }, []);
 
   const handleClearHistory = async () => {
-    if (!confirm('대화 기록을 모두 삭제하시겠습니까?')) return;
+    if (!(await confirmDialog('대화 기록을 모두 삭제하시겠습니까?'))) return;
     try {
       await chatApi.clearHistory();
       setMessages([]);
     } catch (error) {
       console.error('대화 기록 삭제 실패:', error);
-      alert('대화 기록 삭제 중 오류가 발생했습니다.');
+      toast.error('대화 기록 삭제 중 오류가 발생했습니다.');
     }
   };
 
@@ -244,7 +249,7 @@ export default function AiAssistant() {
             onClick={(e) => e.stopPropagation()}
           >
             {loadingAssetDetail ? (
-              <div className="text-center text-gray-500 py-8">로딩 중...</div>
+              <LoadingState className="py-8" />
             ) : (
               <>
                 <div className="flex items-center justify-between mb-4">

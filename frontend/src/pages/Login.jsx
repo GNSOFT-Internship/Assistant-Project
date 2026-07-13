@@ -19,7 +19,7 @@ export default function Login() {
         setError(result.message || '아이디 또는 비밀번호가 잘못되었습니다');
       }
       // 성공 시에는 로그인 상태가 갱신되면서 LoginRoute가 자동으로 /dashboard로 이동시킨다.
-    } catch (err) {
+    } catch {
       setError('로그인 중 오류가 발생했습니다');
     } finally {
       setLoading(false);

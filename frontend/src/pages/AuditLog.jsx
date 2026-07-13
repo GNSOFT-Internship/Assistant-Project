@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Navigate } from 'react-router-dom';
 import { assetApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import LoadingState from '../components/LoadingState';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 const PAGE_SIZE = 30;
@@ -86,7 +87,7 @@ export default function AuditLog() {
         </div>
 
         {loading ? (
-          <div className="text-center text-gray-500 py-8">로딩 중...</div>
+          <LoadingState className="py-8" />
         ) : logs.length === 0 ? (
           <div className="text-center text-gray-500 py-8">기록이 없습니다.</div>
         ) : (

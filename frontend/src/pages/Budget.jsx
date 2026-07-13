@@ -2,9 +2,13 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { budgetApi, aiApi } from '../services/api';
 import { Save } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
+import { formatPercent } from '../utils/format';
+import LoadingState from '../components/LoadingState';
 
 export default function Budget() {
   const { user } = useAuth();
+  const toast = useToast();
   const isAdmin = user?.role === 'ADMIN';
   const [year, setYear] = useState(new Date().getFullYear());
   const [budgets, setBudgets] = useState({});
@@ -28,7 +32,7 @@ export default function Budget() {
       setForecast(response.data);
     } catch (error) {
       console.error('AI 예산 예측 실패:', error);
-      alert('AI 예산 예측을 불러오는 데 실패했습니다.');
+      toast.error('AI 예산 예측을 불러오는 데 실패했습니다.');
     } finally {
       setLoadingForecast(false);
     }
@@ -41,14 +45,14 @@ export default function Budget() {
       newInputs[item.month] = String(item.amount);
     });
     setInputs(newInputs);
-    alert('AI 예측 예산 금액이 입력창에 일괄 대입되었습니다. 저장하려면 상단의 "전체 저장" 버튼을 눌러주세요.');
+    toast.success('AI 예측 예산 금액이 입력창에 일괄 대입되었습니다. 저장하려면 상단의 "전체 저장" 버튼을 눌러주세요.');
   };
 
   const handleSimulate = async (e) => {
     e.preventDefault();
     const budgetVal = parseFloat(totalBudgetInput);
     if (!totalBudgetInput || Number.isNaN(budgetVal) || budgetVal <= 0) {
-      alert('올바른 예산 총액을 입력하세요.');
+      toast.error('올바른 예산 총액을 입력하세요.');
       return;
     }
     setLoadingSimulation(true);
@@ -57,7 +61,7 @@ export default function Budget() {
       setSimulation(response.data);
     } catch (error) {
       console.error('AI 예산 시뮬레이션 실패:', error);
-      alert('AI 예산 시뮬레이션에 실패했습니다.');
+      toast.error('AI 예산 시뮬레이션에 실패했습니다.');
     } finally {
       setLoadingSimulation(false);
     }
@@ -92,7 +96,7 @@ export default function Budget() {
     const raw = inputs[month];
     const value = parseFloat(raw);
     if (!raw || Number.isNaN(value) || value < 0) {
-      alert('올바른 금액을 입력하세요.');
+      toast.error('올바른 금액을 입력하세요.');
       return;
     }
     setSaving(month);
@@ -101,7 +105,7 @@ export default function Budget() {
       await load();
     } catch (error) {
       console.error('예산 저장 실패:', error);
-      alert('저장 중 오류가 발생했습니다.');
+      toast.error('저장 중 오류가 발생했습니다.');
     } finally {
       setSaving(null);
     }
@@ -110,12 +114,12 @@ export default function Budget() {
   const handleSaveAll = async () => {
     const entries = Object.entries(inputs).filter(([, raw]) => raw !== '' && raw != null);
     if (entries.length === 0) {
-      alert('저장할 예산이 없습니다. 최소 한 달 이상 금액을 입력하세요.');
+      toast.error('저장할 예산이 없습니다. 최소 한 달 이상 금액을 입력하세요.');
       return;
     }
     const invalid = entries.find(([, raw]) => Number.isNaN(parseFloat(raw)) || parseFloat(raw) < 0);
     if (invalid) {
-      alert(`${invalid[0]}월 금액이 올바르지 않습니다.`);
+      toast.error(`${invalid[0]}월 금액이 올바르지 않습니다.`);
       return;
     }
 
@@ -125,15 +129,16 @@ export default function Budget() {
         entries.map(([month, raw]) => budgetApi.set(year, Number(month), parseFloat(raw)))
       );
       await load();
+      toast.success('예산이 저장되었습니다.');
     } catch (error) {
       console.error('일괄 저장 실패:', error);
-      alert('일괄 저장 중 오류가 발생했습니다.');
+      toast.error('일괄 저장 중 오류가 발생했습니다.');
     } finally {
       setSavingAll(false);
     }
   };
 
-  if (loading) return <div className="card">로딩 중...</div>;
+  if (loading) return <div className="card"><LoadingState /></div>;
 
   return (
     <div className="space-y-6">
@@ -202,8 +207,11 @@ export default function Budget() {
                     <td className="table-cell">{spent.toLocaleString()}원</td>
                     <td className="table-cell">
                       {rate != null ? (
-                        <span className={rate >= 100 ? 'badge-red' : rate >= 80 ? 'badge-yellow' : 'badge-green'}>
-                          {rate.toFixed(1)}%
+                        <span
+                          className={rate >= 100 ? 'badge-red' : rate >= 80 ? 'badge-yellow' : 'badge-green'}
+                          title={`${rate.toLocaleString('ko-KR', { maximumFractionDigits: 1 })}%`}
+                        >
+                          {formatPercent(rate)}
                         </span>
                       ) : (
                         <span className="text-gray-400">-</span>

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { aiApi, assetApi } from '../services/api';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { AssetStatusBadge, MaintenanceTypeBadge } from '../components/StatusBadge';
+import LoadingState from '../components/LoadingState';
 import { ArrowLeft } from 'lucide-react';
 
 const TOP_FAILURE_COUNT = 5;
@@ -119,7 +120,7 @@ export default function Maintenance() {
     setViewingMaintenance([]);
   };
 
-  if (loading) return <div className="card">로딩 중...</div>;
+  if (loading) return <div className="card"><LoadingState /></div>;
   if (!analysis) return <div className="card">분석 데이터를 불러올 수 없습니다.</div>;
 
   const failureEntries = Object.entries(analysis.failurePatterns || {}).sort((a, b) => b[1] - a[1]);
@@ -242,7 +243,7 @@ export default function Maintenance() {
               <BarChart data={costData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" />
-                <YAxis />
+                <YAxis tickFormatter={(value) => value.toLocaleString()} />
                 <Tooltip
                   formatter={(value) => [`${value.toLocaleString()}원`, '유지보수 비용']}
                 />
@@ -348,7 +349,7 @@ export default function Maintenance() {
                 </div>
 
                 {loadingAssetDetail ? (
-                  <div className="text-center text-gray-500 py-8">로딩 중...</div>
+                  <LoadingState className="py-8" />
                 ) : (
                   <>
                     <div className="flex items-center justify-between mb-4">
@@ -418,7 +419,7 @@ export default function Maintenance() {
                 </div>
 
                 {loadingFailureAssets ? (
-                  <div className="text-center text-gray-500 py-8">로딩 중...</div>
+                  <LoadingState className="py-8" />
                 ) : failureAssets.length === 0 ? (
                   <div className="text-center text-gray-500 py-8">해당 고장 유형이 발생한 자산이 없습니다.</div>
                 ) : (
