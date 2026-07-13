@@ -3,9 +3,13 @@ import { Link, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   LayoutDashboard, Package, Wrench, Lightbulb, MessageSquare,
-  Upload, FileText, LogOut, Wallet, ChevronLeft, ChevronRight, ScrollText, Search
+  Upload, FileText, LogOut, Wallet, ChevronLeft, ChevronRight, ScrollText, Search, Keyboard
 } from 'lucide-react';
 import CommandPalette from './CommandPalette';
+import ShortcutRecorderModal from './ShortcutRecorderModal';
+import { loadShortcut, matchesShortcut, describeShortcut } from '../utils/shortcut';
+
+const ONBOARDING_KEY = 'cmdk_onboarding_seen';
 
 function ScrollableNav({ items, activePath, variant }) {
   const scrollRef = useRef(null);
@@ -96,6 +100,17 @@ export default function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [recorderOpen, setRecorderOpen] = useState(false);
+  const [shortcut, setShortcut] = useState(() => loadShortcut());
+  const [showOnboarding, setShowOnboarding] = useState(
+    () => typeof window !== 'undefined' && !localStorage.getItem(ONBOARDING_KEY)
+  );
+  const shortcutLabel = describeShortcut(shortcut);
+
+  const dismissOnboarding = () => {
+    localStorage.setItem(ONBOARDING_KEY, '1');
+    setShowOnboarding(false);
+  };
 
   const handleLogout = () => {
     logout();
@@ -116,15 +131,16 @@ export default function Layout() {
 
   useEffect(() => {
     const handleKeyDown = (e) => {
-      const isShortcut = (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k';
-      if (isShortcut) {
+      if (matchesShortcut(e, shortcut)) {
         e.preventDefault();
         setPaletteOpen((prev) => !prev);
+        dismissOnboarding();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shortcut]);
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -145,17 +161,43 @@ export default function Layout() {
               </div>
             </div>
             <div className="flex items-center gap-3 flex-shrink-0">
+              <div className="relative hidden sm:flex items-center gap-1">
+                <button
+                  onClick={() => {
+                    setPaletteOpen(true);
+                    dismissOnboarding();
+                  }}
+                  title={`전역 검색 (${shortcutLabel})`}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-gray-500 border border-slate-200 hover:bg-gray-50 hover:text-gray-700 transition-colors"
+                >
+                  <Search size={14} />
+                  <span>검색</span>
+                  <kbd className="text-xs text-slate-400 border border-slate-200 rounded px-1">{shortcutLabel}</kbd>
+                </button>
+                <button
+                  onClick={() => setRecorderOpen(true)}
+                  title="검색 단축키 변경"
+                  className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+                >
+                  <Keyboard size={16} />
+                </button>
+                {showOnboarding && (
+                  <div className="absolute top-full mt-2 right-0 z-40 w-64 bg-slate-800 text-white text-xs rounded-lg p-3 shadow-xl">
+                    <div className="absolute -top-1.5 right-6 w-3 h-3 bg-slate-800 rotate-45" />
+                    <p className="mb-2 leading-relaxed">
+                      💡 <strong>{shortcutLabel}</strong> 또는 이 검색 버튼으로 어디서든 빠르게 페이지 이동과 자산 검색을 할 수 있어요. 단축키는 옆의 키보드 아이콘으로 자유롭게 바꿀 수 있어요.
+                    </p>
+                    <button onClick={dismissOnboarding} className="text-blue-300 hover:text-blue-200 font-medium">
+                      확인
+                    </button>
+                  </div>
+                )}
+              </div>
               <button
-                onClick={() => setPaletteOpen(true)}
-                title="전역 검색 (Ctrl/⌘+K)"
-                className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-gray-500 border border-slate-200 hover:bg-gray-50 hover:text-gray-700 transition-colors"
-              >
-                <Search size={14} />
-                <span>검색</span>
-                <kbd className="text-xs text-slate-400 border border-slate-200 rounded px-1">⌘K</kbd>
-              </button>
-              <button
-                onClick={() => setPaletteOpen(true)}
+                onClick={() => {
+                  setPaletteOpen(true);
+                  dismissOnboarding();
+                }}
                 title="전역 검색"
                 className="sm:hidden p-2 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
               >
@@ -185,6 +227,11 @@ export default function Layout() {
         <Outlet />
       </main>
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} navItems={menuItems} />
+      <ShortcutRecorderModal
+        open={recorderOpen}
+        onClose={() => setRecorderOpen(false)}
+        onSaved={(next) => setShortcut(next)}
+      />
     </div>
   );
 }
