@@ -33,11 +33,15 @@
 - ORM: JPA/Hibernate 대신 SQLAlchemy 사용.
 - `docs/schema.sql`의 테이블명은 `user`이지만, 실제 Java 엔티티는 `app_user`로 매핑되어 있었습니다(MySQL 예약어
   회피 목적으로 추정). 이 Python 버전도 `app_user`를 그대로 사용합니다.
-- `/api/ai/*` 엔드포인트(자연어 검색, 교체 우선순위 추천, 유지보수 분석)와 `/api/reports/monthly`는
-  `GN_API_KEY`가 설정된 경우 사내 GPU 서버 경유 Qwen3.5를
-  호출해 한국어 서술을 생성합니다. 없으면 규칙 기반
+- `/api/ai/*` 엔드포인트(자연어 검색, 교체 우선순위 추천, 유지보수 분석, 작업 지시서, 예산 예측/시뮬레이터,
+  조달 규격서, 고장 진단 챗봇), `/api/qa/ask`, `/api/reports/monthly`는 `GN_API_KEY`가 설정된 경우
+  사내 GPU 서버(gn-cab) 경유 Qwen3.5를 호출해 한국어 서술을 생성합니다. 없으면 규칙 기반
   폴백 문구로 동작합니다. 유지보수 분석의 AI 서술과 보고서의 AI 요약/문제점/권장사항은 토큰 절약을 위해
   `includeAi=true` 파라미터(프론트엔드의 "AI 분석하기"/"AI 요약 보기" 버튼)를 명시했을 때만 생성됩니다.
+- 위 AI 호출 엔드포인트들은 `app/rate_limit.py`의 슬라이딩 윈도우 제한(`main.py`에서 라우터 단위로 적용)으로
+  분당 호출 횟수가 제한되어 있습니다. gn-cab API 키 자체의 분당 호출 제한을 넘지 않도록 하기 위한 것으로,
+  초과 시 `429 Too Many Requests`를 반환합니다.
 - 자산/예산/유지보수 이력/파일 업로드의 쓰기(생성·수정·삭제) 엔드포인트는 `require_admin` 의존성으로 보호되어
   `ADMIN` 역할만 호출할 수 있고, `USER` 역할은 조회만 가능합니다.
-- `backend-py/tests/`에 pytest 기반 자동화 테스트가 있습니다 (`cd backend-py && pytest`).
+- `backend-py/tests/`에 pytest 기반 자동화 테스트가 있습니다 (`cd backend-py && pytest`). GitHub Actions로
+  `backend-py` 변경 시마다 자동 실행됩니다.
