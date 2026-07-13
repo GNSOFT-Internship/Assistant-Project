@@ -103,6 +103,19 @@ CREATE TABLE `budget` (
     UNIQUE KEY `uq_budget_year_month` (`year`, `month`)
 );
 
+-- WorkOrder 테이블 (AI 유지보수 작업 지시서)
+CREATE TABLE `work_order` (
+    `id` BIGINT PRIMARY KEY AUTO_INCREMENT,
+    `maintenance_record_id` BIGINT NOT NULL UNIQUE,
+    `title` VARCHAR(255) NOT NULL,
+    `steps` TEXT NOT NULL COMMENT '단계별 조치 사항 (JSON array)',
+    `required_tools` TEXT COMMENT '필요 공구 및 자재 (JSON array)',
+    `safety_precautions` TEXT COMMENT '안전 주의사항 (JSON array)',
+    `estimated_time` VARCHAR(100) COMMENT '예상 작업 시간',
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (`maintenance_record_id`) REFERENCES `maintenance_record`(`id`) ON DELETE CASCADE
+);
+
 -- 더미 데이터 삽입
 
 -- 관리자/사용자 계정 (password: admin123)

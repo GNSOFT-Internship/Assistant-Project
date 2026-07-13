@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { assetApi } from '../services/api';
+import { assetApi, aiApi } from '../services/api';
 import { Calendar, DollarSign, Clock, MapPin, User, Package, History, Edit, Trash2 } from 'lucide-react';
 import { AssetStatusBadge, MaintenanceTypeBadge } from '../components/StatusBadge';
 import { useAuth } from '../context/AuthContext';
@@ -59,6 +59,21 @@ export default function AssetDetail() {
   const [loading, setLoading] = useState(true);
   const [editingRecord, setEditingRecord] = useState(null);
   const [recordForm, setRecordForm] = useState(EMPTY_RECORD_FORM);
+  const [activeWorkOrder, setActiveWorkOrder] = useState(null);
+  const [loadingWO, setLoadingWO] = useState(false);
+
+  const handleViewWorkOrder = async (record) => {
+    setLoadingWO(true);
+    try {
+      const response = await aiApi.getWorkOrder(record.id);
+      setActiveWorkOrder(response.data);
+    } catch (error) {
+      console.error('AI 작업 지시서 로드 실패:', error);
+      alert('AI 작업 지시서를 불러오거나 생성하는 데 실패했습니다.');
+    } finally {
+      setLoadingWO(false);
+    }
+  };
 
   useEffect(() => {
     loadAsset();
@@ -276,12 +291,19 @@ export default function AssetDetail() {
                     )}
                   </div>
                 </div>
-                {record.technician && (
-                  <div className="text-sm text-gray-500 mt-1">기술자: {record.technician}</div>
-                )}
-                {record.failureType && (
-                  <div className="text-sm text-red-600 mt-1">고장유형: {record.failureType}</div>
-                )}
+                <div className="flex justify-between items-center mt-2 pt-2 border-t border-dashed border-gray-100 flex-wrap gap-2">
+                  <div className="flex gap-3 text-sm text-gray-500">
+                    {record.technician && <span>기술자: {record.technician}</span>}
+                    {record.technician && record.failureType && <span>|</span>}
+                    {record.failureType && <span className="text-red-600 font-medium">고장유형: {record.failureType}</span>}
+                  </div>
+                  <button
+                    onClick={() => handleViewWorkOrder(record)}
+                    className="btn btn-secondary py-1 px-3 text-xs bg-blue-50 text-blue-700 hover:bg-blue-100 border-none flex items-center gap-1"
+                  >
+                    AI 작업 지시서
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -409,6 +431,114 @@ export default function AssetDetail() {
                 <button type="submit" className="btn btn-primary">저장</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* AI 작업 지시서 모달 */}
+      {activeWorkOrder && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <style>{`
+            @media print {
+              body * {
+                visibility: hidden;
+              }
+              #print-work-order, #print-work-order * {
+                visibility: visible;
+              }
+              #print-work-order {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                background: white !important;
+                color: black !important;
+              }
+            }
+          `}</style>
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto print:p-0 print:max-h-full print:shadow-none print:w-full">
+            <div className="flex justify-between items-center mb-4 border-b pb-3 print:hidden">
+              <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                🔧 AI 유지보수 작업 지시서
+              </h2>
+              <button
+                onClick={() => setActiveWorkOrder(null)}
+                className="text-gray-500 hover:text-gray-700 text-2xl font-semibold"
+              >&times;</button>
+            </div>
+
+            <div id="print-work-order" className="space-y-6">
+              <div className="text-center pb-4 border-b border-double border-gray-300">
+                <h1 className="text-2xl font-bold text-gray-900">{activeWorkOrder.title}</h1>
+                <p className="text-sm text-gray-500 mt-2">일련번호: WO-{activeWorkOrder.id} | 생성일시: {activeWorkOrder.createdAt ? new Date(activeWorkOrder.createdAt).toLocaleString('ko-KR') : '-'}</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-gray-50 p-3 rounded">
+                  <div className="text-sm text-gray-500 font-medium">대상 자산</div>
+                  <div className="font-semibold text-gray-800">{asset?.assetName} ({asset?.assetCode})</div>
+                </div>
+                <div className="bg-gray-50 p-3 rounded">
+                  <div className="text-sm text-gray-500 font-medium">예상 작업 시간</div>
+                  <div className="font-semibold text-gray-800">{activeWorkOrder.estimatedTime || '미정'}</div>
+                </div>
+              </div>
+
+              {activeWorkOrder.requiredTools && activeWorkOrder.requiredTools.length > 0 && (
+                <div>
+                  <h3 className="font-bold text-gray-700 mb-2 flex items-center gap-1">🛠️ 필요 공구 및 자재</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {activeWorkOrder.requiredTools.map((tool, idx) => (
+                      <span key={idx} className="bg-gray-100 text-gray-800 text-xs px-2.5 py-1 rounded font-medium">{tool}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {activeWorkOrder.safetyPrecautions && activeWorkOrder.safetyPrecautions.length > 0 && (
+                <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-r">
+                  <h3 className="font-bold text-red-800 mb-2 flex items-center gap-1">⚠️ 필수 안전 주의사항</h3>
+                  <ul className="list-disc list-inside text-sm text-red-700 space-y-1">
+                    {activeWorkOrder.safetyPrecautions.map((prec, idx) => (
+                      <li key={idx}>{prec}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <div>
+                <h3 className="font-bold text-gray-700 mb-2 flex items-center gap-1">📋 단계별 표준 조치 절차</h3>
+                <ol className="space-y-3">
+                  {activeWorkOrder.steps.map((step, idx) => (
+                    <li key={idx} className="flex gap-3 text-sm text-gray-800 items-start">
+                      <span className="flex items-center justify-center bg-blue-100 text-blue-800 font-bold rounded-full w-5 h-5 text-xs flex-shrink-0 mt-0.5">{idx + 1}</span>
+                      <span className="leading-relaxed">{step}</span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 mt-6 pt-4 border-t print:hidden">
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="btn btn-primary"
+              >
+                인쇄하기
+              </button>
+              <button type="button" onClick={() => setActiveWorkOrder(null)} className="btn btn-secondary">닫기</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 로딩 인디케이터 */}
+      {loadingWO && (
+        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+          <div className="bg-white p-4 rounded shadow-lg flex items-center gap-3">
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+            <span className="text-sm font-medium">AI 작업 지시서 생성 중...</span>
           </div>
         </div>
       )}

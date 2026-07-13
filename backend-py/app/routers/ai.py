@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from .. import llm, models
+from .. import llm, models, schemas
 from ..database import get_db
 from ..scoring import compute_replacement_metrics
 from .assets import asset_to_dto
@@ -541,3 +541,375 @@ def get_assets_by_failure_type(
     result.sort(key=lambda a: -a["occurrenceCount"])
 
     return {"success": True, "message": None, "data": result}
+
+
+# ---------------------------------------------------------------------------
+# 5. AI 기반 유지보수 작업 지시서 생성/조회
+# ---------------------------------------------------------------------------
+
+_WORK_ORDER_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "title": {"type": "string", "description": "작업 지시서 제목 (예: [작업 지시서] 에어컨 냉매 누출 조치)"},
+        "steps": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "수리 또는 교체 조치를 위한 단계별 상세 수행 가이드"
+        },
+        "requiredTools": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "작업에 필요한 도구, 공구, 교체 부품 등"
+        },
+        "safetyPrecautions": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "작업 시 지켜야 할 안전 주의사항"
+        },
+        "estimatedTime": {"type": "string", "description": "예상 작업 시간 (예: '1시간 30분', '2시간')"}
+    },
+    "required": ["title", "steps", "requiredTools", "safetyPrecautions", "estimatedTime"],
+    "additionalProperties": False
+}
+
+_WORK_ORDER_SYSTEM_PROMPT = (
+    "당신은 공공기관 자산 유지보수 전문가 AI다. 아래 입력되는 자산 정보와 고장 증상/정비 내용을 바탕으로 "
+    "실무 정비사가 현장에서 바로 보며 안전하고 정확하게 수리/조치할 수 있는 단계별 '작업 지시서(Standard Work Order)'를 한국어로 작성한다."
+)
+
+
+@router.get("/work-orders/{maintenance_record_id}", response_model=schemas.WorkOrderResponse)
+def get_or_create_work_order(maintenance_record_id: int, db: Session = Depends(get_db)):
+    import json
+    # 1. 기존 지시서가 있는지 조회
+    wo = db.query(models.WorkOrder).filter(models.WorkOrder.maintenance_record_id == maintenance_record_id).first()
+    if wo:
+        return schemas.WorkOrderResponse(
+            id=wo.id,
+            maintenanceRecordId=wo.maintenance_record_id,
+            title=wo.title,
+            steps=json.loads(wo.steps),
+            requiredTools=json.loads(wo.required_tools) if wo.required_tools else [],
+            safetyPrecautions=json.loads(wo.safety_precautions) if wo.safety_precautions else [],
+            estimatedTime=wo.estimated_time,
+            createdAt=wo.created_at
+        )
+
+    # 2. 없으면 유지보수 기록 조회 및 관련 자산 정보 수집
+    record = db.query(models.MaintenanceRecord).filter(models.MaintenanceRecord.id == maintenance_record_id).first()
+    if not record:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Maintenance record not found")
+
+    asset = db.query(models.Asset).filter(models.Asset.id == record.asset_id).first()
+    asset_info = f"자산명: {asset.asset_name if asset else '알수없음'}, 카테고리: {asset.category if asset else '알수없음'}, 위치: {asset.location if asset else '알수없음'}"
+    record_info = f"고장유형: {record.failure_type or '없음'}, 정비유형: {record.maintenance_type.value}, 내용: {record.description or ''}"
+
+    # LLM 호출하여 지시서 생성
+    if not llm.is_configured():
+        wo_title = f"[작업 지시서] {record.failure_type or '유지보수'} 조치 가이드"
+        wo_steps = [
+            "현장 방문 및 대상 기기 육안 검사 실시",
+            "기기의 전원/연결부 해제 확인",
+            "증상 관련 부품 점검 및 수리/교체 조치",
+            "기기 재가동 테스트 및 점검 이력 서명"
+        ]
+        wo_tools = ["기본 수공구 세트", "멀티테스터기"]
+        wo_safety = ["작업 전 반드시 기기 전원 차단 확인", "안전 장갑 및 안전화 착용"]
+        wo_time = "1시간"
+    else:
+        try:
+            prompt = f"자산 정보: {asset_info}\n유지보수 기록 정보: {record_info}"
+            res = llm.ask_json(_WORK_ORDER_SYSTEM_PROMPT, prompt, _WORK_ORDER_SCHEMA, effort="medium")
+            wo_title = res.get("title") or f"[작업 지시서] {record.failure_type or '유지보수'} 조치 가이드"
+            wo_steps = res.get("steps") or ["현장 점검", "조치 수행"]
+            wo_tools = res.get("requiredTools") or []
+            wo_safety = res.get("safetyPrecautions") or []
+            wo_time = res.get("estimatedTime") or "1시간"
+        except Exception:
+            logger.warning("AI 작업 지시서 생성 실패, 기본 템플릿 사용", exc_info=True)
+            wo_title = f"[작업 지시서] {record.failure_type or '유지보수'} 조치 가이드"
+            wo_steps = [
+                "현장 방문 및 대상 기기 육안 검사 실시",
+                "기기의 전원/연결부 해제 확인",
+                "증상 관련 부품 점검 및 수리/교체 조치",
+                "기기 재가동 테스트 및 점검 이력 서명"
+            ]
+            wo_tools = ["기본 수공구 세트"]
+            wo_safety = ["작업 전 반드시 기기 전원 차단 확인"]
+            wo_time = "1시간"
+
+    # DB에 저장
+    wo_obj = models.WorkOrder(
+        maintenance_record_id=maintenance_record_id,
+        title=wo_title,
+        steps=json.dumps(wo_steps, ensure_ascii=False),
+        required_tools=json.dumps(wo_tools, ensure_ascii=False),
+        safety_precautions=json.dumps(wo_safety, ensure_ascii=False),
+        estimated_time=wo_time
+    )
+    db.add(wo_obj)
+    db.commit()
+    db.refresh(wo_obj)
+
+    return schemas.WorkOrderResponse(
+        id=wo_obj.id,
+        maintenanceRecordId=wo_obj.maintenance_record_id,
+        title=wo_obj.title,
+        steps=wo_steps,
+        requiredTools=wo_tools,
+        safetyPrecautions=wo_safety,
+        estimatedTime=wo_obj.estimated_time,
+        createdAt=wo_obj.created_at
+    )
+
+
+# ---------------------------------------------------------------------------
+# 6. AI 차년도 예산 예측
+# ---------------------------------------------------------------------------
+
+_FORECAST_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "forecastYear": {"type": "integer", "description": "예측 대상 연도 (예: 2026)"},
+        "monthlyForecast": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "month": {"type": "integer", "description": "월 (1~12)"},
+                    "amount": {"type": "number", "description": "예측 유지보수 지출액 (원)"},
+                    "reason": {"type": "string", "description": "해당 월 예측 근거 (예: 겨울철 난방기 수리비 증가)"}
+                },
+                "required": ["month", "amount", "reason"],
+                "additionalProperties": False
+            }
+        },
+        "rationale": {"type": "string", "description": "차년도 전체 예산 예측 분석 총평 및 핵심 근거"}
+    },
+    "required": ["forecastYear", "monthlyForecast", "rationale"],
+    "additionalProperties": False
+}
+
+_FORECAST_SYSTEM_PROMPT = (
+    "당신은 공공기관 자산관리 회계 AI다. 제공되는 과거 연월별 유지보수 지출 이력 통계와 현재 등록된 자산 목록(노후화 정도)을 바탕으로, "
+    "다음 연도의 월별 유지보수 예산 소요액(1월~12월)을 합리적으로 예측하여 한국어로 근거와 분석 결과를 제시한다."
+)
+
+
+@router.get("/budgets/forecast", response_model=schemas.BudgetForecastResponse)
+def get_budget_forecast(db: Session = Depends(get_db)):
+    all_records = db.query(models.MaintenanceRecord).all()
+    all_assets = db.query(models.Asset).all()
+
+    # 과거 월별 비용 분석
+    cost_by_month: dict = {}
+    for r in all_records:
+        key = f"{r.maintenance_date.year}-{r.maintenance_date.month:02d}"
+        cost_by_month[key] = cost_by_month.get(key, 0.0) + (float(r.cost) if r.cost is not None else 0.0)
+    cost_by_month = dict(sorted(cost_by_month.items()))
+
+    # 자산 카테고리 정보
+    asset_summary = {}
+    for a in all_assets:
+        asset_summary[a.category] = asset_summary.get(a.category, 0) + 1
+
+    forecast_year = date.today().year + 1
+
+    if not llm.is_configured() or not all_records:
+        # LLM 미설정 또는 과거 이력 부재 시의 폴백 규칙 기반 계산
+        monthly_items = []
+        for m in range(1, 13):
+            past_months_costs = [v for k, v in cost_by_month.items() if k.endswith(f"-{m:02d}")]
+            avg_cost = sum(past_months_costs) / len(past_months_costs) if past_months_costs else 1000000.0
+            amount = round(avg_cost * 1.05, -4)  # 5% 상승 및 만원단위 반올림
+            monthly_items.append(schemas.BudgetForecastItem(
+                month=m,
+                amount=amount,
+                reason=f"과거 {m}월 지출 실적 평균 대비 인플레이션 및 장비 노후화 보정"
+            ))
+        return schemas.BudgetForecastResponse(
+            forecastYear=forecast_year,
+            monthlyForecast=monthly_items,
+            rationale="과거 데이터 실적을 기반으로 5%의 안전율을 적용해 수립한 예측안입니다."
+        )
+
+    try:
+        prompt = (
+            f"과거 월별 지출 현황: {cost_by_month}\n"
+            f"카테고리별 자산 보유 대수: {asset_summary}\n"
+            f"예측 대상 연도: {forecast_year}년"
+        )
+        res = llm.ask_json(_FORECAST_SYSTEM_PROMPT, prompt, _FORECAST_SCHEMA, effort="medium")
+        monthly_forecast = [
+            schemas.BudgetForecastItem(
+                month=item["month"],
+                amount=round(item["amount"], -4),
+                reason=item["reason"]
+            )
+            for item in res.get("monthlyForecast", [])
+        ]
+        monthly_forecast.sort(key=lambda x: x.month)
+        return schemas.BudgetForecastResponse(
+            forecastYear=res.get("forecastYear") or forecast_year,
+            monthlyForecast=monthly_forecast,
+            rationale=res.get("rationale") or "AI 예측 분석 결과입니다."
+        )
+    except Exception:
+        logger.warning("AI 예산 예측 생성 실패, 폴백 규칙 적용", exc_info=True)
+        monthly_items = []
+        for m in range(1, 13):
+            past_months_costs = [v for k, v in cost_by_month.items() if k.endswith(f"-{m:02d}")]
+            avg_cost = sum(past_months_costs) / len(past_months_costs) if past_months_costs else 1000000.0
+            monthly_items.append(schemas.BudgetForecastItem(
+                month=m,
+                amount=round(avg_cost * 1.05, -4),
+                reason=f"과거 {m}월 지출 실적 평균 대비 장비 노후화 보정"
+            ))
+        return schemas.BudgetForecastResponse(
+            forecastYear=forecast_year,
+            monthlyForecast=monthly_items,
+            rationale="AI 예측 API 실패로 인해 과거 실적 평균 기반 5% 상승분을 적용해 산출한 백업용 예산 예측 결과입니다."
+        )
+
+
+# ---------------------------------------------------------------------------
+# 7. AI 예산 최적화 시뮬레이터
+# ---------------------------------------------------------------------------
+
+_SIMULATE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "allocations": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "category": {"type": "string", "description": "자산 카테고리"},
+                    "allocatedAmount": {"type": "number", "description": "배정 예산액 (원)"},
+                    "ratio": {"type": "number", "description": "전체 예산 중 비율 (0~1)"},
+                    "reason": {"type": "string", "description": "이 카테고리에 해당 예산을 배정한 상세 재무/노후 근거"}
+                },
+                "required": ["category", "allocatedAmount", "ratio", "reason"],
+                "additionalProperties": False
+            }
+        },
+        "totalAllocated": {"type": "number", "description": "배정된 예산 총합 (원)"},
+        "summary": {"type": "string", "description": "전체 예산 배분 시뮬레이션 총평"}
+    },
+    "required": ["allocations", "totalAllocated", "summary"],
+    "additionalProperties": False
+}
+
+_SIMULATE_SYSTEM_PROMPT = (
+    "당신은 공공기관 자산 예산 기획 AI다. 주어진 전체 예산 상한액과 카테고리별 자산 보유량, 내용연수 도달율, "
+    "과거 수리비 지출 비중 데이터를 분석하여, 각 카테고리별로 예산을 가장 시급하고 경제적으로 배분하는 최적의 시뮬레이션을 생성한다. "
+    "총 배정 금액은 상한액을 넘지 않아야 하며, 비율의 합은 1.0에 가까워야 한다."
+)
+
+
+@router.post("/budgets/simulate", response_model=schemas.BudgetSimulationResponse)
+def simulate_budget(request: schemas.BudgetSimulationRequest, db: Session = Depends(get_db)):
+    total_budget = request.totalBudget
+    all_assets = db.query(models.Asset).all()
+    all_records = db.query(models.MaintenanceRecord).all()
+
+    categories = [
+        "IT 장비", "사무기기", "설비", "전기설비", "안전설비", "보안장비", "가구", "측정장비"
+    ]
+
+    asset_by_cat: dict = {}
+    cost_by_cat: dict = {}
+    expired_by_cat: dict = {}
+
+    for cat in categories:
+        asset_by_cat[cat] = 0
+        cost_by_cat[cat] = 0.0
+        expired_by_cat[cat] = 0
+
+    today = date.today()
+    for a in all_assets:
+        if a.category in asset_by_cat:
+            asset_by_cat[a.category] += 1
+            used_years = today.year - a.purchase_date.year
+            if used_years > a.useful_life:
+                expired_by_cat[a.category] += 1
+
+    for r in all_records:
+        asset = db.query(models.Asset).filter(models.Asset.id == r.asset_id).first()
+        if asset and asset.category in cost_by_cat:
+            cost_by_cat[asset.category] += float(r.cost or 0.0)
+
+    if not llm.is_configured():
+        allocations = []
+        total_weight = 0.0
+        weights = {}
+        for cat in categories:
+            cost_weight = cost_by_cat[cat]
+            expired_weight = expired_by_cat[cat] * 1000000.0
+            w = cost_weight + expired_weight + 500000.0
+            weights[cat] = w
+            total_weight += w
+
+        total_allocated = 0.0
+        for cat in categories:
+            ratio = weights[cat] / total_weight if total_weight > 0 else (1.0 / len(categories))
+            amount = round(total_budget * ratio, -4)
+            total_allocated += amount
+            allocations.append(schemas.CategoryAllocation(
+                category=cat,
+                allocatedAmount=amount,
+                ratio=ratio,
+                reason=f"보유 기기 {asset_by_cat[cat]}대(노후 {expired_by_cat[cat]}대) 및 과거 누적 수리비 {cost_by_cat[cat]:,.0f}원에 근거한 최적 배분"
+            ))
+        return schemas.BudgetSimulationResponse(
+            allocations=allocations,
+            totalAllocated=total_allocated,
+            summary=f"과거 지출 가중치 및 내용연수 초과 기기 현황을 기준으로 총 {total_budget:,.0f}원을 합리적으로 자동 배분한 시뮬레이션입니다."
+        )
+
+    try:
+        prompt = (
+            f"전체 가용 예산: {total_budget:,.0f}원\n"
+            f"카테고리별 자산 대수: {asset_by_cat}\n"
+            f"카테고리별 내용연수 초과 자산 대수: {expired_by_cat}\n"
+            f"카테고리별 과거 수리비 누적액: {cost_by_cat}"
+        )
+        res = llm.ask_json(_SIMULATE_SYSTEM_PROMPT, prompt, _SIMULATE_SCHEMA, effort="medium")
+        allocations = [
+            schemas.CategoryAllocation(
+                category=item["category"],
+                allocatedAmount=round(item["allocatedAmount"], -4),
+                ratio=item["ratio"],
+                reason=item["reason"]
+            )
+            for item in res.get("allocations", [])
+        ]
+        return schemas.BudgetSimulationResponse(
+            allocations=allocations,
+            totalAllocated=sum(item.allocatedAmount for item in allocations),
+            summary=res.get("summary") or "AI 예산 시뮬레이션 결과입니다."
+        )
+    except Exception:
+        logger.warning("AI 예산 시뮬레이션 호출 실패, 폴백 적용", exc_info=True)
+        allocations = []
+        total_weight = 0.0
+        weights = {}
+        for cat in categories:
+            w = cost_by_cat[cat] + (expired_by_cat[cat] * 1000000.0) + 500000.0
+            weights[cat] = w
+            total_weight += w
+        for cat in categories:
+            ratio = weights[cat] / total_weight if total_weight > 0 else (1.0 / len(categories))
+            amount = round(total_budget * ratio, -4)
+            allocations.append(schemas.CategoryAllocation(
+                category=cat,
+                allocatedAmount=amount,
+                ratio=ratio,
+                reason=f"과거 수리비 지출 및 노후 장비 비율에 따른 비율 배정 ({ratio*100:.1f}%)"
+            ))
+        return schemas.BudgetSimulationResponse(
+            allocations=allocations,
+            totalAllocated=sum(item.allocatedAmount for item in allocations),
+            summary="AI 시뮬레이터 연동 장애로 인해 과거 지출 비중 기반의 가중치로 대체 계산된 최적 예산 시뮬레이션 결과입니다."
+        )

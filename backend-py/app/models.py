@@ -167,3 +167,16 @@ class Budget(Base):
     allocated_amount = Column(DECIMAL(15, 2), nullable=False)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class WorkOrder(Base):
+    __tablename__ = "work_order"
+
+    id = Column(BigIntegerPK, primary_key=True, autoincrement=True)
+    maintenance_record_id = Column(BigInteger, ForeignKey("maintenance_record.id", ondelete="CASCADE"), nullable=False, unique=True)
+    title = Column(String(255), nullable=False)
+    steps = Column(Text, nullable=False)  # JSON array string
+    required_tools = Column(Text, nullable=True)  # JSON array string
+    safety_precautions = Column(Text, nullable=True)  # JSON array string
+    estimated_time = Column(String(100), nullable=True)
+    created_at = Column(DateTime, server_default=func.now())

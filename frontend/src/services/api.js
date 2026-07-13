@@ -69,6 +69,9 @@ export const aiApi = {
   getAssetsByFailureType: (failureType, params) => api.get('/ai/maintenance-analysis/failure-assets', { params: { failureType, ...params } }),
   askQuestion: (question) => api.post('/qa/ask', { question }, { timeout: AI_TIMEOUT }),
   getDashboardData: () => api.get('/dashboard'),
+  getWorkOrder: (recordId) => api.get(`/ai/work-orders/${recordId}`, { timeout: AI_TIMEOUT }),
+  getBudgetForecast: () => api.get('/ai/budgets/forecast', { timeout: AI_TIMEOUT }),
+  simulateBudget: (totalBudget) => api.post('/ai/budgets/simulate', { totalBudget }, { timeout: AI_TIMEOUT }),
 };
 
 export const authApi = {

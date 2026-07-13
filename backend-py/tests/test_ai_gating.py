@@ -90,3 +90,40 @@ def test_monthly_report_includes_ai_narrative_when_requested(client, admin_heade
     assert data["executiveSummary"] is not None
     assert isinstance(data["keyIssues"], list)
     assert isinstance(data["recommendations"], list)
+
+
+def test_get_or_create_work_order(client, admin_headers):
+    asset = client.post("/api/assets", json=ASSET_PAYLOAD, headers=admin_headers).json()["data"]
+    record = client.post(f"/api/assets/{asset['id']}/maintenance", json=MAINTENANCE_PAYLOAD, headers=admin_headers).json()["data"]
+
+    resp = client.get(f"/api/ai/work-orders/{record['id']}", headers=admin_headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "title" in data
+    assert "steps" in data
+    assert isinstance(data["steps"], list)
+    assert len(data["steps"]) > 0
+
+    resp2 = client.get(f"/api/ai/work-orders/{record['id']}", headers=admin_headers)
+    assert resp2.status_code == 200
+    assert resp2.json()["id"] == data["id"]
+
+
+def test_get_budget_forecast(client, admin_headers):
+    resp = client.get("/api/ai/budgets/forecast", headers=admin_headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "forecastYear" in data
+    assert "monthlyForecast" in data
+    assert len(data["monthlyForecast"]) == 12
+    assert "rationale" in data
+
+
+def test_simulate_budget(client, admin_headers):
+    resp = client.post("/api/ai/budgets/simulate", json={"totalBudget": 50000000.0}, headers=admin_headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "allocations" in data
+    assert len(data["allocations"]) > 0
+    assert "totalAllocated" in data
+    assert "summary" in data

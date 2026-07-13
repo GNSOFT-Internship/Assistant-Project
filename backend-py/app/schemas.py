@@ -99,3 +99,43 @@ class QnAResponse(BaseModel):
     answer: str
     sourceData: List[Any] = []
     hasData: bool = False
+
+
+class WorkOrderResponse(BaseModel):
+    id: int
+    maintenanceRecordId: int
+    title: str
+    steps: List[str]
+    requiredTools: Optional[List[str]] = None
+    safetyPrecautions: Optional[List[str]] = None
+    estimatedTime: Optional[str] = None
+    createdAt: Optional[datetime] = None
+
+
+class BudgetSimulationRequest(BaseModel):
+    totalBudget: float = Field(gt=0)
+
+
+class CategoryAllocation(BaseModel):
+    category: str
+    allocatedAmount: float
+    ratio: float
+    reason: str
+
+
+class BudgetSimulationResponse(BaseModel):
+    allocations: List[CategoryAllocation]
+    totalAllocated: float
+    summary: str
+
+
+class BudgetForecastItem(BaseModel):
+    month: int
+    amount: float
+    reason: str
+
+
+class BudgetForecastResponse(BaseModel):
+    forecastYear: int
+    monthlyForecast: List[BudgetForecastItem]
+    rationale: str
