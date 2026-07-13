@@ -1,11 +1,31 @@
 import React, { useState, useEffect } from 'react';
 import { aiApi } from '../services/api';
-import { TrendingUp } from 'lucide-react';
+import { TrendingUp, FileText } from 'lucide-react';
 
 export default function Recommendations() {
   const [recommendations, setRecommendations] = useState([]);
   const [budget, setBudget] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  // 조달 사양서 생성 관련 상태
+  const [specData, setSpecData] = useState(null);
+  const [loadingSpec, setLoadingSpec] = useState(false);
+  const [showSpecModal, setShowSpecModal] = useState(false);
+
+  const handleGenerateSpec = async (assetId) => {
+    setLoadingSpec(true);
+    setShowSpecModal(true);
+    try {
+      const response = await aiApi.getProcurementSpec(assetId);
+      setSpecData(response.data);
+    } catch (error) {
+      console.error('조달 규격서 생성 실패:', error);
+      alert('조달 규격서 생성에 실패했습니다.');
+      setShowSpecModal(false);
+    } finally {
+      setLoadingSpec(false);
+    }
+  };
 
   useEffect(() => {
     loadRecommendations();
@@ -96,9 +116,18 @@ export default function Recommendations() {
                   </div>
                 </div>
 
-                <div className="bg-blue-50 rounded p-3">
-                  <div className="text-sm font-medium text-blue-900 mb-1">AI 추천 이유:</div>
-                  <div className="text-sm text-blue-800">{rec.reason}</div>
+                <div className="bg-blue-50/70 border border-blue-100 rounded-xl p-3 flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+                  <div className="flex-1">
+                    <div className="text-sm font-medium text-blue-900 mb-1">AI 추천 이유:</div>
+                    <div className="text-sm text-blue-800">{rec.reason}</div>
+                  </div>
+                  <button
+                    onClick={() => handleGenerateSpec(rec.assetId)}
+                    className="btn btn-primary text-xs py-1.5 px-3.5 whitespace-nowrap self-end md:self-auto flex items-center gap-1.5 shadow-md shadow-blue-500/20"
+                  >
+                    <FileText size={14} />
+                    AI 조달 규격서/RFP 생성
+                  </button>
                 </div>
               </div>
             ))}
@@ -111,6 +140,90 @@ export default function Recommendations() {
           </div>
         )}
       </div>
+
+      {/* AI 조달 규격서 및 RFP 모달 */}
+      {showSpecModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="card w-full max-w-4xl max-h-[85vh] overflow-y-auto flex flex-col p-6 space-y-4 shadow-2xl border-none">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+              <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                📋 AI 조달 구매 규격서 & 제안요청서(RFP)
+              </h2>
+              <button
+                onClick={() => {
+                  setShowSpecModal(false);
+                  setSpecData(null);
+                }}
+                className="text-slate-400 hover:text-slate-600 font-bold"
+              >
+                닫기
+              </button>
+            </div>
+
+            {loadingSpec ? (
+              <div className="py-12 text-center flex flex-col items-center justify-center gap-3">
+                <div className="w-8 h-8 rounded-full border-4 border-blue-600 border-t-transparent animate-spin"></div>
+                <p className="text-sm text-slate-500 font-medium animate-pulse">Qwen3.5 AI 조달 사양서 및 제안요청서 생성 중...</p>
+              </div>
+            ) : specData ? (
+              <div className="space-y-4 overflow-y-auto pr-1">
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col md:flex-row justify-between gap-4">
+                  <div>
+                    <div className="text-xs text-slate-400 font-semibold uppercase">공고 규격서명</div>
+                    <div className="text-lg font-bold text-slate-800 mt-0.5">{specData.title}</div>
+                  </div>
+                  <div className="text-right min-w-[150px]">
+                    <div className="text-xs text-slate-400 font-semibold uppercase">예상 도입 사업비</div>
+                    <div className="text-xl font-extrabold text-blue-600 mt-0.5">{specData.budgetEstimate?.toLocaleString()}원</div>
+                  </div>
+                </div>
+
+                <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100/50 text-sm text-blue-900 leading-relaxed">
+                  <span className="font-bold">💡 규격 설계 및 예산 근거:</span> {specData.rationale}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-bold text-slate-700 border-l-4 border-blue-600 pl-2">
+                      1. 조달 기술 규격 사양서
+                    </h3>
+                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs text-slate-700 whitespace-pre-wrap font-mono leading-relaxed max-h-96 overflow-y-auto">
+                      {specData.specifications}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-bold text-slate-700 border-l-4 border-indigo-600 pl-2">
+                      2. 조달 제안요청서(RFP)
+                    </h3>
+                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs text-slate-700 whitespace-pre-wrap font-mono leading-relaxed max-h-96 overflow-y-auto">
+                      {specData.rfp}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-4 border-t border-slate-100">
+                  <button
+                    onClick={() => window.print()}
+                    className="btn btn-primary"
+                  >
+                    규격서 인쇄 / PDF 저장
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowSpecModal(false);
+                      setSpecData(null);
+                    }}
+                    className="btn btn-secondary"
+                  >
+                    닫기
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

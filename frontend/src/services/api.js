@@ -72,6 +72,8 @@ export const aiApi = {
   getWorkOrder: (recordId) => api.get(`/ai/work-orders/${recordId}`, { timeout: AI_TIMEOUT }),
   getBudgetForecast: () => api.get('/ai/budgets/forecast', { timeout: AI_TIMEOUT }),
   simulateBudget: (totalBudget) => api.post('/ai/budgets/simulate', { totalBudget }, { timeout: AI_TIMEOUT }),
+  getProcurementSpec: (assetId) => api.get(`/ai/procurement-spec/${assetId}`, { timeout: AI_TIMEOUT }),
+  diagnoseFailure: (assetId, chatHistory) => api.post('/ai/diagnose', { assetId, chatHistory }, { timeout: AI_TIMEOUT }),
 };
 
 export const authApi = {

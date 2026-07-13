@@ -127,3 +127,30 @@ def test_simulate_budget(client, admin_headers):
     assert len(data["allocations"]) > 0
     assert "totalAllocated" in data
     assert "summary" in data
+
+
+def test_generate_procurement_spec(client, admin_headers):
+    asset = client.post("/api/assets", json=ASSET_PAYLOAD, headers=admin_headers).json()["data"]
+    resp = client.get(f"/api/ai/procurement-spec/{asset['id']}", headers=admin_headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "title" in data
+    assert "specifications" in data
+    assert "rfp" in data
+    assert "budgetEstimate" in data
+    assert "rationale" in data
+
+
+def test_diagnose_asset_failure(client, admin_headers):
+    asset = client.post("/api/assets", json=ASSET_PAYLOAD, headers=admin_headers).json()["data"]
+    payload = {
+        "assetId": asset["id"],
+        "chatHistory": [
+            {"role": "user", "content": "화면 전원이 켜지지 않아요. E-02 에러코드가 뜹니다."}
+        ]
+    }
+    resp = client.post("/api/ai/diagnose", json=payload, headers=admin_headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "reply" in data
+    assert len(data["reply"]) > 0

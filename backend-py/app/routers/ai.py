@@ -913,3 +913,128 @@ def simulate_budget(request: schemas.BudgetSimulationRequest, db: Session = Depe
             totalAllocated=sum(item.allocatedAmount for item in allocations),
             summary="AI 시뮬레이터 연동 장애로 인해 과거 지출 비중 기반의 가중치로 대체 계산된 최적 예산 시뮬레이션 결과입니다."
         )
+_PROCUREMENT_SYSTEM_PROMPT = (
+    "당신은 대한민국 공공기관의 자산 구매 조달 및 제안요청서(RFP) 기획 AI다. 주어진 자산 모델의 상세 사양과 취득 단가 등을 분석하여, "
+    "나라장터(G2B) 규격에 부합하는 조달 구매 기술 규격 사양서와 제안요청서(RFP)를 한국어로 자동 작성하고 예상 조달 예산을 산정한다."
+)
+
+
+@router.get("/procurement-spec/{asset_id}", response_model=schemas.ProcurementSpecResponse)
+def generate_procurement_spec(asset_id: int, db: Session = Depends(get_db)):
+    asset = db.query(models.Asset).filter(models.Asset.id == asset_id).first()
+    if not asset:
+        raise HTTPException(status_code=404, detail="Asset not found")
+
+    if not llm.is_configured():
+        title = f"[조달 구매 규격서] {asset.asset_name} 대체 장비 도입"
+        specifications = (
+            f"## 1. 개요\n본 규격서는 노후 자산 `{asset.asset_code}`({asset.asset_name})의 대체를 위한 신규 구매 장비 사양을 정의한다.\n\n"
+            f"## 2. 세부 사양\n* 카테고리: {asset.category}\n* 권장 사양: {asset.description or '기존 장비 사양 동등 이상'}\n* 내용연수 기준: {asset.useful_life}년 이상 작동 보증"
+        )
+        rfp = (
+            f"## 제안요청서(RFP)\n\n"
+            f"* **사업명**: {asset.asset_name} 교체 조달 구매 사업\n"
+            f"* **납품 장소**: {asset.location}\n"
+            f"* **제안 요구사항**: 기존 설치 장비의 철거 및 신규 장비의 안정적 설치, 하자 보증 1년 제공."
+        )
+        return schemas.ProcurementSpecResponse(
+            title=title,
+            specifications=specifications,
+            rfp=rfp,
+            budgetEstimate=float(asset.purchase_price) * 1.15 if asset.purchase_price else 1500000.0,
+            rationale="AI 모델 미설정으로 인해 기존 장비 취득가 대비 물가상승분(15%)을 적용해 자동 조달 예산을 모의 산정했습니다."
+        )
+
+    try:
+        prompt = (
+            f"기존 자산 이름: {asset.asset_name}\n"
+            f"자산 코드: {asset.asset_code}\n"
+            f"카테고리: {asset.category}\n"
+            f"구매 가격: {asset.purchase_price:,.0f}원\n"
+            f"기본 설명 및 스펙: {asset.description or '없음'}"
+        )
+        res = llm.ask_json(_PROCUREMENT_SYSTEM_PROMPT, prompt, _PROCUREMENT_SCHEMA, effort="medium")
+        return schemas.ProcurementSpecResponse(
+            title=res.get("title") or f"[조달 규격] {asset.asset_name} 교체 조달",
+            specifications=res.get("specifications") or "사양이 생성되지 않았습니다.",
+            rfp=res.get("rfp") or "RFP가 생성되지 않았습니다.",
+            budgetEstimate=res.get("budgetEstimate") or (float(asset.purchase_price) * 1.15),
+            rationale=res.get("rationale") or "AI 분석 결과입니다."
+        )
+    except Exception:
+        logger.warning("AI 조달 규격서 생성 실패, 폴백 템플릿 적용", exc_info=True)
+        return schemas.ProcurementSpecResponse(
+            title=f"[조달 규격] {asset.asset_name} 신규 구매 규격서",
+            specifications=f"## 1. 대상 장비\n* 품명: {asset.asset_name}\n* 기존 사양: {asset.description or 'N/A'}",
+            rfp=f"## 제안요청서\n* 기존 장비의 교체를 위한 구매 입찰.",
+            budgetEstimate=float(asset.purchase_price) * 1.15 if asset.purchase_price else 1500000.0,
+            rationale="AI API 호출 장애로 백업용 템플릿이 반환되었습니다."
+        )
+
+
+# ---------------------------------------------------------------------------
+# 9. AI 기반 자산별 고장 진단 및 조치 가이드 챗봇
+# ---------------------------------------------------------------------------
+
+_DIAGNOSE_SYSTEM_PROMPT = (
+    "당신은 공공기관 시설/장비 전문 정비 AI 엔지니어다. 기기의 상세 정보와 과거 수리 이력이 제공되면, "
+    "정비사가 호소하는 고장 증상에 맞춰 과거 사례와 연계하여 최적의 해결책(점검 순서, 필수 교체 자재 등)을 대화형으로 친절하게 답변하라. "
+    "답변은 아주 읽기 쉽게 마크다운과 순서번호(1., 2.)를 활용해 줄바꿈을 자주 하여 작성하라."
+)
+
+
+@router.post("/diagnose", response_model=schemas.DiagnosticsResponse)
+def diagnose_asset_failure(request: schemas.DiagnosticsRequest, db: Session = Depends(get_db)):
+    asset = db.query(models.Asset).filter(models.Asset.id == request.assetId).first()
+    if not asset:
+        raise HTTPException(status_code=404, detail="Asset not found")
+
+    maint_records = db.query(models.MaintenanceRecord).filter(models.MaintenanceRecord.asset_id == asset.id).all()
+    records_str = ""
+    for idx, r in enumerate(maint_records):
+        records_str += f"[{idx+1}] 날짜: {r.maintenance_date}, 유형: {r.maintenance_type.value}, 비용: {r.cost:,.0f}원, 설명: {r.description or ''}\n"
+
+    last_user_msg = request.chatHistory[-1].content if request.chatHistory else ""
+
+    # Build prompt
+    prompt = (
+        f"대상 기기: {asset.asset_name} (코드: {asset.asset_code}, 카테고리: {asset.category})\n"
+        f"장비 상세 설명: {asset.description or '없음'}\n"
+        f"과거 정비 이력 목록:\n{records_str or '없음'}\n\n"
+    )
+
+    # Append chat history
+    prompt += "=== 대화 기록 ===\n"
+    for msg in request.chatHistory[:-1]:
+        prompt += f"{msg.role}: {msg.content}\n"
+    prompt += f"정비사(사용자) 질문: {last_user_msg}\n"
+
+    if not llm.is_configured():
+        matched_records = [r for r in maint_records if r.description and any(w in r.description for w in last_user_msg.split())]
+        if matched_records:
+            reply = (
+                f"과거 정비 이력에서 유사한 키워드가 포함된 {len(matched_records)}건의 사례를 발견했습니다.\n\n"
+                f"**추천 조치 사항**:\n"
+            )
+            for r in matched_records[:2]:
+                reply += f"* {r.maintenance_date} 수리 이력: \"{r.description}\" (비용: {r.cost:,.0f}원)\n"
+            reply += "\n위 사례의 조치 내역을 먼저 검토해 주시기 바라며, 기본적으로 기기 전원 공급 장치와 단자 결합부 접촉 상태를 가장 먼저 확인하는 것을 권장합니다."
+        else:
+            reply = (
+                f"안녕하세요. {asset.asset_name} 기기 정비 챗봇입니다. 현재 AI 서비스 점검 중으로 폴백 답변을 드립니다.\n\n"
+                f"기종: {asset.category} ({asset.asset_code})\n"
+                f"**기본 점검 가이드**:\n"
+                f"1. 전원선 연결 상태 및 배전판 스위치가 켜져 있는지 확인하십시오.\n"
+                f"2. 과거 수리 이력 중 수리 유형이 `{asset.status}` 상태와 연관이 깊은지 확인하십시오.\n"
+                f"3. 증상이 지속되는 경우 제조사 서비스 센터 또는 전문 정비 부서로 이관을 권장합니다."
+            )
+        return schemas.DiagnosticsResponse(reply=reply)
+
+    try:
+        reply = llm.ask(_DIAGNOSE_SYSTEM_PROMPT, prompt)
+        return schemas.DiagnosticsResponse(reply=reply or "죄송합니다. 진단 결과 응답이 유효하지 않습니다.")
+    except Exception as e:
+        logger.warning("AI 고장 진단 Q&A 호출 실패, 폴백 적용", exc_info=True)
+        return schemas.DiagnosticsResponse(
+            reply=f"AI 엔진 통신 중 오류({e})가 발생하여 기본 점검 모드로 자동 전환되었습니다.\n\n기기의 입출력 단자 상태와 배선 상태를 우선적으로 육안 검사해 주시기 바랍니다."
+        )

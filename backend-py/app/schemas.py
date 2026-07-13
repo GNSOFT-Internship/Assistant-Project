@@ -139,3 +139,25 @@ class BudgetForecastResponse(BaseModel):
     forecastYear: int
     monthlyForecast: List[BudgetForecastItem]
     rationale: str
+
+
+class ProcurementSpecResponse(BaseModel):
+    title: str
+    specifications: str  # 기술 규격 사양서 마크다운
+    rfp: str             # 제안요청서(RFP) 마크다운
+    budgetEstimate: float
+    rationale: str
+
+
+class ChatMessage(BaseModel):
+    role: str  # "user" or "assistant"
+    content: str
+
+
+class DiagnosticsRequest(BaseModel):
+    assetId: int
+    chatHistory: List[ChatMessage]
+
+
+class DiagnosticsResponse(BaseModel):
+    reply: str
