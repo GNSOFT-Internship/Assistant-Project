@@ -1,0 +1,81 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import Recommendations from './Recommendations';
+import { ToastProvider } from '../context/ToastContext';
+import { aiApi } from '../services/api';
+
+vi.mock('../services/api', () => ({
+  aiApi: {
+    getReplacementRecommendation: vi.fn(),
+    getProcurementSpec: vi.fn(),
+  },
+}));
+
+const RECOMMENDATION = {
+  assetId: 1,
+  assetName: '데스크톱 Lenovo ThinkCentre',
+  assetCode: 'ASSET-003',
+  score: 111.2,
+  purchasePrice: 800000,
+  totalRepairCost: 345000,
+  usedYears: 8,
+  usefulLife: 5,
+  maintenanceCount: 5,
+  reason: '내용연수를 초과해 사용 중입니다.',
+};
+
+function renderPage() {
+  return render(
+    <ToastProvider>
+      <Recommendations />
+    </ToastProvider>
+  );
+}
+
+describe('Recommendations', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('renders a recommendation card after loading', async () => {
+    aiApi.getReplacementRecommendation.mockResolvedValue({ data: { data: { recommendations: [RECOMMENDATION] } } });
+    renderPage();
+    await waitFor(() => expect(screen.getByText('데스크톱 Lenovo ThinkCentre')).toBeInTheDocument());
+    expect(screen.getByText('111.2점')).toBeInTheDocument();
+  });
+
+  it('shows an empty state when there are no recommendations', async () => {
+    aiApi.getReplacementRecommendation.mockResolvedValue({ data: { data: { recommendations: [] } } });
+    renderPage();
+    await waitFor(() => expect(screen.getByText('교체 권장 자산이 없습니다.')).toBeInTheDocument());
+  });
+
+  it('opens the procurement spec modal and closes it without crashing', async () => {
+    const user = userEvent.setup();
+    aiApi.getReplacementRecommendation.mockResolvedValue({ data: { data: { recommendations: [RECOMMENDATION] } } });
+    aiApi.getProcurementSpec.mockResolvedValue({
+      data: { title: 'NAS 스토리지 규격서', specifications: '스펙 내용', rfp: 'RFP 내용', budgetEstimate: 5000000, rationale: '근거' },
+    });
+    renderPage();
+    await waitFor(() => expect(screen.getByText('데스크톱 Lenovo ThinkCentre')).toBeInTheDocument());
+
+    await user.click(screen.getByText('AI 조달 규격서/RFP 생성'));
+    await waitFor(() => expect(screen.getByText('NAS 스토리지 규격서')).toBeInTheDocument());
+
+    // 헤더/푸터에 동일한 기능의 "닫기" 버튼이 두 개 있으므로 첫 번째만 사용한다.
+    await user.click(screen.getAllByText('닫기')[0]);
+    await waitFor(() => expect(screen.queryByText('NAS 스토리지 규격서')).not.toBeInTheDocument());
+  });
+
+  it('re-queries with a budget filter when Enter is pressed in the budget field', async () => {
+    const user = userEvent.setup();
+    aiApi.getReplacementRecommendation.mockResolvedValue({ data: { data: { recommendations: [] } } });
+    renderPage();
+    await waitFor(() => expect(aiApi.getReplacementRecommendation).toHaveBeenCalledTimes(1));
+
+    await user.type(screen.getByPlaceholderText('입력 후 Enter'), '1000000{Enter}');
+
+    await waitFor(() => expect(aiApi.getReplacementRecommendation).toHaveBeenCalledWith(1000000));
+  });
+});

@@ -6,3 +6,11 @@ import '@testing-library/jest-dom';
 if (typeof Element !== 'undefined' && !Element.prototype.scrollIntoView) {
   Element.prototype.scrollIntoView = () => {};
 }
+
+// 엑셀/PDF 다운로드 버튼이 사용하는 Blob URL API와 인쇄 버튼이 사용하는
+// window.print도 jsdom에 구현되어 있지 않다.
+if (typeof window !== 'undefined') {
+  if (!window.URL.createObjectURL) window.URL.createObjectURL = () => 'blob:mock';
+  if (!window.URL.revokeObjectURL) window.URL.revokeObjectURL = () => {};
+  if (!window.print) window.print = () => {};
+}
