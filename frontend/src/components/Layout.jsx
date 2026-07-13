@@ -3,8 +3,9 @@ import { Link, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   LayoutDashboard, Package, Wrench, Lightbulb, MessageSquare,
-  Upload, FileText, LogOut, Wallet, ChevronLeft, ChevronRight, ScrollText
+  Upload, FileText, LogOut, Wallet, ChevronLeft, ChevronRight, ScrollText, Search
 } from 'lucide-react';
+import CommandPalette from './CommandPalette';
 
 function ScrollableNav({ items, activePath, variant }) {
   const scrollRef = useRef(null);
@@ -94,6 +95,7 @@ export default function Layout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [paletteOpen, setPaletteOpen] = useState(false);
 
   const handleLogout = () => {
     logout();
@@ -111,6 +113,18 @@ export default function Layout() {
     { path: '/budget', label: '예산 관리', icon: Wallet },
     ...(user?.role === 'ADMIN' ? [{ path: '/audit-log', label: '감사 로그', icon: ScrollText }] : []),
   ];
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      const isShortcut = (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k';
+      if (isShortcut) {
+        e.preventDefault();
+        setPaletteOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -131,6 +145,22 @@ export default function Layout() {
               </div>
             </div>
             <div className="flex items-center gap-3 flex-shrink-0">
+              <button
+                onClick={() => setPaletteOpen(true)}
+                title="전역 검색 (Ctrl/⌘+K)"
+                className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-gray-500 border border-slate-200 hover:bg-gray-50 hover:text-gray-700 transition-colors"
+              >
+                <Search size={14} />
+                <span>검색</span>
+                <kbd className="text-xs text-slate-400 border border-slate-200 rounded px-1">⌘K</kbd>
+              </button>
+              <button
+                onClick={() => setPaletteOpen(true)}
+                title="전역 검색"
+                className="sm:hidden p-2 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+              >
+                <Search size={18} />
+              </button>
               <div className="hidden sm:flex items-center gap-2 text-sm text-gray-600">
                 <div className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center text-xs font-semibold text-gray-600">
                   {user?.username?.[0]?.toUpperCase()}
@@ -154,6 +184,7 @@ export default function Layout() {
       <main className="max-w-7xl mx-auto py-6 px-4">
         <Outlet />
       </main>
+      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} navItems={menuItems} />
     </div>
   );
 }
