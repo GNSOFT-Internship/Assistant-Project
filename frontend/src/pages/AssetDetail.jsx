@@ -4,6 +4,7 @@ import { assetApi, aiApi } from '../services/api';
 import { Calendar, DollarSign, Clock, Package, History, Edit, Trash2, FileText, Send, MessageSquare, Loader } from 'lucide-react';
 import { AssetStatusBadge, MaintenanceTypeBadge } from '../components/StatusBadge';
 import LoadingState from '../components/LoadingState';
+import Modal from '../components/Modal';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
@@ -501,11 +502,9 @@ export default function AssetDetail() {
         )}
       </div>
 
-      {editingRecord && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
-            <h2 className="text-xl font-bold mb-4">유지보수 기록 수정</h2>
-            <form onSubmit={handleRecordSubmit} className="space-y-4">
+      <Modal open={!!editingRecord} onClose={closeRecordModal}>
+        <h2 className="text-xl font-bold mb-4">유지보수 기록 수정</h2>
+        <form onSubmit={handleRecordSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-1">정비일</label>
                 <input
@@ -569,10 +568,8 @@ export default function AssetDetail() {
                 <button type="button" onClick={closeRecordModal} className="btn btn-secondary">취소</button>
                 <button type="submit" className="btn btn-primary">저장</button>
               </div>
-            </form>
-          </div>
-        </div>
-      )}
+        </form>
+      </Modal>
 
       {/* AI 작업 지시서 모달 */}
       {activeWorkOrder && (

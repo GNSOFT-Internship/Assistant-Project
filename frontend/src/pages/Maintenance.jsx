@@ -4,6 +4,7 @@ import { aiApi, assetApi } from '../services/api';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { AssetStatusBadge, MaintenanceTypeBadge } from '../components/StatusBadge';
 import LoadingState from '../components/LoadingState';
+import Modal from '../components/Modal';
 import { ArrowLeft } from 'lucide-react';
 
 const TOP_FAILURE_COUNT = 5;
@@ -330,15 +331,7 @@ export default function Maintenance() {
         </div>
       </div>
 
-      {selectedFailureType && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
-          onClick={closeFailureAssetsModal}
-        >
-          <div
-            className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
+      <Modal open={!!selectedFailureType} onClose={closeFailureAssetsModal} maxWidth="max-w-2xl">
             {viewingAsset ? (
               <>
                 <div className="flex items-center gap-2 mb-4">
@@ -454,9 +447,7 @@ export default function Maintenance() {
                 )}
               </>
             )}
-          </div>
-        </div>
-      )}
+      </Modal>
     </div>
   );
 }

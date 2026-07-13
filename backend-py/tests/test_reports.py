@@ -32,3 +32,77 @@ def test_monthly_report_pdf_returns_valid_pdf(client, admin_headers):
 def test_monthly_report_pdf_requires_auth(client):
     resp = client.get("/api/reports/monthly/pdf")
     assert resp.status_code == 401
+
+
+def _create_asset(client, admin_headers, **overrides):
+    payload = {**ASSET_PAYLOAD, **overrides}
+    resp = client.post("/api/assets", json=payload, headers=admin_headers)
+    assert resp.status_code == 200, resp.text
+    return resp.json()["data"]
+
+
+def test_monthly_report_totals_and_status_breakdown_match_actual_data(client, admin_headers):
+    """총 자산 수/상태별 집계/누적 비용이 실제로 등록한 데이터와 정확히 일치하는지 확인한다."""
+    _create_asset(client, admin_headers, assetCode="TEST-REPORT-A", status="ACTIVE")
+    _create_asset(client, admin_headers, assetCode="TEST-REPORT-B", status="ACTIVE")
+    replacement_needed = _create_asset(client, admin_headers, assetCode="TEST-REPORT-C", status="REPLACEMENT_NEEDED")
+
+    client.post(
+        f"/api/assets/{replacement_needed['id']}/maintenance",
+        json={"maintenanceDate": "2024-05-01", "maintenanceType": "REPAIR", "cost": 30000, "description": "수리1"},
+        headers=admin_headers,
+    )
+    client.post(
+        f"/api/assets/{replacement_needed['id']}/maintenance",
+        json={"maintenanceDate": "2024-06-01", "maintenanceType": "REPAIR", "cost": 20000, "description": "수리2"},
+        headers=admin_headers,
+    )
+
+    resp = client.get("/api/reports/monthly", headers=admin_headers)
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+
+    assert data["totalAssets"] >= 3
+    assert data["byStatus"]["ACTIVE"] >= 2
+    assert data["byStatus"]["REPLACEMENT_NEEDED"] >= 1
+    assert data["totalMaintenanceCost"] >= 50000
+
+
+def test_monthly_report_repeated_failure_count_requires_two_or_more_repairs(client, admin_headers):
+    """REPAIR 유형이 2건 이상인 자산만 '반복 고장'으로 집계되고, 정기점검(ROUTINE)은 집계되지 않아야 한다."""
+    resp_before = client.get("/api/reports/monthly", headers=admin_headers)
+    baseline = resp_before.json()["data"]["repeatedFailureCount"]
+
+    single_repair = _create_asset(client, admin_headers, assetCode="TEST-REPORT-SINGLE")
+    client.post(
+        f"/api/assets/{single_repair['id']}/maintenance",
+        json={"maintenanceDate": "2024-05-01", "maintenanceType": "REPAIR", "cost": 10000, "description": "1회 수리"},
+        headers=admin_headers,
+    )
+
+    many_routine = _create_asset(client, admin_headers, assetCode="TEST-REPORT-ROUTINE")
+    for i in range(3):
+        client.post(
+            f"/api/assets/{many_routine['id']}/maintenance",
+            json={"maintenanceDate": f"2024-0{i+1}-01", "maintenanceType": "ROUTINE", "cost": 5000, "description": "정기점검"},
+            headers=admin_headers,
+        )
+
+    # 아직 REPAIR가 2건 이상인 자산이 늘지 않았으므로 반복 고장 수는 그대로여야 한다
+    resp_mid = client.get("/api/reports/monthly", headers=admin_headers)
+    assert resp_mid.json()["data"]["repeatedFailureCount"] == baseline
+
+    repeated = _create_asset(client, admin_headers, assetCode="TEST-REPORT-REPEATED")
+    client.post(
+        f"/api/assets/{repeated['id']}/maintenance",
+        json={"maintenanceDate": "2024-05-01", "maintenanceType": "REPAIR", "cost": 10000, "description": "수리A"},
+        headers=admin_headers,
+    )
+    client.post(
+        f"/api/assets/{repeated['id']}/maintenance",
+        json={"maintenanceDate": "2024-06-01", "maintenanceType": "REPAIR", "cost": 15000, "description": "수리B"},
+        headers=admin_headers,
+    )
+
+    resp_after = client.get("/api/reports/monthly", headers=admin_headers)
+    assert resp_after.json()["data"]["repeatedFailureCount"] == baseline + 1

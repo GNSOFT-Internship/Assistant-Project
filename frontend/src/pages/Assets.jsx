@@ -4,6 +4,7 @@ import { assetApi } from '../services/api';
 import { Plus, Edit, Trash2, Eye, ChevronLeft, ChevronRight, Download, Upload, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import { AssetStatusBadge } from '../components/StatusBadge';
 import LoadingState from '../components/LoadingState';
+import Modal from '../components/Modal';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
@@ -370,13 +371,11 @@ export default function Assets() {
         )}
       </div>
 
-      {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <h2 className="text-xl font-bold mb-4">
-              {editingAsset ? '자산 수정' : '자산 등록'}
-            </h2>
-            <form onSubmit={handleSubmit} className="space-y-4">
+      <Modal open={showModal} onClose={closeModal} maxWidth="max-w-2xl">
+        <h2 className="text-xl font-bold mb-4">
+          {editingAsset ? '자산 수정' : '자산 등록'}
+        </h2>
+        <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-1">자산명</label>
                 <input
@@ -496,10 +495,8 @@ export default function Assets() {
                   저장
                 </button>
               </div>
-            </form>
-          </div>
-        </div>
-      )}
+        </form>
+      </Modal>
     </div>
   );
 }
