@@ -1,47 +1,69 @@
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   html {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Malgun Gothic",
-      "Apple SD Gothic Neo", Roboto, sans-serif;
+    font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont,
+      system-ui, Roboto, "Helvetica Neue", "Segoe UI", "Apple SD Gothic Neo",
+      "Malgun Gothic", sans-serif;
+    scroll-behavior: smooth;
   }
 
   body {
-    @apply bg-gray-50 text-gray-900 antialiased;
+    @apply bg-slate-50 text-slate-900 antialiased;
+    letter-spacing: -0.02em;
   }
 }
 
 @layer components {
   .btn {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-4 py-2
-      text-sm font-medium transition-colors duration-150
+    @apply inline-flex items-center justify-center gap-1.5 rounded-xl px-4 py-2.5
+      text-sm font-semibold transition-all duration-200
       focus:outline-none focus:ring-2 focus:ring-offset-2
-      disabled:opacity-50 disabled:cursor-not-allowed;
+      disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98];
   }
 
   .btn-primary {
-    @apply btn bg-blue-600 text-white shadow-sm hover:bg-blue-700 focus:ring-blue-500;
+    @apply btn bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 focus:ring-blue-500;
+    box-shadow: 0 4px 14px 0 rgba(37, 99, 235, 0.25);
+  }
+
+  .btn-primary:hover {
+    box-shadow: 0 6px 20px 0 rgba(37, 99, 235, 0.35);
   }
 
   .btn-secondary {
-    @apply btn bg-white text-gray-700 border border-gray-300 shadow-sm
-      hover:bg-gray-50 focus:ring-blue-500;
+    @apply btn bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 focus:ring-blue-500;
+    box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.02);
+  }
+
+  .btn-secondary:hover {
+    box-shadow: 0 4px 10px 0 rgba(0, 0, 0, 0.05);
   }
 
   .btn-danger {
-    @apply btn bg-white text-red-600 border border-gray-300 shadow-sm
-      hover:bg-red-50 focus:ring-red-500;
+    @apply btn bg-white text-red-600 border border-red-100 hover:bg-red-50 focus:ring-red-500;
+    box-shadow: 0 2px 4px 0 rgba(239, 68, 68, 0.05);
   }
 
   .card {
-    @apply bg-white rounded-xl shadow-sm border border-gray-200 p-6;
+    @apply bg-white rounded-2xl border border-slate-100 p-6;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.03), 0 2px 4px -1px rgba(0, 0, 0, 0.01), 0 0 0 1px rgba(0, 0, 0, 0.01);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 20px -3px rgba(59, 130, 246, 0.08), 0 4px 12px -2px rgba(59, 130, 246, 0.03), 0 0 0 1px rgba(59, 130, 246, 0.1);
+    border-color: rgba(59, 130, 246, 0.15);
   }
 
   .input {
-    @apply block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm
-      text-gray-900 placeholder-gray-400 shadow-sm
+    @apply block w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm
+      text-slate-900 placeholder-slate-400 shadow-sm transition-all duration-150
       focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500;
   }
 
@@ -50,41 +72,41 @@
   }
 
   .table-header {
-    @apply bg-gray-50 text-xs font-semibold uppercase tracking-wider text-gray-500;
+    @apply bg-slate-50/70 text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-100;
   }
 
   .table-cell {
-    @apply px-4 py-3 whitespace-nowrap;
+    @apply px-4 py-3.5 whitespace-nowrap text-slate-700 border-b border-slate-100;
   }
 
   .table tbody tr {
-    @apply transition-colors;
+    @apply transition-colors hover:bg-slate-50/50;
   }
 
   .badge {
-    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold;
   }
 
   .badge-green {
-    @apply badge bg-green-100 text-green-800;
+    @apply badge bg-emerald-50 text-emerald-700 border border-emerald-100;
   }
   .badge-red {
-    @apply badge bg-red-100 text-red-800;
+    @apply badge bg-rose-50 text-rose-700 border border-rose-100;
   }
   .badge-yellow {
-    @apply badge bg-yellow-100 text-yellow-800;
+    @apply badge bg-amber-50 text-amber-700 border border-amber-100;
   }
   .badge-blue {
-    @apply badge bg-blue-100 text-blue-800;
+    @apply badge bg-sky-50 text-sky-700 border border-sky-100;
   }
   .badge-gray {
-    @apply badge bg-gray-100 text-gray-800;
+    @apply badge bg-slate-50 text-slate-600 border border-slate-100;
   }
   .badge-purple {
-    @apply badge bg-purple-100 text-purple-800;
+    @apply badge bg-violet-50 text-violet-700 border border-violet-100;
   }
   .badge-orange {
-    @apply badge bg-orange-100 text-orange-800;
+    @apply badge bg-orange-50 text-orange-700 border border-orange-100;
   }
 }
 

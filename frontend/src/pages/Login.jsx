@@ -27,21 +27,25 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-gray-50 to-gray-100 flex items-center justify-center px-4">
-      <div className="max-w-md w-full">
+    <div className="relative min-h-screen bg-slate-50 flex items-center justify-center px-4 overflow-hidden">
+      {/* 백그라운드 그라데이션 블롭 데코레이션 */}
+      <div className="absolute top-1/4 left-1/4 w-80 h-80 bg-blue-400/20 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-pulse pointer-events-none"></div>
+      <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-indigo-400/20 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-pulse pointer-events-none"></div>
+
+      <div className="relative max-w-md w-full z-10">
         <div className="flex flex-col items-center mb-8">
-          <div className="w-14 h-14 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold text-xl shadow-md mb-4">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white flex items-center justify-center font-extrabold text-2xl shadow-md shadow-blue-500/20 mb-4">
             자
           </div>
-          <h2 className="text-center text-2xl font-bold text-gray-900">
-            자산관리 시스템
+          <h2 className="text-center text-3xl font-extrabold text-slate-900 tracking-tight">
+            자산관리 의사결정 시스템
           </h2>
-          <p className="mt-1 text-center text-sm text-gray-500">
-            로그인하여 계속하세요
+          <p className="mt-2 text-center text-sm text-slate-500 font-medium">
+            공공기관 시설·자산 정보 관리 및 LLM 분석 포털
           </p>
         </div>
 
-        <div className="card">
+        <div className="card border border-slate-100/80 bg-white/90 backdrop-blur-sm shadow-xl shadow-slate-100">
           <form className="space-y-4" onSubmit={handleSubmit}>
             {error && (
               <div className="rounded-lg bg-red-50 border border-red-200 p-3">

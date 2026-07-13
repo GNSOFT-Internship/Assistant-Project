@@ -67,8 +67,8 @@ function ScrollableNav({ items, activePath, variant }) {
               to={item.path}
               className={`${itemClass} ${
                 active
-                  ? 'bg-blue-50 text-blue-700'
-                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-sm shadow-blue-500/25 font-semibold'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
               }`}
             >
               <Icon size={iconSize} />
@@ -112,13 +112,13 @@ export default function Layout() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-gray-200">
+    <div className="min-h-screen bg-slate-50">
+      <nav className="sticky top-0 z-30 bg-white/70 backdrop-blur-md border-b border-slate-100">
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex justify-between h-16">
             <div className="flex items-center min-w-0 flex-1">
               <div className="flex-shrink-0 flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-sm">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 text-white flex items-center justify-center font-extrabold text-sm shadow-sm shadow-blue-500/30">
                   자
                 </div>
                 <h1 className="text-lg font-bold text-gray-900 hidden sm:block whitespace-nowrap">
