@@ -109,7 +109,7 @@ Assistant-Project/
 │   │   ├── App.jsx          # 프론트엔드 라우팅 및 렌더링 루트
 │   │   └── index.css        # 스타일 시트 (네비게이션 화살표 스타일 추가)
 │   └── package.json         # 프론트엔드 패키지 의존성 파일
-├── .github/workflows/        # GitHub Actions CI (backend-py 변경 시 pytest 자동 실행)
+├── .github/workflows/        # GitHub Actions CI (backend-py 변경 시 pytest, frontend 변경 시 vitest 자동 실행)
 └── docs/                     # 데이터베이스 테이블 및 초기 데이터 스크립트 (schema.sql)
 ```
 
@@ -169,6 +169,13 @@ pytest
 ```
 
 pytest + FastAPI TestClient + SQLite 인메모리 DB 기반으로 인증, 자산 CRUD, 엑셀 일괄 등록, 감사 로그, 파일 업로드, 권한 분리, AI 게이팅, AI 요청 제한, 챗봇 이력 저장 등을 검증하는 자동화 테스트가 `backend-py/tests/`에 있습니다. 각 테스트는 트랜잭션 롤백으로 격리되어 서로 영향을 주지 않으며, GitHub Actions로 `backend-py` 변경 시마다 자동 실행됩니다.
+
+```bash
+cd frontend
+npm test
+```
+
+Vitest + React Testing Library 기반으로 공용 유틸/컨텍스트/컴포넌트 및 주요 페이지 동작을 검증하는 프론트엔드 테스트가 `frontend/src/**/*.test.{js,jsx}`에 있습니다. 백엔드와 마찬가지로 GitHub Actions로 `frontend` 변경 시마다 자동 실행됩니다.
 
 ---
 
