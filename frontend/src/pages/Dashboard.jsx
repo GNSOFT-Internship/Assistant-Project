@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { aiApi } from '../services/api';
-import { TrendingUp, TrendingDown, AlertCircle, CheckCircle } from 'lucide-react';
+import { TrendingUp, TrendingDown, AlertCircle, CheckCircle, AlertTriangle } from 'lucide-react';
+
+const BUDGET_WARNING_THRESHOLD = 90;
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -40,6 +42,11 @@ export default function Dashboard() {
     );
   }
 
+  const budgetWarning =
+    data.hasBudgetData &&
+    data.budgetConsumptionRate != null &&
+    data.budgetConsumptionRate >= BUDGET_WARNING_THRESHOLD;
+
   const stats = [
     { label: '이번달 유지보수 비용', value: `₩${data.currentMonthMaintenanceCost?.toLocaleString()}`, icon: TrendingUp, color: 'text-blue-600' },
     { label: '신규 고장 건수', value: data.newFailureCount, icon: AlertCircle, color: 'text-red-600' },
@@ -47,8 +54,9 @@ export default function Dashboard() {
     {
       label: '예산 소진율',
       value: data.budgetConsumptionRate != null ? `${data.budgetConsumptionRate.toFixed(1)}%` : '데이터 없음',
-      icon: TrendingDown,
-      color: 'text-yellow-600',
+      icon: budgetWarning ? AlertTriangle : TrendingDown,
+      color: budgetWarning ? 'text-red-600' : 'text-yellow-600',
+      warning: budgetWarning,
     },
   ];
 
@@ -72,13 +80,25 @@ export default function Dashboard() {
         </div>
       )}
 
+      {budgetWarning && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-2">
+          <AlertTriangle size={18} className="text-red-600 flex-shrink-0" />
+          <p className="text-sm text-red-800">
+            <strong>예산 경고:</strong> 이번 달 예산 소진율이 {data.budgetConsumptionRate.toFixed(1)}%로 {BUDGET_WARNING_THRESHOLD}%를 초과했습니다. 예산 재검토가 필요합니다.
+          </p>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {stats.map((stat) => {
           const Icon = stat.icon;
           return (
-            <div key={stat.label} className="card">
+            <div
+              key={stat.label}
+              className={`card ${stat.warning ? 'border-2 border-red-300 bg-red-50' : ''}`}
+            >
               <div className="flex items-center">
-                <div className={`p-3 rounded-full bg-gray-100 ${stat.color}`}>
+                <div className={`p-3 rounded-full ${stat.warning ? 'bg-red-100' : 'bg-gray-100'} ${stat.color}`}>
                   <Icon size={24} />
                 </div>
                 <div className="ml-4">
