@@ -970,6 +970,19 @@ def simulate_budget(request: schemas.BudgetSimulationRequest, db: Session = Depe
             totalAllocated=sum(item.allocatedAmount for item in allocations),
             summary="AI 시뮬레이터 연동 장애로 인해 과거 지출 비중 기반의 가중치로 대체 계산된 최적 예산 시뮬레이션 결과입니다."
         )
+_PROCUREMENT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "title": {"type": "string", "description": "조달 규격서 제목"},
+        "specifications": {"type": "string", "description": "마크다운 형식의 기술 규격 사양서 본문"},
+        "rfp": {"type": "string", "description": "마크다운 형식의 제안요청서(RFP) 본문"},
+        "budgetEstimate": {"type": "number", "description": "예상 조달 예산 (원)"},
+        "rationale": {"type": "string", "description": "예산 산정 근거 및 분석 총평"}
+    },
+    "required": ["title", "specifications", "rfp", "budgetEstimate", "rationale"],
+    "additionalProperties": False
+}
+
 _PROCUREMENT_SYSTEM_PROMPT = (
     "당신은 대한민국 공공기관의 자산 구매 조달 및 제안요청서(RFP) 기획 AI다. 주어진 자산 모델의 상세 사양과 취득 단가 등을 분석하여, "
     "나라장터(G2B) 규격에 부합하는 조달 구매 기술 규격 사양서와 제안요청서(RFP)를 한국어로 자동 작성하고 예상 조달 예산을 산정한다."
@@ -1049,7 +1062,8 @@ def diagnose_asset_failure(request: schemas.DiagnosticsRequest, db: Session = De
     maint_records = db.query(models.MaintenanceRecord).filter(models.MaintenanceRecord.asset_id == asset.id).all()
     records_str = ""
     for idx, r in enumerate(maint_records):
-        records_str += f"[{idx+1}] 날짜: {r.maintenance_date}, 유형: {r.maintenance_type.value}, 비용: {r.cost:,.0f}원, 설명: {r.description or ''}\n"
+        cost_str = f"{float(r.cost):,.0f}원" if r.cost is not None else "비용 미기재"
+        records_str += f"[{idx+1}] 날짜: {r.maintenance_date}, 유형: {r.maintenance_type.value}, 비용: {cost_str}, 설명: {r.description or ''}\n"
 
     last_user_msg = request.chatHistory[-1].content if request.chatHistory else ""
 
@@ -1074,7 +1088,8 @@ def diagnose_asset_failure(request: schemas.DiagnosticsRequest, db: Session = De
                 f"**추천 조치 사항**:\n"
             )
             for r in matched_records[:2]:
-                reply += f"* {r.maintenance_date} 수리 이력: \"{r.description}\" (비용: {r.cost:,.0f}원)\n"
+                cost_str = f"{float(r.cost):,.0f}원" if r.cost is not None else "비용 미기재"
+                reply += f"* {r.maintenance_date} 수리 이력: \"{r.description}\" (비용: {cost_str})\n"
             reply += "\n위 사례의 조치 내역을 먼저 검토해 주시기 바라며, 기본적으로 기기 전원 공급 장치와 단자 결합부 접촉 상태를 가장 먼저 확인하는 것을 권장합니다."
         else:
             reply = (
@@ -1088,7 +1103,7 @@ def diagnose_asset_failure(request: schemas.DiagnosticsRequest, db: Session = De
         return schemas.DiagnosticsResponse(reply=reply)
 
     try:
-        reply = llm.ask(_DIAGNOSE_SYSTEM_PROMPT, prompt)
+        reply = llm.ask_text(_DIAGNOSE_SYSTEM_PROMPT, prompt)
         return schemas.DiagnosticsResponse(reply=reply or "죄송합니다. 진단 결과 응답이 유효하지 않습니다.")
     except Exception as e:
         logger.warning("AI 고장 진단 Q&A 호출 실패, 폴백 적용", exc_info=True)

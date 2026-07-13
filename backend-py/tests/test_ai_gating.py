@@ -164,3 +164,23 @@ def test_diagnose_asset_failure(client, admin_headers):
     data = resp.json()
     assert "reply" in data
     assert len(data["reply"]) > 0
+
+
+def test_diagnose_asset_failure_with_null_cost_record_does_not_crash(client, admin_headers):
+    """cost가 없는(None) 유지보수 기록이 있어도 비용 포맷팅에서 500이 나면 안 된다."""
+    asset = client.post("/api/assets", json=ASSET_PAYLOAD, headers=admin_headers).json()["data"]
+    client.post(
+        f"/api/assets/{asset['id']}/maintenance",
+        json={
+            "maintenanceDate": "2024-05-01",
+            "maintenanceType": "INSPECTION",
+            "description": "비용 미기재 점검",
+        },
+        headers=admin_headers,
+    )
+    payload = {
+        "assetId": asset["id"],
+        "chatHistory": [{"role": "user", "content": "이 장비 점검 이력 알려줘"}],
+    }
+    resp = client.post("/api/ai/diagnose", json=payload, headers=admin_headers)
+    assert resp.status_code == 200
