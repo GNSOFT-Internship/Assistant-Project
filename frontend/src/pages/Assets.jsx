@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { assetApi } from '../services/api';
-import { Plus, Edit, Trash2, Eye, ChevronLeft, ChevronRight, Download, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
+import { Plus, Edit, Trash2, Eye, ChevronLeft, ChevronRight, Download, Upload, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import { AssetStatusBadge } from '../components/StatusBadge';
 import { useAuth } from '../context/AuthContext';
 
@@ -21,6 +21,8 @@ export default function Assets() {
   const [sortOrder, setSortOrder] = useState('asc');
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef(null);
   const [showModal, setShowModal] = useState(false);
   const [editingAsset, setEditingAsset] = useState(null);
   const [formData, setFormData] = useState({
@@ -166,6 +168,34 @@ export default function Assets() {
     }
   };
 
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleImportFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+
+    setImporting(true);
+    try {
+      const response = await assetApi.importExcel(file);
+      const { created, failed } = response.data.data;
+      let msg = `${created}건 등록 완료`;
+      if (failed.length > 0) {
+        const detail = failed.slice(0, 5).map((f) => `${f.row}행: ${f.error}`).join('\n');
+        msg += `\n${failed.length}건 실패\n${detail}${failed.length > 5 ? '\n...' : ''}`;
+      }
+      alert(msg);
+      loadAssets();
+    } catch (error) {
+      console.error('엑셀 가져오기 실패:', error);
+      alert(error.response?.data?.detail || '엑셀 가져오기 중 오류가 발생했습니다.');
+    } finally {
+      setImporting(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center flex-wrap gap-2">
@@ -179,12 +209,28 @@ export default function Assets() {
             <Download size={16} /> {exporting ? '내보내는 중...' : '엑셀 내보내기'}
           </button>
           {isAdmin && (
-            <button
-              onClick={() => { resetForm(); setShowModal(true); }}
-              className="btn btn-primary flex items-center gap-2"
-            >
-              <Plus size={16} /> 자산 등록
-            </button>
+            <>
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept=".xlsx"
+                className="hidden"
+                onChange={handleImportFileChange}
+              />
+              <button
+                onClick={handleImportClick}
+                disabled={importing}
+                className="btn btn-secondary flex items-center gap-2"
+              >
+                <Upload size={16} /> {importing ? '가져오는 중...' : '엑셀 일괄 등록'}
+              </button>
+              <button
+                onClick={() => { resetForm(); setShowModal(true); }}
+                className="btn btn-primary flex items-center gap-2"
+              >
+                <Plus size={16} /> 자산 등록
+              </button>
+            </>
           )}
         </div>
       </div>

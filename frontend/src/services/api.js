@@ -48,6 +48,11 @@ api.interceptors.response.use(
 export const assetApi = {
   getAll: (params) => api.get('/assets', { params }),
   exportExcel: (params) => api.get('/assets/export', { params, responseType: 'blob' }),
+  importExcel: (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post('/assets/import', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+  },
   getById: (id) => api.get(`/assets/${id}`),
   create: (data) => api.post('/assets', data),
   update: (id, data) => api.put(`/assets/${id}`, data),
@@ -56,6 +61,7 @@ export const assetApi = {
   updateMaintenanceRecord: (assetId, recordId, data) => api.put(`/assets/${assetId}/maintenance/${recordId}`, data),
   deleteMaintenanceRecord: (assetId, recordId) => api.delete(`/assets/${assetId}/maintenance/${recordId}`),
   getHistory: (id) => api.get(`/assets/${id}/history`),
+  getAuditLogs: (params) => api.get('/assets/audit-logs', { params }),
 };
 
 // LLM 응답(GLM-5.2)은 수십 초가 걸릴 수 있어, AI 서술을 실제로 호출하는

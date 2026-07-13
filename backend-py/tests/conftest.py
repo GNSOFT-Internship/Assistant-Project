@@ -90,6 +90,16 @@ def _reset_login_lockout():
     auth_router._failed_attempts.clear()
 
 
+@pytest.fixture(autouse=True)
+def _reset_ai_rate_limit():
+    """AI 요청 제한도 프로세스 메모리 기반이라, 테스트가 몰아서 여러 번
+    AI 엔드포인트를 호출해도 429로 실패하지 않도록 매번 비워준다."""
+    from app import rate_limit
+    rate_limit._timestamps.clear()
+    yield
+    rate_limit._timestamps.clear()
+
+
 @pytest.fixture()
 def admin_headers(client):
     resp = client.post("/api/auth/login", json={"username": "admin", "password": "admin123"})

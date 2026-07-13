@@ -3,7 +3,7 @@ import { Link, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   LayoutDashboard, Package, Wrench, Lightbulb, MessageSquare,
-  Upload, FileText, LogOut, Wallet, ChevronLeft, ChevronRight
+  Upload, FileText, LogOut, Wallet, ChevronLeft, ChevronRight, ScrollText
 } from 'lucide-react';
 
 function ScrollableNav({ items, activePath, variant }) {
@@ -109,6 +109,7 @@ export default function Layout() {
     { path: '/files', label: '파일 업로드', icon: Upload },
     { path: '/reports', label: '보고서', icon: FileText },
     { path: '/budget', label: '예산 관리', icon: Wallet },
+    ...(user?.role === 'ADMIN' ? [{ path: '/audit-log', label: '감사 로그', icon: ScrollText }] : []),
   ];
 
   return (

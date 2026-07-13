@@ -3,7 +3,7 @@ import logging
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from . import models, auth
+from . import models, auth, rate_limit
 from .database import Base, engine, SessionLocal
 from .routers import auth_router, assets, budgets, chat, dashboard, files, qna, ai, reports
 
@@ -25,6 +25,8 @@ app.add_middleware(
 # 프론트엔드가 토큰을 헤더에 실어 보내더라도 서버가 검증하지 않으면
 # 의미가 없으므로, 라우터 단위로 인증 의존성을 강제한다.
 _auth_dep = [Depends(auth.get_current_user)]
+# AI를 실제로 호출하는 라우터에는 인증에 더해 요청 제한을 함께 건다.
+_ai_dep = _auth_dep + [Depends(rate_limit.check_ai_rate_limit)]
 
 app.include_router(auth_router.router)
 app.include_router(assets.router, dependencies=_auth_dep)
@@ -32,9 +34,9 @@ app.include_router(budgets.router, dependencies=_auth_dep)
 app.include_router(chat.router, dependencies=_auth_dep)
 app.include_router(dashboard.router, dependencies=_auth_dep)
 app.include_router(files.router, dependencies=_auth_dep)
-app.include_router(qna.router, dependencies=_auth_dep)
-app.include_router(ai.router, dependencies=_auth_dep)
-app.include_router(reports.router, dependencies=_auth_dep)
+app.include_router(qna.router, dependencies=_ai_dep)
+app.include_router(ai.router, dependencies=_ai_dep)
+app.include_router(reports.router, dependencies=_ai_dep)
 
 
 @app.on_event("startup")

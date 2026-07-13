@@ -5,9 +5,11 @@ from decimal import Decimal
 from typing import Optional
 
 import pandas as pd
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
+from pydantic import ValidationError
 from sqlalchemy import or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .. import auth, models, schemas
@@ -225,6 +227,144 @@ def export_assets(
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@router.get("/audit-logs")
+def get_all_audit_logs(
+    db: Session = Depends(get_db),
+    page: int = 1,
+    pageSize: int = 50,
+    action: str = "",
+    changedBy: str = "",
+    _admin: dict = Depends(auth.require_admin),
+):
+    """자산별 이력 화면과 별개로, 시스템 전체에서 누가 언제 무엇을 등록·수정·
+    삭제했는지 한 화면에서 확인할 수 있는 감사 로그. 관리자만 조회 가능하다."""
+    query = db.query(models.AssetAuditLog)
+    if action:
+        try:
+            query = query.filter(models.AssetAuditLog.action == models.AuditAction(action))
+        except ValueError:
+            raise HTTPException(status_code=400, detail="유효하지 않은 action 값입니다.")
+    if changedBy:
+        query = query.filter(models.AssetAuditLog.changed_by == changedBy)
+
+    query = query.order_by(models.AssetAuditLog.created_at.desc())
+    total = query.count()
+    page = max(1, page)
+    page_size = max(1, min(pageSize, 200))
+    logs = query.offset((page - 1) * page_size).limit(page_size).all()
+
+    return {
+        "success": True,
+        "message": None,
+        "data": {
+            "items": [audit_to_dto(l) for l in logs],
+            "total": total,
+            "page": page,
+            "pageSize": page_size,
+        },
+    }
+
+
+_IMPORT_COLUMN_MAP = {
+    "자산번호": "assetCode",
+    "자산명": "assetName",
+    "카테고리": "category",
+    "위치": "location",
+    "담당자": "responsiblePerson",
+    "구매일": "purchaseDate",
+    "구매가": "purchasePrice",
+    "내용연수(년)": "usefulLife",
+    "상태": "status",
+    "설명": "description",
+}
+_IMPORT_REQUIRED_COLUMNS = {"자산번호", "자산명", "카테고리", "구매일", "구매가", "내용연수(년)"}
+
+
+@router.post("/import")
+def import_assets_excel(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(auth.require_admin),
+):
+    """엑셀 내보내기(/export)와 같은 컬럼 형식으로 자산을 대량 등록한다.
+    행 단위로 검증해서 실패한 행은 건너뛰고, 성공한 행까지는 그대로 반영한다."""
+    try:
+        df = pd.read_excel(io.BytesIO(file.file.read()))
+    except Exception:
+        raise HTTPException(status_code=400, detail="엑셀 파일을 읽을 수 없습니다. xlsx 형식을 확인해주세요.")
+
+    missing = _IMPORT_REQUIRED_COLUMNS - set(df.columns)
+    if missing:
+        raise HTTPException(status_code=400, detail=f"필수 컬럼이 없습니다: {', '.join(sorted(missing))}")
+
+    created = 0
+    errors: list[dict] = []
+
+    for idx, row in df.iterrows():
+        excel_row_no = idx + 2  # 헤더 행 제외, 엑셀 기준 1-based 행 번호
+
+        payload = {}
+        for kor, eng in _IMPORT_COLUMN_MAP.items():
+            if kor not in df.columns:
+                continue
+            value = row[kor]
+            payload[eng] = None if pd.isna(value) else value
+
+        try:
+            if payload.get("purchaseDate") is not None:
+                raw_date = payload["purchaseDate"]
+                payload["purchaseDate"] = (
+                    raw_date.date().isoformat() if hasattr(raw_date, "date") else str(raw_date)[:10]
+                )
+            if payload.get("purchasePrice") is not None:
+                payload["purchasePrice"] = float(payload["purchasePrice"])
+            if payload.get("usefulLife") is not None:
+                payload["usefulLife"] = int(payload["usefulLife"])
+            if not payload.get("status"):
+                payload["status"] = "ACTIVE"
+            asset_req = schemas.AssetRequest(**payload)
+        except (ValidationError, TypeError, ValueError) as e:
+            errors.append({"row": excel_row_no, "error": str(e)})
+            continue
+
+        asset = models.Asset(
+            asset_name=asset_req.assetName,
+            asset_code=asset_req.assetCode,
+            category=asset_req.category,
+            location=asset_req.location,
+            responsible_person=asset_req.responsiblePerson,
+            purchase_date=date.fromisoformat(asset_req.purchaseDate),
+            purchase_price=Decimal(str(asset_req.purchasePrice)),
+            useful_life=asset_req.usefulLife,
+            status=models.AssetStatus(asset_req.status or "ACTIVE"),
+            description=asset_req.description,
+        )
+        db.add(asset)
+        try:
+            db.flush()
+        except IntegrityError:
+            db.rollback()
+            errors.append({"row": excel_row_no, "error": f"자산번호 '{asset_req.assetCode}'가 이미 존재합니다."})
+            continue
+
+        _log_change(
+            db, asset, models.AuditAction.CREATE, current_user.get("username"),
+            {field: {"old": None, "new": _field_value(asset, field)} for field, _ in _TRACKED_FIELDS},
+        )
+        db.commit()
+        created += 1
+
+    message = f"{created}건 등록 완료"
+    if errors:
+        message += f", {len(errors)}건 실패"
+
+    return {
+        "success": True,
+        "message": message,
+        "data": {"created": created, "failed": errors},
+    }
 
 
 @router.get("/{asset_id}")

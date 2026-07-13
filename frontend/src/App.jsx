@@ -14,6 +14,7 @@ const AiAssistant = lazy(() => import('./pages/AiAssistant'));
 const FileUpload = lazy(() => import('./pages/FileUpload'));
 const Reports = lazy(() => import('./pages/Reports'));
 const Budget = lazy(() => import('./pages/Budget'));
+const AuditLog = lazy(() => import('./pages/AuditLog'));
 
 function RequireAuth({ children }) {
   const { isAuthenticated, loading } = useAuth();
@@ -114,6 +115,14 @@ function App() {
                 element={
                   <Suspense fallback={null}>
                     <Budget />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="audit-log"
+                element={
+                  <Suspense fallback={null}>
+                    <AuditLog />
                   </Suspense>
                 }
               />

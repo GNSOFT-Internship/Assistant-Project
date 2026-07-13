@@ -1,3 +1,7 @@
+import io
+
+import pandas as pd
+
 ASSET_PAYLOAD = {
     "assetName": "테스트 노트북",
     "assetCode": "TEST-ASSET-001",
@@ -185,3 +189,119 @@ def test_get_all_assets_sorts_by_purchase_price(client, admin_headers):
     items_desc = resp_desc.json()["data"]["items"]
     codes_desc = [i["assetCode"] for i in items_desc if i["assetCode"] in ("TEST-ASSET-014", "TEST-ASSET-015", "TEST-ASSET-016")]
     assert codes_desc == ["TEST-ASSET-016", "TEST-ASSET-014", "TEST-ASSET-015"]
+
+
+def _make_import_excel(rows):
+    df = pd.DataFrame(rows)
+    buffer = io.BytesIO()
+    df.to_excel(buffer, index=False)
+    buffer.seek(0)
+    return buffer
+
+
+def test_import_assets_excel_creates_rows_and_logs_audit(client, admin_headers):
+    buffer = _make_import_excel([
+        {
+            "자산번호": "IMPORT-001", "자산명": "가져오기 프린터", "카테고리": "IT 장비",
+            "위치": "1층", "담당자": "홍길동", "구매일": "2022-01-15",
+            "구매가": 500000, "내용연수(년)": 5, "상태": "ACTIVE", "설명": "import test",
+        },
+        {
+            "자산번호": "IMPORT-002", "자산명": "가져오기 모니터", "카테고리": "IT 장비",
+            "위치": "2층", "담당자": "김철수", "구매일": "2023-03-01",
+            "구매가": 300000, "내용연수(년)": 4, "상태": "ACTIVE", "설명": None,
+        },
+    ])
+
+    resp = client.post(
+        "/api/assets/import",
+        files={"file": ("assets.xlsx", buffer, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+        headers=admin_headers,
+    )
+    assert resp.status_code == 200, resp.text
+    data = resp.json()["data"]
+    assert data["created"] == 2
+    assert data["failed"] == []
+
+    resp2 = client.get("/api/assets?search=IMPORT-00", headers=admin_headers)
+    codes = [i["assetCode"] for i in resp2.json()["data"]["items"]]
+    assert "IMPORT-001" in codes
+    assert "IMPORT-002" in codes
+
+    created = next(i for i in resp2.json()["data"]["items"] if i["assetCode"] == "IMPORT-001")
+    history = client.get(f"/api/assets/{created['id']}/history", headers=admin_headers).json()["data"]["items"]
+    assert history[0]["action"] == "CREATE"
+    assert history[0]["changedBy"] == "admin"
+
+
+def test_import_assets_excel_reports_errors_without_blocking_valid_rows(client, admin_headers):
+    _create_asset(client, admin_headers, assetCode="IMPORT-DUP")
+
+    buffer = _make_import_excel([
+        {
+            "자산번호": "IMPORT-DUP", "자산명": "중복 자산", "카테고리": "IT 장비",
+            "위치": "1층", "담당자": "홍길동", "구매일": "2022-01-15",
+            "구매가": 500000, "내용연수(년)": 5, "상태": "ACTIVE", "설명": None,
+        },
+        {
+            "자산번호": "IMPORT-OK", "자산명": "정상 자산", "카테고리": "IT 장비",
+            "위치": "1층", "담당자": "홍길동", "구매일": "2022-01-15",
+            "구매가": 500000, "내용연수(년)": 5, "상태": "ACTIVE", "설명": None,
+        },
+    ])
+
+    resp = client.post(
+        "/api/assets/import",
+        files={"file": ("assets.xlsx", buffer, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+        headers=admin_headers,
+    )
+    assert resp.status_code == 200, resp.text
+    data = resp.json()["data"]
+    assert data["created"] == 1
+    assert len(data["failed"]) == 1
+    assert data["failed"][0]["row"] == 2
+
+    resp2 = client.get("/api/assets?search=IMPORT-OK", headers=admin_headers)
+    codes = [i["assetCode"] for i in resp2.json()["data"]["items"]]
+    assert "IMPORT-OK" in codes
+
+
+def test_import_assets_excel_requires_admin(client, user_headers):
+    buffer = _make_import_excel([{
+        "자산번호": "IMPORT-FORBIDDEN", "자산명": "권한 테스트", "카테고리": "IT 장비",
+        "위치": "1층", "담당자": "홍길동", "구매일": "2022-01-15",
+        "구매가": 500000, "내용연수(년)": 5, "상태": "ACTIVE", "설명": None,
+    }])
+    resp = client.post(
+        "/api/assets/import",
+        files={"file": ("assets.xlsx", buffer, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+        headers=user_headers,
+    )
+    assert resp.status_code == 403
+
+
+def test_global_audit_log_lists_across_assets(client, admin_headers):
+    a1 = _create_asset(client, admin_headers, assetCode="AUDIT-001")
+    a2 = _create_asset(client, admin_headers, assetCode="AUDIT-002")
+
+    resp = client.get("/api/assets/audit-logs?pageSize=200", headers=admin_headers)
+    assert resp.status_code == 200
+    items = resp.json()["data"]["items"]
+    codes = {i["assetCode"] for i in items}
+    assert "AUDIT-001" in codes
+    assert "AUDIT-002" in codes
+    assert all(i["action"] in ("CREATE", "UPDATE", "DELETE") for i in items)
+
+
+def test_global_audit_log_filters_by_action(client, admin_headers):
+    _create_asset(client, admin_headers, assetCode="AUDIT-FILTER-001")
+
+    resp = client.get("/api/assets/audit-logs?action=CREATE&pageSize=200", headers=admin_headers)
+    items = resp.json()["data"]["items"]
+    assert any(i["assetCode"] == "AUDIT-FILTER-001" for i in items)
+    assert all(i["action"] == "CREATE" for i in items)
+
+
+def test_global_audit_log_requires_admin(client, user_headers):
+    resp = client.get("/api/assets/audit-logs", headers=user_headers)
+    assert resp.status_code == 403
