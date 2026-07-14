@@ -50,6 +50,20 @@ _SEARCH_FILTER_SCHEMA = {
         "keyword": {"type": ["string", "null"], "description": "자산명에서 찾을 키워드, 없으면 null"},
         "minUsedYears": {"type": ["integer", "null"], "description": "최소 사용기간(년), 없으면 null"},
         "maxUsedYears": {"type": ["integer", "null"], "description": "최대 사용기간(년), 없으면 null"},
+        "minPrice": {
+            "type": ["number", "null"],
+            "description": (
+                "'~원 이상', '~만원 이상', '~보다 비싼' 같은 최소 구매가 조건이 있으면 그 금액을 "
+                "원 단위로 환산해 반환 (예: '100만원 이상' → 1000000). 조건이 없으면 null."
+            ),
+        },
+        "maxPrice": {
+            "type": ["number", "null"],
+            "description": (
+                "'~원 이하', '~만원 이하', '~보다 싼/저렴한' 같은 최대 구매가 조건이 있으면 그 금액을 "
+                "원 단위로 환산해 반환 (예: '100만원 이하' → 1000000). 조건이 없으면 null."
+            ),
+        },
         "statusFilter": {
             "type": ["string", "null"],
             "enum": ["ACTIVE", "INACTIVE", "REPLACEMENT_NEEDED", "UNDER_MAINTENANCE", None],
@@ -100,8 +114,8 @@ _SEARCH_FILTER_SCHEMA = {
         "explanation": {"type": "string", "description": "검색 조건을 어떻게 해석했는지 한국어로 한 문장 설명"},
     },
     "required": [
-        "category", "location", "keyword", "minUsedYears", "maxUsedYears", "statusFilter",
-        "failureKeyword", "minFailureCount", "minMaintenanceCount", "noRepairHistory",
+        "category", "location", "keyword", "minUsedYears", "maxUsedYears", "minPrice", "maxPrice",
+        "statusFilter", "failureKeyword", "minFailureCount", "minMaintenanceCount", "noRepairHistory",
         "noMaintenanceHistory", "explanation",
     ],
     "additionalProperties": False,
@@ -118,7 +132,9 @@ _SEARCH_SYSTEM_PROMPT = (
     "횟수를 묻는 경우에는 minMaintenanceCount에 그 숫자를 설정한다 (failureKeyword는 null로 둔다). "
     "'수리 이력이 없는', '고장난 적 없는'처럼 부정/결여형 조건이면 noRepairHistory를 true로, "
     "'유지보수 이력이 아예 없는'처럼 정기점검까지 포함해 어떤 기록도 없어야 하면 "
-    "noMaintenanceHistory를 true로 설정한다."
+    "noMaintenanceHistory를 true로 설정한다. 구매가 관련 이상/이하 조건이 있으면 minPrice/maxPrice에 "
+    "원 단위 금액으로 정확히 추출한다 (실제 비교는 별도 로직이 수행하므로 여기서는 조건 자체만 "
+    "숫자로 추출하면 된다)."
 )
 
 
@@ -136,6 +152,11 @@ def _apply_filter(asset: models.Asset, f: dict, records: Optional[list] = None) 
     if f.get("minUsedYears") is not None and used_years < f["minUsedYears"]:
         return False
     if f.get("maxUsedYears") is not None and used_years > f["maxUsedYears"]:
+        return False
+    price = float(asset.purchase_price) if asset.purchase_price is not None else 0.0
+    if f.get("minPrice") is not None and price < f["minPrice"]:
+        return False
+    if f.get("maxPrice") is not None and price > f["maxPrice"]:
         return False
     if f.get("statusFilter") and asset.status.value != f["statusFilter"]:
         return False
@@ -174,8 +195,8 @@ def _apply_filter(asset: models.Asset, f: dict, records: Optional[list] = None) 
 
 
 _FILTER_CRITERIA_FIELDS = [
-    "category", "location", "keyword", "minUsedYears", "maxUsedYears", "statusFilter",
-    "failureKeyword", "minMaintenanceCount", "noRepairHistory", "noMaintenanceHistory",
+    "category", "location", "keyword", "minUsedYears", "maxUsedYears", "minPrice", "maxPrice",
+    "statusFilter", "failureKeyword", "minMaintenanceCount", "noRepairHistory", "noMaintenanceHistory",
 ]
 
 

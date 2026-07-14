@@ -54,6 +54,37 @@ def test_natural_language_search_keyword_fallback_filters_by_name(client, admin_
     assert "TEST-SEARCH-003" not in codes
 
 
+def test_natural_language_search_price_condition_is_applied_by_code(client, admin_headers, monkeypatch):
+    """가격 조건(minPrice/maxPrice)은 LLM이 숫자만 추출하고, 실제 비교는 코드가 확정적으로
+    수행해야 한다. LLM이 조건과 무관한 explanation을 내놔도 결과는 정확해야 한다."""
+    cheap = _create_asset(client, admin_headers, assetCode="TEST-SEARCH-CHEAP", purchasePrice=500000)
+    expensive = _create_asset(client, admin_headers, assetCode="TEST-SEARCH-EXP", purchasePrice=1610000)
+
+    from app.routers import ai as ai_router
+
+    monkeypatch.setattr(ai_router.llm, "is_configured", lambda: True)
+    monkeypatch.setattr(
+        ai_router.llm,
+        "ask_json",
+        lambda *args, **kwargs: {
+            "category": None, "location": None, "keyword": None,
+            "minUsedYears": None, "maxUsedYears": None,
+            "minPrice": None, "maxPrice": 1000000,
+            "statusFilter": None, "failureKeyword": None, "minFailureCount": None,
+            "minMaintenanceCount": None, "noRepairHistory": None, "noMaintenanceHistory": None,
+            "explanation": "100만원 이하인 자산을 찾았습니다.",
+        },
+    )
+
+    resp = client.post("/api/ai/natural-language-search", json={"query": "100만원 이하인 자산"}, headers=admin_headers)
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    codes = {a["assetCode"] for a in data["assets"]}
+    assert "TEST-SEARCH-CHEAP" in codes
+    assert "TEST-SEARCH-EXP" not in codes
+    assert data["hasFilter"] is True
+
+
 def test_replacement_recommendation_without_budget_returns_top_five(client, admin_headers):
     for i in range(7):
         asset = _create_asset(client, admin_headers, assetCode=f"TEST-REC-{i:03d}", purchasePrice=100000)
