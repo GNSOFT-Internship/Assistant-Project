@@ -151,6 +151,27 @@ def test_generate_procurement_spec(client, admin_headers):
     assert "rationale" in data
 
 
+def test_generate_procurement_spec_pdf(client, admin_headers):
+    asset = client.post("/api/assets", json=ASSET_PAYLOAD, headers=admin_headers).json()["data"]
+    spec = client.get(f"/api/ai/procurement-spec/{asset['id']}", headers=admin_headers).json()
+    resp = client.post(f"/api/ai/procurement-spec/{asset['id']}/pdf", json=spec, headers=admin_headers)
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/pdf"
+    assert resp.content[:5] == b"%PDF-"
+
+
+def test_generate_procurement_spec_pdf_404_for_missing_asset(client, admin_headers):
+    spec = {
+        "title": "테스트",
+        "specifications": "사양",
+        "rfp": "제안요청서",
+        "budgetEstimate": 1000000,
+        "rationale": "근거",
+    }
+    resp = client.post("/api/ai/procurement-spec/999999/pdf", json=spec, headers=admin_headers)
+    assert resp.status_code == 404
+
+
 def test_diagnose_asset_failure(client, admin_headers):
     asset = client.post("/api/assets", json=ASSET_PAYLOAD, headers=admin_headers).json()["data"]
     payload = {

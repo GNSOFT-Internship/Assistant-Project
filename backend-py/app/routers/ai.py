@@ -1,10 +1,20 @@
+import io
 import json
 import logging
+import re
 from datetime import date
 from typing import Optional
+from xml.sax.saxutils import escape as xml_escape
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import mm
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -12,6 +22,8 @@ from .. import llm, models, schemas
 from ..database import get_db
 from ..scoring import compute_replacement_metrics
 from .assets import asset_to_dto
+
+_KOREAN_FONT = "HYGothic-Medium"
 
 logger = logging.getLogger(__name__)
 
@@ -989,12 +1001,7 @@ _PROCUREMENT_SYSTEM_PROMPT = (
 )
 
 
-@router.get("/procurement-spec/{asset_id}", response_model=schemas.ProcurementSpecResponse)
-def generate_procurement_spec(asset_id: int, db: Session = Depends(get_db)):
-    asset = db.query(models.Asset).filter(models.Asset.id == asset_id).first()
-    if not asset:
-        raise HTTPException(status_code=404, detail="Asset not found")
-
+def _generate_procurement_spec(asset: models.Asset) -> schemas.ProcurementSpecResponse:
     if not llm.is_configured():
         title = f"[조달 구매 규격서] {asset.asset_name} 대체 장비 도입"
         specifications = (
@@ -1040,6 +1047,86 @@ def generate_procurement_spec(asset_id: int, db: Session = Depends(get_db)):
             budgetEstimate=float(asset.purchase_price) * 1.15 if asset.purchase_price else 1500000.0,
             rationale="AI API 호출 장애로 백업용 템플릿이 반환되었습니다."
         )
+
+
+@router.get("/procurement-spec/{asset_id}", response_model=schemas.ProcurementSpecResponse)
+def generate_procurement_spec(asset_id: int, db: Session = Depends(get_db)):
+    asset = db.query(models.Asset).filter(models.Asset.id == asset_id).first()
+    if not asset:
+        raise HTTPException(status_code=404, detail="Asset not found")
+    return _generate_procurement_spec(asset)
+
+
+def _md_inline_to_xml(text: str) -> str:
+    escaped = xml_escape(text or "")
+    return re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", escaped)
+
+
+def _markdown_to_flowables(text: str, heading_style, subheading_style, body_style, bullet_style):
+    elements = []
+    for raw_line in (text or "").split("\n"):
+        line = raw_line.strip()
+        if not line:
+            elements.append(Spacer(1, 2 * mm))
+        elif line.startswith("### "):
+            elements.append(Paragraph(_md_inline_to_xml(line[4:]), subheading_style))
+        elif line.startswith("## "):
+            elements.append(Paragraph(_md_inline_to_xml(line[3:]), subheading_style))
+        elif line.startswith("# "):
+            elements.append(Paragraph(_md_inline_to_xml(line[2:]), heading_style))
+        elif line.startswith("- ") or line.startswith("* "):
+            elements.append(Paragraph(f"• {_md_inline_to_xml(line[2:])}", bullet_style))
+        else:
+            elements.append(Paragraph(_md_inline_to_xml(line), body_style))
+    return elements
+
+
+def _build_procurement_spec_pdf(asset: models.Asset, spec: schemas.ProcurementSpecResponse) -> bytes:
+    if _KOREAN_FONT not in pdfmetrics.getRegisteredFontNames():
+        pdfmetrics.registerFont(UnicodeCIDFont(_KOREAN_FONT))
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=20 * mm, bottomMargin=20 * mm)
+    styles = getSampleStyleSheet()
+
+    title_style = ParagraphStyle("PsTitle", parent=styles["Title"], fontName=_KOREAN_FONT, fontSize=16)
+    heading_style = ParagraphStyle("PsHeading", parent=styles["Heading2"], fontName=_KOREAN_FONT, fontSize=13, spaceBefore=10, spaceAfter=6)
+    subheading_style = ParagraphStyle("PsSubHeading", parent=styles["Heading3"], fontName=_KOREAN_FONT, fontSize=11, spaceBefore=8, spaceAfter=4)
+    body_style = ParagraphStyle("PsBody", parent=styles["BodyText"], fontName=_KOREAN_FONT, fontSize=9.5, leading=14)
+    bullet_style = ParagraphStyle("PsBullet", parent=body_style, leftIndent=10 * mm)
+
+    elements = [
+        Paragraph(_md_inline_to_xml(spec.title), title_style),
+        Paragraph(f"자산코드: {asset.asset_code} | 예상 도입 사업비: {spec.budgetEstimate:,.0f}원", body_style),
+        Spacer(1, 6 * mm),
+        Paragraph("규격 설계 및 예산 근거", heading_style),
+        Paragraph(_md_inline_to_xml(spec.rationale), body_style),
+        Spacer(1, 6 * mm),
+        Paragraph("1. 조달 기술 규격 사양서", heading_style),
+        *_markdown_to_flowables(spec.specifications, heading_style, subheading_style, body_style, bullet_style),
+        Spacer(1, 6 * mm),
+        Paragraph("2. 조달 제안요청서(RFP)", heading_style),
+        *_markdown_to_flowables(spec.rfp, heading_style, subheading_style, body_style, bullet_style),
+    ]
+
+    doc.build(elements)
+    return buffer.getvalue()
+
+
+@router.post("/procurement-spec/{asset_id}/pdf")
+def generate_procurement_spec_pdf(asset_id: int, spec: schemas.ProcurementSpecResponse, db: Session = Depends(get_db)):
+    asset = db.query(models.Asset).filter(models.Asset.id == asset_id).first()
+    if not asset:
+        raise HTTPException(status_code=404, detail="Asset not found")
+
+    # 화면에 이미 표시된 규격서 데이터를 그대로 PDF로 변환한다 (AI 재호출 없음 → 화면 내용과 100% 일치, 지연/비용 절감).
+    pdf_bytes = _build_procurement_spec_pdf(asset, spec)
+    filename = f"procurement-spec-{asset.asset_code}.pdf"
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -9,6 +9,7 @@ vi.mock('../services/api', () => ({
   aiApi: {
     getReplacementRecommendation: vi.fn(),
     getProcurementSpec: vi.fn(),
+    downloadProcurementSpecPdf: vi.fn(),
   },
 }));
 
@@ -66,6 +67,26 @@ describe('Recommendations', () => {
     // 헤더/푸터에 동일한 기능의 "닫기" 버튼이 두 개 있으므로 첫 번째만 사용한다.
     await user.click(screen.getAllByText('닫기')[0]);
     await waitFor(() => expect(screen.queryByText('NAS 스토리지 규격서')).not.toBeInTheDocument());
+  });
+
+  it('downloads the procurement spec as a real PDF file via reportlab backend', async () => {
+    const user = userEvent.setup();
+    aiApi.getReplacementRecommendation.mockResolvedValue({ data: { data: { recommendations: [RECOMMENDATION] } } });
+    aiApi.getProcurementSpec.mockResolvedValue({
+      data: { title: 'NAS 스토리지 규격서', specifications: '스펙 내용', rfp: 'RFP 내용', budgetEstimate: 5000000, rationale: '근거' },
+    });
+    aiApi.downloadProcurementSpecPdf.mockResolvedValue({ data: new Blob(['%PDF-1.4'], { type: 'application/pdf' }) });
+    renderPage();
+    await waitFor(() => expect(screen.getByText('데스크톱 Lenovo ThinkCentre')).toBeInTheDocument());
+
+    await user.click(screen.getByText('AI 조달 규격서/RFP 생성'));
+    await waitFor(() => expect(screen.getByText('NAS 스토리지 규격서')).toBeInTheDocument());
+
+    await user.click(screen.getByText('규격서/RFP PDF 다운로드'));
+    await waitFor(() => expect(aiApi.downloadProcurementSpecPdf).toHaveBeenCalledWith(
+      RECOMMENDATION.assetId,
+      expect.objectContaining({ title: 'NAS 스토리지 규격서' })
+    ));
   });
 
   it('re-queries with a budget filter when Enter is pressed in the budget field', async () => {

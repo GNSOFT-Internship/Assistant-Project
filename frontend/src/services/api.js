@@ -79,6 +79,7 @@ export const aiApi = {
   getBudgetForecast: () => api.get('/ai/budgets/forecast', { timeout: AI_TIMEOUT }),
   simulateBudget: (totalBudget) => api.post('/ai/budgets/simulate', { totalBudget }, { timeout: AI_TIMEOUT }),
   getProcurementSpec: (assetId) => api.get(`/ai/procurement-spec/${assetId}`, { timeout: AI_TIMEOUT }),
+  downloadProcurementSpecPdf: (assetId, spec) => api.post(`/ai/procurement-spec/${assetId}/pdf`, spec, { responseType: 'blob', timeout: AI_TIMEOUT }),
   diagnoseFailure: (assetId, chatHistory) => api.post('/ai/diagnose', { assetId, chatHistory }, { timeout: AI_TIMEOUT }),
 };
 
