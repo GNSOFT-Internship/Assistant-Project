@@ -399,8 +399,15 @@ def batch_apply_files(
     total_records_created = 0
     errors = []
 
+    # 배치 안의 파일 수만큼 매번 DB를 왕복하지 않도록, 파일 목록과 자산 목록을
+    # 루프 시작 전에 한 번씩만 조회해 재사용한다 (N+1 쿼리 방지).
+    file_uploads_by_id = {
+        f.id: f for f in db.query(models.FileUpload).filter(models.FileUpload.id.in_(request.fileIds)).all()
+    }
+    assets_by_code = {a.asset_code: a for a in db.query(models.Asset).all()}
+
     for file_id in request.fileIds:
-        file_upload = db.query(models.FileUpload).filter(models.FileUpload.id == file_id).first()
+        file_upload = file_uploads_by_id.get(file_id)
         if file_upload is None:
             errors.append(f"File ID {file_id} not found")
             continue
@@ -418,7 +425,6 @@ def batch_apply_files(
             changed_by = current_user.get("username")
 
             if result.get("kind") == "maintenance_records":
-                assets_by_code = {a.asset_code: a for a in db.query(models.Asset).all()}
                 touched_assets = {}
                 counts_by_asset = {}
                 for r in result.get("records", []):
@@ -454,9 +460,7 @@ def batch_apply_files(
                 file_upload.extracted_data = json.dumps(result, ensure_ascii=False)
 
             elif result.get("kind") == "pdf_quote":
-                asset = None
-                if result.get("assetCode"):
-                    asset = db.query(models.Asset).filter(models.Asset.asset_code == result["assetCode"]).first()
+                asset = assets_by_code.get(result["assetCode"]) if result.get("assetCode") else None
                 if asset is not None and result.get("totalAmount") is not None:
                     description_parts = ["[견적서 자동 등록]"]
                     if result.get("vendor"):

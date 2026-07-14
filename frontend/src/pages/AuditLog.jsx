@@ -32,8 +32,17 @@ export default function AuditLog() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [actionFilter, setActionFilter] = useState('');
+  const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+
+  // 검색어 입력을 400ms 디바운스해서 키 입력마다 요청이 나가지 않도록 함 (Assets 페이지와 동일한 패턴)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearch(searchInput);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   const loadLogs = useCallback(async () => {
     setLoading(true);
@@ -79,8 +88,8 @@ export default function AuditLog() {
           <input
             type="text"
             placeholder="자산명 검색..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
             className="input flex-1"
           />
           <select

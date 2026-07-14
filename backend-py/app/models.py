@@ -80,7 +80,7 @@ class MaintenanceRecord(Base):
     __tablename__ = "maintenance_record"
 
     id = Column(BigIntegerPK, primary_key=True, autoincrement=True)
-    asset_id = Column(BigInteger, ForeignKey("asset.id", ondelete="CASCADE"), nullable=False)
+    asset_id = Column(BigInteger, ForeignKey("asset.id", ondelete="CASCADE"), nullable=False, index=True)
     maintenance_date = Column(Date, nullable=False)
     maintenance_type = Column(Enum(MaintenanceType), nullable=False)
     cost = Column(DECIMAL(15, 2), nullable=True)
