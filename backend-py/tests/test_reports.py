@@ -106,3 +106,46 @@ def test_monthly_report_repeated_failure_count_requires_two_or_more_repairs(clie
 
     resp_after = client.get("/api/reports/monthly", headers=admin_headers)
     assert resp_after.json()["data"]["repeatedFailureCount"] == baseline + 1
+
+
+def test_monthly_report_includes_repeated_failure_asset_detail_and_category_cost(client, admin_headers):
+    """반복 고장 자산은 이름/코드/횟수/누적비용까지, 카테고리별 비용도 함께 내려줘야 한다."""
+    asset = _create_asset(client, admin_headers, assetCode="TEST-REPORT-DETAIL", category="IT 장비")
+    client.post(
+        f"/api/assets/{asset['id']}/maintenance",
+        json={"maintenanceDate": "2024-05-01", "maintenanceType": "REPAIR", "cost": 10000, "description": "수리A"},
+        headers=admin_headers,
+    )
+    client.post(
+        f"/api/assets/{asset['id']}/maintenance",
+        json={"maintenanceDate": "2024-06-01", "maintenanceType": "REPAIR", "cost": 15000, "description": "수리B"},
+        headers=admin_headers,
+    )
+
+    resp = client.get("/api/reports/monthly", headers=admin_headers)
+    data = resp.json()["data"]
+
+    detail = next((a for a in data["repeatedFailureAssets"] if a["assetCode"] == "TEST-REPORT-DETAIL"), None)
+    assert detail is not None
+    assert detail["failureCount"] >= 2
+    assert detail["totalCost"] >= 25000
+    assert data["costByCategory"].get("IT 장비", 0) >= 25000
+
+
+def test_monthly_report_pdf_reflects_new_sections(client, admin_headers):
+    """반복 고장 자산/카테고리별 비용 섹션이 추가된 뒤에도 PDF가 정상 생성되는지 확인한다."""
+    asset = _create_asset(client, admin_headers, assetCode="TEST-REPORT-PDF-DETAIL")
+    client.post(
+        f"/api/assets/{asset['id']}/maintenance",
+        json={"maintenanceDate": "2024-05-01", "maintenanceType": "REPAIR", "cost": 10000, "description": "수리A"},
+        headers=admin_headers,
+    )
+    client.post(
+        f"/api/assets/{asset['id']}/maintenance",
+        json={"maintenanceDate": "2024-06-01", "maintenanceType": "REPAIR", "cost": 15000, "description": "수리B"},
+        headers=admin_headers,
+    )
+
+    resp = client.get("/api/reports/monthly/pdf", headers=admin_headers)
+    assert resp.status_code == 200
+    assert resp.content.startswith(b"%PDF")
