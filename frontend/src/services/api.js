@@ -110,7 +110,8 @@ export const chatApi = {
 };
 
 export const reportApi = {
-  getMonthly: (params) => api.get('/reports/monthly', { params, timeout: params?.includeAi ? AI_TIMEOUT : undefined }),
+  getMonthly: (params) => api.get('/reports/monthly', { params }),
+  getNarrative: (reportData) => api.post('/reports/monthly/narrative', reportData, { timeout: AI_TIMEOUT }),
   downloadPdf: () => api.get('/reports/monthly/pdf', { responseType: 'blob', timeout: AI_TIMEOUT }),
 };
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { aiApi, assetApi } from '../services/api';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
@@ -121,19 +121,23 @@ export default function Maintenance() {
     setViewingMaintenance([]);
   };
 
+  // 모달 열기/닫기 같은 분석 결과와 무관한 상태가 바뀔 때마다 이 파생 데이터들이
+  // 다시 계산되지 않도록 analysis가 실제로 바뀔 때만 재계산한다.
+  const { failureEntries, totalFailures, failureChartData, costData } = useMemo(() => {
+    const entries = Object.entries(analysis?.failurePatterns || {}).sort((a, b) => b[1] - a[1]);
+    const total = entries.reduce((sum, [, v]) => sum + v, 0);
+    const top = entries.slice(0, TOP_FAILURE_COUNT);
+    const otherCount = entries.slice(TOP_FAILURE_COUNT).reduce((sum, [, v]) => sum + v, 0);
+    const chartData = [
+      ...top.map(([name, value]) => ({ name, value })),
+      ...(otherCount > 0 ? [{ name: '기타', value: otherCount }] : []),
+    ];
+    const cost = Object.entries(analysis?.costTrend?.monthlyCosts || {}).map(([name, value]) => ({ name, value }));
+    return { failureEntries: entries, totalFailures: total, failureChartData: chartData, costData: cost };
+  }, [analysis]);
+
   if (loading) return <div className="card"><LoadingState /></div>;
   if (!analysis) return <div className="card">분석 데이터를 불러올 수 없습니다.</div>;
-
-  const failureEntries = Object.entries(analysis.failurePatterns || {}).sort((a, b) => b[1] - a[1]);
-  const totalFailures = failureEntries.reduce((sum, [, v]) => sum + v, 0);
-  const topFailures = failureEntries.slice(0, TOP_FAILURE_COUNT);
-  const otherFailureCount = failureEntries.slice(TOP_FAILURE_COUNT).reduce((sum, [, v]) => sum + v, 0);
-  const failureChartData = [
-    ...topFailures.map(([name, value]) => ({ name, value })),
-    ...(otherFailureCount > 0 ? [{ name: '기타', value: otherFailureCount }] : []),
-  ];
-
-  const costData = Object.entries(analysis.costTrend?.monthlyCosts || {}).map(([name, value]) => ({ name, value }));
 
   return (
     <div className="space-y-6">

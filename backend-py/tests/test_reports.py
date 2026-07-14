@@ -149,3 +149,30 @@ def test_monthly_report_pdf_reflects_new_sections(client, admin_headers):
     resp = client.get("/api/reports/monthly/pdf", headers=admin_headers)
     assert resp.status_code == 200
     assert resp.content.startswith(b"%PDF")
+
+
+def test_monthly_report_narrative_endpoint_generates_from_given_data_without_hitting_db(client, admin_headers):
+    """'AI 요약 보기' 클릭 시 화면에 이미 있는 통계를 그대로 보내 서술만 받아오는
+    엔드포인트. DB를 다시 조회하지 않고 넘겨받은 데이터만으로 생성되어야 한다."""
+    report_data = {
+        "totalAssets": 3,
+        "byCategory": {"IT 장비": 3},
+        "byStatus": {"ACTIVE": 3},
+        "totalMaintenanceCost": 100000,
+        "costByMonth": {"2024-05": 100000},
+        "costByCategory": {"IT 장비": 100000},
+        "replacementCandidates": [],
+        "repeatedFailureCount": 0,
+        "repeatedFailureAssets": [],
+    }
+    resp = client.post("/api/reports/monthly/narrative", json=report_data, headers=admin_headers)
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert isinstance(data["executiveSummary"], str) and len(data["executiveSummary"]) > 0
+    assert len(data["keyIssues"]) >= 1
+    assert len(data["recommendations"]) >= 1
+
+
+def test_monthly_report_narrative_requires_auth(client):
+    resp = client.post("/api/reports/monthly/narrative", json={"totalAssets": 0})
+    assert resp.status_code == 401

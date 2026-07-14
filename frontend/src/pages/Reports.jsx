@@ -30,8 +30,10 @@ export default function Reports() {
   const handleLoadAiSummary = async () => {
     setLoadingAiSummary(true);
     try {
-      const response = await reportApi.getMonthly({ includeAi: true });
-      setReport(response.data.data);
+      // 이미 화면에 있는 통계(report)를 그대로 넘겨서, 서버가 DB를 다시 긁어
+      // 전체 통계를 재계산하지 않고 AI 서술만 생성하도록 한다.
+      const response = await reportApi.getNarrative(report);
+      setReport((prev) => ({ ...prev, ...response.data.data }));
     } catch (error) {
       console.error('AI 요약 로드 실패:', error);
       toast.error('AI 요약을 불러오는 중 오류가 발생했습니다.');

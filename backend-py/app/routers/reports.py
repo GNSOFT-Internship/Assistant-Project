@@ -2,7 +2,7 @@ import io
 import logging
 from datetime import date, datetime
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Body, Depends
 from fastapi.responses import StreamingResponse
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
@@ -239,6 +239,15 @@ def get_monthly_report(db: Session = Depends(get_db), includeAi: bool = False):
         "message": None,
         "data": {**report_data, **narrative},
     }
+
+
+@router.post("/monthly/narrative")
+def get_monthly_report_narrative(report_data: dict = Body(...)):
+    """화면에서 "AI 요약 보기"를 누른 시점에는 이미 /monthly로 받아둔 통계 데이터가
+    그대로 있으므로, DB를 다시 긁어 _build_report_data를 전부 재계산하지 않고
+    그 데이터를 그대로 받아 AI 서술만 생성한다."""
+    narrative = _generate_narrative(report_data)
+    return {"success": True, "message": None, "data": narrative}
 
 
 def _build_pdf(report_data: dict, narrative: dict) -> bytes:

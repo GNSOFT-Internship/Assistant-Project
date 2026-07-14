@@ -8,6 +8,7 @@ import { reportApi } from '../services/api';
 vi.mock('../services/api', () => ({
   reportApi: {
     getMonthly: vi.fn(),
+    getNarrative: vi.fn(),
     downloadPdf: vi.fn(),
   },
 }));
@@ -49,15 +50,14 @@ describe('Reports', () => {
     expect(screen.queryByText('AI 요약')).not.toBeInTheDocument();
   });
 
-  it('loads and displays the AI narrative when the button is clicked', async () => {
+  it('loads and displays the AI narrative when the button is clicked, without re-fetching the whole report', async () => {
     const user = userEvent.setup();
     renderPage();
     await waitFor(() => expect(screen.getByText('AI 요약 보기')).toBeInTheDocument());
 
-    reportApi.getMonthly.mockResolvedValue({
+    reportApi.getNarrative.mockResolvedValue({
       data: {
         data: {
-          ...REPORT_DATA,
           executiveSummary: '총 25개 자산을 관리 중입니다.',
           keyIssues: ['반복 고장 자산이 있습니다.'],
           recommendations: ['정기 점검을 강화하세요.'],
@@ -68,6 +68,10 @@ describe('Reports', () => {
 
     await waitFor(() => expect(screen.getByText('총 25개 자산을 관리 중입니다.')).toBeInTheDocument());
     expect(screen.getByText('반복 고장 자산이 있습니다.')).toBeInTheDocument();
+    // AI 요약은 이미 화면에 있는 통계를 그대로 넘겨 서술만 받아오고, 통계 자체를
+    // 다시 조회(getMonthly)하지는 않아야 한다.
+    expect(reportApi.getMonthly).toHaveBeenCalledTimes(1);
+    expect(reportApi.getNarrative).toHaveBeenCalledWith(expect.objectContaining({ totalAssets: 25 }));
   });
 
   it('triggers a PDF download when the download button is clicked', async () => {

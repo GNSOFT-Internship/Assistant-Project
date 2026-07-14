@@ -22,10 +22,8 @@ def _to_source_data(assets):
     ]
 
 
-def _build_context(db: Session) -> str:
+def _build_context(assets: list, records: list) -> str:
     today = date.today()
-    assets = db.query(models.Asset).all()
-    records = db.query(models.MaintenanceRecord).all()
 
     records_by_asset: dict[int, list] = {}
     for r in records:
@@ -135,7 +133,8 @@ def answer_question(db: Session, question: str) -> dict:
     if not llm.is_configured():
         return _fallback_answer(db, question, all_assets)
 
-    context = _build_context(db)
+    all_records = db.query(models.MaintenanceRecord).all()
+    context = _build_context(all_assets, all_records)
     user_message = f"[자산 데이터]\n{context}\n\n[질문]\n{question}"
 
     try:
