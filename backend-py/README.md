@@ -10,7 +10,11 @@
    ```sql
    CREATE DATABASE asset_management CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
    CREATE USER 'asset'@'%' IDENTIFIED BY 'assetpass';
-   GRANT ALL ON asset_management.* TO 'asset'@'%';
+   -- ALL 대신 앱이 실제로 쓰는 권한만 부여한다 (최소 권한 원칙). SELECT/INSERT/UPDATE/DELETE는
+   -- 통상적인 CRUD용이고, CREATE/ALTER/INDEX/REFERENCES는 최초 기동 시 SQLAlchemy의
+   -- Base.metadata.create_all()이 테이블을 자동 생성하기 위해 필요하다. DROP·GRANT OPTION·
+   -- 계정 관리 등 관리자 권한은 애플리케이션 계정에 절대 주지 않는다.
+   GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, REFERENCES ON asset_management.* TO 'asset'@'%';
    ```
 
 2. `.env.example`을 `.env`로 복사하고 `DATABASE_URL` 등을 환경에 맞게 수정합니다. (연결 문자열에 `?charset=utf8mb4`가
