@@ -118,6 +118,26 @@ def test_update_maintenance_record_not_found_returns_404(client, admin_headers):
     assert resp.status_code == 404
 
 
+def test_delete_maintenance_record_not_found_returns_404(client, admin_headers):
+    """존재하지 않는 유지보수 기록을 삭제 시도하면, 조용히 성공 처리하지 말고 다른
+    수정/조회 API처럼 404를 반환해야 한다 (삭제 안 됐는데 "삭제됨"으로 오인하는 것 방지)."""
+    asset = _create_asset(client, admin_headers, assetCode="TEST-ASSET-DEL-404")
+    resp = client.delete(f"/api/assets/{asset['id']}/maintenance/999999", headers=admin_headers)
+    assert resp.status_code == 404
+
+
+def test_delete_maintenance_record_unknown_asset_returns_404(client, admin_headers):
+    resp = client.delete("/api/assets/999999/maintenance/1", headers=admin_headers)
+    assert resp.status_code == 404
+
+
+def test_get_asset_history_unknown_asset_returns_404(client, admin_headers):
+    """자산 유지보수 이력 조회(get_asset_maintenance_history)와 동일하게, 감사 로그
+    조회(get_asset_history)도 존재하지 않는 자산 id면 빈 목록이 아니라 404여야 한다."""
+    resp = client.get("/api/assets/999999/history", headers=admin_headers)
+    assert resp.status_code == 404
+
+
 def test_create_asset_rejects_negative_price(client, admin_headers):
     payload = {**ASSET_PAYLOAD, "assetCode": "TEST-ASSET-007", "purchasePrice": -100}
     resp = client.post("/api/assets", json=payload, headers=admin_headers)

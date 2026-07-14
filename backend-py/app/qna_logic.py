@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from . import llm, models
 from .routers.assets import asset_to_dto
+from .scoring import calc_used_years
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +35,7 @@ def _build_context(db: Session) -> str:
     for a in assets:
         asset_records = records_by_asset.get(a.id, [])
         total_cost = sum(float(r.cost) if r.cost is not None else 0.0 for r in asset_records)
-        used_years = today.year - a.purchase_date.year
+        used_years = calc_used_years(a.purchase_date, today)
         lines.append(
             f"id={a.id} | {a.asset_name} | 카테고리={a.category} | 위치={a.location} | "
             f"담당자={a.responsible_person} | 구매일={a.purchase_date} | 사용기간={used_years}년 | "

@@ -128,3 +128,12 @@ def test_batch_upload_and_batch_apply(client, admin_headers):
     # 유지보수 기록 건수 확인 (각 파일당 1건씩 총 2건 등록 완료 확인)
     maintenance = client.get(f"/api/assets/{asset['id']}/maintenance", headers=admin_headers).json()["data"]["items"]
     assert len(maintenance) == 2
+
+
+def test_unknown_file_id_returns_404_not_400(client, admin_headers):
+    """존재하지 않는 file_id는 요청 자체가 잘못된 게 아니라 리소스가 없는 것이므로,
+    자산/유지보수 API와 동일하게 400이 아니라 404를 반환해야 한다."""
+    assert client.post("/api/files/999999/process", headers=admin_headers).status_code == 404
+    assert client.post("/api/files/999999/apply", headers=admin_headers).status_code == 404
+    assert client.post("/api/files/999999/unapply", headers=admin_headers).status_code == 404
+    assert client.delete("/api/files/999999", headers=admin_headers).status_code == 404

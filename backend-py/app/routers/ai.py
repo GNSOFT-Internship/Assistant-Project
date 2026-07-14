@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 
 from .. import llm, models, schemas
 from ..database import get_db
-from ..scoring import compute_replacement_metrics
+from ..scoring import calc_used_years, compute_replacement_metrics
 from .assets import asset_to_dto
 
 _KOREAN_FONT = "HYGothic-Medium"
@@ -148,7 +148,7 @@ def _apply_filter(asset: models.Asset, f: dict, records: Optional[list] = None) 
         return False
     if f.get("keyword") and f["keyword"].lower() not in (asset.asset_name or "").lower():
         return False
-    used_years = date.today().year - asset.purchase_date.year
+    used_years = calc_used_years(asset.purchase_date)
     if f.get("minUsedYears") is not None and used_years < f["minUsedYears"]:
         return False
     if f.get("maxUsedYears") is not None and used_years > f["maxUsedYears"]:
@@ -790,7 +790,7 @@ def get_budget_forecast(db: Session = Depends(get_db)):
     expired_by_cat = {}
     for a in all_assets:
         asset_summary[a.category] = asset_summary.get(a.category, 0) + 1
-        used_years = today.year - a.purchase_date.year
+        used_years = calc_used_years(a.purchase_date, today)
         if used_years > a.useful_life:
             expired_by_cat[a.category] = expired_by_cat.get(a.category, 0) + 1
 
@@ -885,6 +885,21 @@ def _clamp_allocations_to_budget(allocations: list, total_budget: float) -> list
     scale = total_budget / current_total
     for item in allocations:
         item.allocatedAmount = round(item.allocatedAmount * scale, -4)
+
+    # 비례 축소 후에도 항목별로 만원 단위 반올림을 거치면 합계가 다시 total_budget을
+    # 넘을 수 있다 (이 함수가 보장하려는 "총합 <= 예산" 불변식이 반올림 때문에 깨짐).
+    # 배정액이 가장 큰 항목부터 1만원 단위로 초과분을 차감해 최종 합계가 반드시
+    # total_budget 이하가 되도록 재보정한다.
+    overflow = sum(item.allocatedAmount for item in allocations) - total_budget
+    if overflow > 0:
+        for item in sorted(allocations, key=lambda i: i.allocatedAmount, reverse=True):
+            if overflow <= 0:
+                break
+            reduce_amount = min(item.allocatedAmount, ((overflow + 9999) // 10000) * 10000)
+            item.allocatedAmount -= reduce_amount
+            overflow -= reduce_amount
+
+    for item in allocations:
         item.ratio = item.allocatedAmount / total_budget if total_budget > 0 else 0.0
     return allocations
 
@@ -919,7 +934,7 @@ def simulate_budget(request: schemas.BudgetSimulationRequest, db: Session = Depe
     for a in all_assets:
         if a.category in asset_by_cat:
             asset_by_cat[a.category] += 1
-            used_years = today.year - a.purchase_date.year
+            used_years = calc_used_years(a.purchase_date, today)
             if used_years > a.useful_life:
                 expired_by_cat[a.category] += 1
 

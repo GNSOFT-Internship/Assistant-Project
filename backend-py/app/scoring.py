@@ -3,13 +3,27 @@ from datetime import date
 from . import models
 
 
+def calc_used_years(purchase_date: date, today: date = None) -> int:
+    """구매일로부터 오늘까지 만으로 몇 년이 지났는지 계산한다.
+
+    단순히 연도만 빼면(today.year - purchase_date.year) 12월에 산 자산이
+    다음 해 1월 1일부터 "1년 사용"으로 잡히는 등 최대 1년까지 오차가
+    생기므로, 월/일까지 비교해 만 나이 계산과 동일한 방식으로 보정한다.
+    """
+    today = today or date.today()
+    years = today.year - purchase_date.year
+    if (today.month, today.day) < (purchase_date.month, purchase_date.day):
+        years -= 1
+    return max(years, 0)
+
+
 def compute_replacement_metrics(asset: "models.Asset", records: list, today: date = None) -> dict:
     """자산의 교체 우선순위 점수와 관련 지표를 계산한다.
 
     ai.py의 교체추천과 reports.py의 월간 보고서가 동일한 공식을 공유한다.
     """
     today = today or date.today()
-    used_years = today.year - asset.purchase_date.year
+    used_years = calc_used_years(asset.purchase_date, today)
     price = float(asset.purchase_price)
     repair_cost = sum(float(r.cost) if r.cost is not None else 0.0 for r in records)
     repair_ratio = (repair_cost / price) if price > 0 else 0.0

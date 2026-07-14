@@ -326,7 +326,7 @@ def process_file(
 ):
     file_upload = db.query(models.FileUpload).filter(models.FileUpload.id == file_id).first()
     if file_upload is None:
-        raise HTTPException(status_code=400, detail="File not found")
+        raise HTTPException(status_code=404, detail="File not found")
 
     file_upload.status = models.UploadStatus.PROCESSING
     db.commit()
@@ -514,7 +514,7 @@ def apply_file(
 ):
     file_upload = db.query(models.FileUpload).filter(models.FileUpload.id == file_id).first()
     if file_upload is None:
-        raise HTTPException(status_code=400, detail="File not found")
+        raise HTTPException(status_code=404, detail="File not found")
 
     if file_upload.status != models.UploadStatus.COMPLETED:
         raise HTTPException(status_code=400, detail="Completed file only can be applied")
@@ -629,7 +629,7 @@ def unapply_file(
 ):
     file_upload = db.query(models.FileUpload).filter(models.FileUpload.id == file_id).first()
     if file_upload is None:
-        raise HTTPException(status_code=400, detail="File not found")
+        raise HTTPException(status_code=404, detail="File not found")
     if not file_upload.applied:
         raise HTTPException(status_code=400, detail="File is not applied")
 
@@ -698,7 +698,7 @@ def delete_file(
 ):
     file_upload = db.query(models.FileUpload).filter(models.FileUpload.id == file_id).first()
     if file_upload is None:
-        raise HTTPException(status_code=400, detail="File not found")
+        raise HTTPException(status_code=404, detail="File not found")
 
     try:
         if file_upload.file_path and os.path.exists(file_upload.file_path):

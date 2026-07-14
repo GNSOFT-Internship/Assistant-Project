@@ -562,20 +562,24 @@ def delete_maintenance_record(
     current_user: dict = Depends(auth.require_admin),
 ):
     asset = db.query(models.Asset).filter(models.Asset.id == asset_id).first()
+    if asset is None:
+        raise HTTPException(status_code=404, detail="Asset not found")
+
     record = (
         db.query(models.MaintenanceRecord)
         .filter(models.MaintenanceRecord.id == record_id, models.MaintenanceRecord.asset_id == asset_id)
         .first()
     )
-    if record is not None:
-        summary = _maintenance_summary(record)
-        db.delete(record)
-        if asset is not None:
-            _log_change(
-                db, asset, models.AuditAction.DELETE, current_user.get("username"),
-                {"maintenance_record": {"old": summary, "new": None}},
-            )
-        db.commit()
+    if record is None:
+        raise HTTPException(status_code=404, detail="Maintenance record not found")
+
+    summary = _maintenance_summary(record)
+    db.delete(record)
+    _log_change(
+        db, asset, models.AuditAction.DELETE, current_user.get("username"),
+        {"maintenance_record": {"old": summary, "new": None}},
+    )
+    db.commit()
     return {"success": True, "message": "Maintenance record deleted", "data": None}
 
 
@@ -586,6 +590,10 @@ def get_asset_history(
     page: int = 1,
     pageSize: int = 100,
 ):
+    asset = db.query(models.Asset).filter(models.Asset.id == asset_id).first()
+    if asset is None:
+        raise HTTPException(status_code=404, detail="Asset not found")
+
     query = (
         db.query(models.AssetAuditLog)
         .filter(models.AssetAuditLog.asset_id == asset_id)
