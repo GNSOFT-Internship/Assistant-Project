@@ -96,8 +96,10 @@ def _reset_ai_rate_limit():
     AI 엔드포인트를 호출해도 429로 실패하지 않도록 매번 비워준다."""
     from app import rate_limit
     rate_limit._timestamps.clear()
+    rate_limit._timestamps_by_ip.clear()
     yield
     rate_limit._timestamps.clear()
+    rate_limit._timestamps_by_ip.clear()
 
 
 @pytest.fixture()

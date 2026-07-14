@@ -1230,8 +1230,8 @@ def diagnose_asset_failure(request: schemas.DiagnosticsRequest, db: Session = De
     try:
         reply = llm.ask_text(_DIAGNOSE_SYSTEM_PROMPT, prompt)
         return schemas.DiagnosticsResponse(reply=reply or "죄송합니다. 진단 결과 응답이 유효하지 않습니다.")
-    except Exception as e:
+    except Exception:
         logger.warning("AI 고장 진단 Q&A 호출 실패, 폴백 적용", exc_info=True)
         return schemas.DiagnosticsResponse(
-            reply=f"AI 엔진 통신 중 오류({e})가 발생하여 기본 점검 모드로 자동 전환되었습니다.\n\n기기의 입출력 단자 상태와 배선 상태를 우선적으로 육안 검사해 주시기 바랍니다."
+            reply="AI 엔진 통신 중 오류가 발생하여 기본 점검 모드로 자동 전환되었습니다.\n\n기기의 입출력 단자 상태와 배선 상태를 우선적으로 육안 검사해 주시기 바랍니다."
         )

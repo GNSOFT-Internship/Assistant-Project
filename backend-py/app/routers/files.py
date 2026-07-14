@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import re
 import uuid
@@ -13,7 +14,17 @@ from ..config import settings
 from ..database import get_db
 from .assets import _log_change, _maintenance_summary
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api/files", tags=["files"])
+
+
+def _safe_stored_filename(original_filename: str) -> str:
+    """업로드 원본 파일명에 경로 구분자나 '..'가 섞여 있어도(예: '../../etc/passwd')
+    디스크 저장 경로가 UPLOAD_DIRECTORY 밖으로 벗어나지 않도록, 디렉터리 성분을
+    제거하고 UUID를 붙인 안전한 파일명만 사용한다."""
+    base_name = os.path.basename(original_filename or "upload")
+    return f"{uuid.uuid4()}_{base_name}"
 
 MAINTENANCE_TYPE_MAP = {
     "정기점검": models.MaintenanceType.ROUTINE,
@@ -220,7 +231,7 @@ async def upload_file(
     try:
         os.makedirs(settings.UPLOAD_DIRECTORY, exist_ok=True)
         original_filename = file.filename
-        filename = f"{uuid.uuid4()}_{original_filename}"
+        filename = _safe_stored_filename(original_filename)
         file_path = os.path.join(settings.UPLOAD_DIRECTORY, filename)
 
         contents = await file.read()
@@ -240,8 +251,9 @@ async def upload_file(
         db.refresh(file_upload)
 
         return {"success": True, "message": "File uploaded successfully", "data": file_to_response(file_upload)}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"File upload failed: {e}")
+    except Exception:
+        logger.warning("파일 업로드 실패", exc_info=True)
+        raise HTTPException(status_code=400, detail="File upload failed")
 
 
 def _process_file_task_logic(file_upload: models.FileUpload, db: Session):
@@ -353,7 +365,7 @@ async def batch_upload_files(
         uploaded_records = []
         for file in files:
             original_filename = file.filename
-            filename = f"{uuid.uuid4()}_{original_filename}"
+            filename = _safe_stored_filename(original_filename)
             file_path = os.path.join(settings.UPLOAD_DIRECTORY, filename)
 
             contents = await file.read()
@@ -381,8 +393,9 @@ async def batch_upload_files(
             uploaded_records.append(file_to_response(file_upload))
 
         return {"success": True, "message": f"{len(uploaded_records)} files uploaded and queued for processing", "data": uploaded_records}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Batch upload failed: {e}")
+    except Exception:
+        logger.warning("일괄 파일 업로드 실패", exc_info=True)
+        raise HTTPException(status_code=400, detail="Batch upload failed")
 
 
 class BatchApplyRequest(BaseModel):

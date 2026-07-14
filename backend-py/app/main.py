@@ -39,23 +39,25 @@ app.include_router(ai.router, dependencies=_ai_dep)
 app.include_router(reports.router, dependencies=_ai_dep)
 
 
+_DEFAULT_JWT_SECRET = "asset-management-secret-key-for-development"
+
+
 @app.on_event("startup")
 def on_startup():
     Base.metadata.create_all(bind=engine)
     seed_initial_users()
-    
+
     from .config import settings
-    # JWT_SECRET 보안성 경고 검증
-    if not settings.DEMO_MODE and settings.JWT_SECRET == "asset-management-secret-key-for-development":
-        import warnings
-        warnings.warn(
-            "SECURITY WARNING: JWT_SECRET is set to the default development key. "
-            "Please configure a secure JWT_SECRET in your production .env file to prevent token forgery.",
-            UserWarning
+    # 이 기본값은 GitHub 공개 저장소에 그대로 노출되어 있으므로, DEMO_MODE 여부와
+    # 무관하게(DEMO_MODE는 대시보드 데모 데이터 표시 여부와만 관련된 별개의 설정이다)
+    # 이 값을 그대로 쓰는 배포는 누구나 관리자 토큰을 위조할 수 있어 절대 허용하지 않는다.
+    # 과거에는 "DEMO_MODE=false일 때만" 경고만 출력했는데, 운영 서버의 .env가
+    # DEMO_MODE=true로 남아있으면 이 검증 자체가 통째로 건너뛰어지는 문제가 있었다.
+    if settings.JWT_SECRET == _DEFAULT_JWT_SECRET:
+        raise RuntimeError(
+            "SECURITY: JWT_SECRET이 공개 저장소에 노출된 기본 개발용 값으로 설정되어 있습니다. "
+            ".env 파일에 고유한 JWT_SECRET을 반드시 설정한 뒤 다시 시작하세요."
         )
-        print("\n" + "=" * 80)
-        print("[WARNING] SECURITY RISK: Default JWT_SECRET is active in non-demo mode!")
-        print("=" * 80 + "\n")
 
 
 def seed_initial_users():

@@ -1,4 +1,7 @@
 import io
+import os
+
+from app.routers.files import _safe_stored_filename
 
 ASSET_PAYLOAD = {
     "assetName": "테스트 파일업로드 자산",
@@ -128,6 +131,20 @@ def test_batch_upload_and_batch_apply(client, admin_headers):
     # 유지보수 기록 건수 확인 (각 파일당 1건씩 총 2건 등록 완료 확인)
     maintenance = client.get(f"/api/assets/{asset['id']}/maintenance", headers=admin_headers).json()["data"]["items"]
     assert len(maintenance) == 2
+
+
+def test_safe_stored_filename_strips_path_traversal_segments():
+    """업로드 원본 파일명에 '../'가 섞여 있어도(예: 악의적으로 조작된 파일명),
+    저장 경로가 UPLOAD_DIRECTORY 밖으로 벗어날 수 없어야 한다."""
+    malicious = "../../../../etc/passwd"
+    stored = _safe_stored_filename(malicious)
+    assert "/" not in stored
+    assert ".." not in stored
+    assert stored.endswith("_passwd")
+
+    # os.path.join과 결합해도 UPLOAD_DIRECTORY 밖으로 나가지 않는지 최종 확인
+    joined = os.path.normpath(os.path.join("uploads", stored))
+    assert joined.startswith("uploads")
 
 
 def test_unknown_file_id_returns_404_not_400(client, admin_headers):

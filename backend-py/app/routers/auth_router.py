@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from .. import models, schemas, auth
+from ..client_ip import get_client_ip
 from ..database import get_db
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -18,7 +19,7 @@ _failed_attempts: dict[str, list[datetime]] = defaultdict(list)
 
 
 def _client_ip(request: Request) -> str:
-    return request.client.host if request.client else "unknown"
+    return get_client_ip(request)
 
 
 def _is_locked(ip: str) -> bool:
