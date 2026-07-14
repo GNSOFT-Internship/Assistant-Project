@@ -99,8 +99,16 @@ _ANSWER_SCHEMA = {
                 "금액을 원 단위로 환산해 반환한다 (예: '100만원 이하' → 1000000). 조건이 없으면 null."
             ),
         },
+        "category": {
+            "type": ["string", "null"],
+            "description": (
+                "질문에 'IT 장비', '사무기기', '설비', '전기설비', '안전설비', '보안장비', '가구', "
+                "'측정장비' 같은 카테고리 조건이 있으면 그 카테고리명(부분 일치), 없으면 null. "
+                "minPrice/maxPrice와 함께 쓰일 때 정확도를 위해 반드시 채운다."
+            ),
+        },
     },
-    "required": ["answer", "relevantAssetIds", "hasData", "hasFilter", "minPrice", "maxPrice"],
+    "required": ["answer", "relevantAssetIds", "hasData", "hasFilter", "minPrice", "maxPrice", "category"],
     "additionalProperties": False,
 }
 
@@ -113,9 +121,10 @@ _SYSTEM_PROMPT = (
     "넣는다. 이때 해당 자산 목록은 화면에 표로 별도 표시되므로, answer 텍스트에는 자산명을 "
     "일일이 나열하지 말고 몇 건인지와 공통 특징만 간결히 요약한다. 단순 통계/개수/일반 질문이면 "
     "hasFilter를 false로 하고 relevantAssetIds는 빈 배열로 둔다. "
-    "질문에 구매가 관련 이상/이하 조건이 있으면 minPrice/maxPrice에 원 단위 금액으로도 반드시 "
-    "채워 넣는다 (relevantAssetIds만으로 가격 비교를 직접 판단하지 말 것 — 실제 비교는 별도 로직이 "
-    "정확히 수행하므로, 여기서는 조건 자체를 숫자로만 정확히 추출하면 된다)."
+    "질문에 구매가 관련 이상/이하 조건이 있으면 minPrice/maxPrice에 원 단위 금액으로, 카테고리 "
+    "조건이 있으면 category에도 반드시 채워 넣는다 (relevantAssetIds만으로 가격/카테고리 비교를 "
+    "직접 판단하지 말 것 — 실제 비교는 별도 로직이 정확히 수행하므로, 여기서는 조건 자체를 "
+    "정확히 추출하면 된다)."
 )
 
 
@@ -141,13 +150,16 @@ def answer_question(db: Session, question: str) -> dict:
 
     min_price = result.get("minPrice")
     max_price = result.get("maxPrice")
-    if has_filter and (min_price is not None or max_price is not None):
-        # 가격 비교는 LLM이 텍스트만 보고 직접 판단하면 계산 실수(자기모순적 답변)가 나올 수 있으므로,
-        # 조건(minPrice/maxPrice)만 LLM에게서 받고 실제 비교는 코드에서 확정적으로 재계산한다.
+    category = result.get("category")
+    if has_filter and (min_price is not None or max_price is not None or category):
+        # 가격/카테고리 비교는 LLM이 텍스트만 보고 직접 판단하면 계산 실수(예: 카테고리 조건을
+        # 놓치거나 가격을 잘못 비교해 자기모순적 답변)가 나올 수 있으므로, 조건 자체만 LLM에게서
+        # 받고 실제 비교는 코드에서 전체 자산을 대상으로 확정적으로 재계산한다.
         relevant_assets = [
             a for a in all_assets
             if (min_price is None or float(a.purchase_price) >= min_price)
             and (max_price is None or float(a.purchase_price) <= max_price)
+            and (not category or category.lower() in (a.category or "").lower())
         ]
         answer = (
             f"조건에 맞는 자산은 총 {len(relevant_assets)}건입니다."

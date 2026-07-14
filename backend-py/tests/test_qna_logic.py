@@ -88,3 +88,32 @@ def test_price_filter_is_recomputed_by_code_even_if_llm_picks_wrong_assets(clien
     codes = {a["assetCode"] for a in data["assets"]}
     assert codes == {"TEST-QNA-CHEAP"}
     assert "1건" in data["answer"]
+
+
+def test_price_filter_combined_with_category_excludes_other_categories(client, admin_headers, monkeypatch):
+    """가격 조건과 카테고리 조건이 함께 걸린 질문("100만원 이하인 IT 장비")에서, 가격만
+    코드로 재계산하고 카테고리 조건을 놓치면 IT가 아닌 저가 자산까지 섞여 나오는 회귀를 막는다."""
+    cheap_it = client.post("/api/assets", json={**IT_ASSET, "assetCode": "TEST-QNA-CHEAP-IT", "purchasePrice": 500000, "category": "IT 장비"}, headers=admin_headers).json()["data"]
+    cheap_office = client.post("/api/assets", json={**IT_ASSET, "assetCode": "TEST-QNA-CHEAP-OFFICE", "purchasePrice": 400000, "category": "사무기기"}, headers=admin_headers).json()["data"]
+
+    from app import qna_logic
+
+    monkeypatch.setattr(qna_logic.llm, "is_configured", lambda: True)
+    monkeypatch.setattr(
+        qna_logic.llm,
+        "ask_json",
+        lambda *args, **kwargs: {
+            "answer": "100만원 이하인 IT 장비는 1건입니다.",
+            "relevantAssetIds": [],
+            "hasData": True,
+            "hasFilter": True,
+            "minPrice": None,
+            "maxPrice": 1000000,
+            "category": "IT 장비",
+        },
+    )
+
+    data = _ask(client, admin_headers, "100만원 이하인 IT 장비 찾기")
+    codes = {a["assetCode"] for a in data["assets"]}
+    assert codes == {"TEST-QNA-CHEAP-IT"}
+    assert "TEST-QNA-CHEAP-OFFICE" not in codes
