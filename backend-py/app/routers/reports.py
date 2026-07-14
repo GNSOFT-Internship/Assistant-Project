@@ -215,8 +215,9 @@ def _generate_narrative(report_data: dict) -> dict:
             f"반복 고장 자산 목록 (2회 이상):\n{repeat_text}\n"
             f"교체 추천 상위 목록:\n{candidates_text}"
         )
-        # 최소 3개 이상 + 구체적 근거를 요구하는 만큼, 딥씽킹 모델의 사고 과정이 길어 답변이 잘리지 않도록 여유 있게 배정한다.
-        result = llm.ask_json(_REPORT_SYSTEM_PROMPT, user_message, _REPORT_SCHEMA, max_tokens=8000, effort="high")
+        # 딥씽킹 모델(effort=high)은 사고 과정만 수 분이 걸려 응답이 느리다. 보고서는 즉시 응답이 중요하므로
+        # 일반 모델(medium)로 빠르게 생성하고, 문항 수 부족분은 _ensure_min_items로 보강한다.
+        result = llm.ask_json(_REPORT_SYSTEM_PROMPT, user_message, _REPORT_SCHEMA, max_tokens=1500, effort="medium")
         result["keyIssues"] = _ensure_min_items(result.get("keyIssues"), 3, fallback["keyIssues"])
         result["recommendations"] = _ensure_min_items(result.get("recommendations"), 3, fallback["recommendations"])
         return result
