@@ -144,9 +144,12 @@ export default function AssetDetail() {
     setChatInput('');
     setLoadingChat(true);
 
+    setChatHistory([...updatedHistory, { role: 'assistant', content: '' }]);
+
     try {
-      const response = await aiApi.diagnoseFailure(asset.id, updatedHistory);
-      setChatHistory([...updatedHistory, { role: 'assistant', content: response.data.reply }]);
+      await aiApi.streamDiagnose(asset.id, updatedHistory, (_chunk, fullTextSoFar) => {
+        setChatHistory([...updatedHistory, { role: 'assistant', content: fullTextSoFar }]);
+      });
     } catch (error) {
       console.error('고장 진단 실패:', error);
       setChatHistory([...updatedHistory, { role: 'assistant', content: '죄송합니다. 고장 진단을 연동하는 중 오류가 발생했습니다.' }]);
@@ -382,7 +385,7 @@ export default function AssetDetail() {
                   </div>
                 </div>
               ))}
-              {loadingChat && (
+              {loadingChat && !chatHistory[chatHistory.length - 1]?.content && (
                 <div className="flex items-center gap-1 text-slate-400 pl-1">
                   <Loader className="animate-spin" size={12} />
                   <span>진단 답변 생각 중...</span>

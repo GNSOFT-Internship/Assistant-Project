@@ -81,6 +81,45 @@ export const aiApi = {
   getProcurementSpec: (assetId) => api.get(`/ai/procurement-spec/${assetId}`, { timeout: AI_TIMEOUT }),
   downloadProcurementSpecPdf: (assetId, spec) => api.post(`/ai/procurement-spec/${assetId}/pdf`, spec, { responseType: 'blob', timeout: AI_TIMEOUT }),
   diagnoseFailure: (assetId, chatHistory) => api.post('/ai/diagnose', { assetId, chatHistory }, { timeout: AI_TIMEOUT }),
+  // 챗봇 답변을 토큰 단위로 흘려받아 체감 속도를 높인다 (axios는 브라우저에서 스트리밍 응답을
+  // 다루기 어려워 fetch를 직접 사용). onChunk가 텍스트 조각을 받을 때마다 호출된다.
+  streamDiagnose: async (assetId, chatHistory, onChunk, { signal } = {}) => {
+    let token;
+    const stored = localStorage.getItem('auth_user');
+    if (stored) {
+      try {
+        token = JSON.parse(stored).token;
+      } catch {
+        // 손상된 값이면 무시
+      }
+    }
+
+    const response = await fetch(`${API_BASE_URL}/ai/diagnose`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ assetId, chatHistory }),
+      signal,
+    });
+
+    if (!response.ok || !response.body) {
+      throw new Error(`AI 응답 스트림 요청 실패 (status: ${response.status})`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let result = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const chunk = decoder.decode(value, { stream: true });
+      result += chunk;
+      onChunk(chunk, result);
+    }
+    return result;
+  },
 };
 
 export const authApi = {

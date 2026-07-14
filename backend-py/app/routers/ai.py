@@ -1178,7 +1178,7 @@ _DIAGNOSE_SYSTEM_PROMPT = (
 )
 
 
-@router.post("/diagnose", response_model=schemas.DiagnosticsResponse)
+@router.post("/diagnose")
 def diagnose_asset_failure(request: schemas.DiagnosticsRequest, db: Session = Depends(get_db)):
     asset = db.query(models.Asset).filter(models.Asset.id == request.assetId).first()
     if not asset:
@@ -1225,13 +1225,14 @@ def diagnose_asset_failure(request: schemas.DiagnosticsRequest, db: Session = De
                 f"2. 과거 수리 이력 중 수리 유형이 `{asset.status}` 상태와 연관이 깊은지 확인하십시오.\n"
                 f"3. 증상이 지속되는 경우 제조사 서비스 센터 또는 전문 정비 부서로 이관을 권장합니다."
             )
-        return schemas.DiagnosticsResponse(reply=reply)
+        return StreamingResponse(iter([reply]), media_type="text/plain; charset=utf-8")
 
-    try:
-        reply = llm.ask_text(_DIAGNOSE_SYSTEM_PROMPT, prompt)
-        return schemas.DiagnosticsResponse(reply=reply or "죄송합니다. 진단 결과 응답이 유효하지 않습니다.")
-    except Exception:
-        logger.warning("AI 고장 진단 Q&A 호출 실패, 폴백 적용", exc_info=True)
-        return schemas.DiagnosticsResponse(
-            reply="AI 엔진 통신 중 오류가 발생하여 기본 점검 모드로 자동 전환되었습니다.\n\n기기의 입출력 단자 상태와 배선 상태를 우선적으로 육안 검사해 주시기 바랍니다."
-        )
+    def _stream():
+        try:
+            for piece in llm.ask_text_stream(_DIAGNOSE_SYSTEM_PROMPT, prompt):
+                yield piece
+        except Exception:
+            logger.warning("AI 고장 진단 Q&A 호출 실패, 폴백 적용", exc_info=True)
+            yield "AI 엔진 통신 중 오류가 발생하여 기본 점검 모드로 자동 전환되었습니다.\n\n기기의 입출력 단자 상태와 배선 상태를 우선적으로 육안 검사해 주시기 바랍니다."
+
+    return StreamingResponse(_stream(), media_type="text/plain; charset=utf-8")

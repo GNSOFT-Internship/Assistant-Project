@@ -157,7 +157,3 @@ class ChatMessage(BaseModel):
 class DiagnosticsRequest(BaseModel):
     assetId: int
     chatHistory: List[ChatMessage]
-
-
-class DiagnosticsResponse(BaseModel):
-    reply: str
