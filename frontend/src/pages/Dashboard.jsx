@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { aiApi } from '../services/api';
 import { TrendingUp, TrendingDown, AlertCircle, CheckCircle, AlertTriangle } from 'lucide-react';
-import { formatPercent } from '../utils/format';
+import { formatPercent, formatCurrency } from '../utils/format';
 import LoadingState from '../components/LoadingState';
 
 const BUDGET_WARNING_THRESHOLD = 90;
@@ -50,7 +50,7 @@ export default function Dashboard() {
     data.budgetConsumptionRate >= BUDGET_WARNING_THRESHOLD;
 
   const stats = [
-    { label: '이번달 유지보수 비용', value: `₩${data.currentMonthMaintenanceCost?.toLocaleString()}`, icon: TrendingUp, color: 'text-blue-600' },
+    { label: '이번달 유지보수 비용', value: formatCurrency(data.currentMonthMaintenanceCost), icon: TrendingUp, color: 'text-blue-600' },
     { label: '신규 고장 건수', value: data.newFailureCount, icon: AlertCircle, color: 'text-red-600' },
     { label: '가동률', value: formatPercent(data.operationRate), icon: CheckCircle, color: 'text-green-600' },
     {

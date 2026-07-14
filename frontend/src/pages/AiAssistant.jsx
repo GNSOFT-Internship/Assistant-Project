@@ -48,7 +48,7 @@ export default function AiAssistant() {
   }, []);
 
   const handleClearHistory = async () => {
-    if (!(await confirmDialog('대화 기록을 모두 삭제하시겠습니까?'))) return;
+    if (!(await confirmDialog('대화 기록을 모두 삭제하시겠습니까?', { danger: true, confirmLabel: '삭제' }))) return;
     try {
       await chatApi.clearHistory();
       setMessages([]);

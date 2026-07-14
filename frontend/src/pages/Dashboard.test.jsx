@@ -38,7 +38,7 @@ describe('Dashboard', () => {
     aiApi.getDashboardData.mockResolvedValue({ data: { data: BASE_DATA } });
     renderPage();
 
-    await waitFor(() => expect(screen.getByText('₩500,000')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('500,000원')).toBeInTheDocument());
     expect(screen.getByText('45.0%')).toBeInTheDocument();
     expect(screen.getByText('25')).toBeInTheDocument();
   });
@@ -80,7 +80,7 @@ describe('Dashboard', () => {
     await waitFor(() => expect(screen.getByText('다시 시도')).toBeInTheDocument());
     await user.click(screen.getByText('다시 시도'));
 
-    await waitFor(() => expect(screen.getByText('₩500,000')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('500,000원')).toBeInTheDocument());
     expect(aiApi.getDashboardData).toHaveBeenCalledTimes(2);
   });
 });

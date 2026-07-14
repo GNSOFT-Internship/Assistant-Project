@@ -325,3 +325,29 @@ def test_global_audit_log_filters_by_action(client, admin_headers):
 def test_global_audit_log_requires_admin(client, user_headers):
     resp = client.get("/api/assets/audit-logs", headers=user_headers)
     assert resp.status_code == 403
+
+
+def test_global_audit_log_search_matches_asset_name_only_not_code(client, admin_headers):
+    """감사 로그의 search는 자산코드가 아니라 자산명으로만 매칭되어야 한다."""
+    _create_asset(client, admin_headers, assetName="검색용 테스트 노트북", assetCode="AUDIT-SEARCH-001")
+    _create_asset(client, admin_headers, assetName="전혀 다른 프린터", assetCode="AUDIT-SEARCH-002")
+
+    resp = client.get("/api/assets/audit-logs?search=테스트 노트북&pageSize=200", headers=admin_headers)
+    assert resp.status_code == 200
+    items = resp.json()["data"]["items"]
+    codes = {i["assetCode"] for i in items}
+    assert "AUDIT-SEARCH-001" in codes
+    assert "AUDIT-SEARCH-002" not in codes
+
+    # 자산코드로는 매칭되지 않아야 한다 (자산명 검색만 지원).
+    resp_code_search = client.get("/api/assets/audit-logs?search=AUDIT-SEARCH-002&pageSize=200", headers=admin_headers)
+    codes_from_code_search = {i["assetCode"] for i in resp_code_search.json()["data"]["items"]}
+    assert "AUDIT-SEARCH-002" not in codes_from_code_search
+
+
+def test_global_audit_log_includes_asset_name(client, admin_headers):
+    _create_asset(client, admin_headers, assetName="이름표시 테스트 자산", assetCode="AUDIT-NAME-001")
+    resp = client.get("/api/assets/audit-logs?pageSize=200", headers=admin_headers)
+    items = resp.json()["data"]["items"]
+    match = next(i for i in items if i["assetCode"] == "AUDIT-NAME-001")
+    assert match["assetName"] == "이름표시 테스트 자산"

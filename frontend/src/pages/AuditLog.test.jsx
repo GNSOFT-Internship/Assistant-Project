@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import AuditLog from './AuditLog';
 import { AuthProvider, useAuth } from '../context/AuthContext';
@@ -64,6 +65,30 @@ describe('AuditLog', () => {
     await waitFor(() => expect(screen.getByText('ASSET-001')).toBeInTheDocument());
     // 필터 드롭다운에도 "등록" 옵션이 있으므로 배지 쪽만 지정해서 확인한다.
     expect(screen.getByText('ASSET-001').closest('tr')).toHaveTextContent('등록');
+  });
+
+  it('searches audit logs by asset name (not asset code)', async () => {
+    const user = userEvent.setup();
+    seedAdmin();
+    assetApi.getAuditLogs.mockResolvedValue({
+      data: {
+        data: {
+          items: [
+            { id: 1, createdAt: '2026-07-13T09:00:00', changedBy: 'admin', action: 'CREATE', assetCode: 'ASSET-001', assetName: '검색용 테스트 노트북', changes: null },
+          ],
+          total: 1,
+        },
+      },
+    });
+    renderPage();
+    await waitFor(() => expect(screen.getByText('ASSET-001')).toBeInTheDocument());
+    expect(screen.getByText('검색용 테스트 노트북')).toBeInTheDocument();
+
+    await user.type(screen.getByPlaceholderText('자산명 검색...'), '테스트 노트북');
+
+    await waitFor(() => expect(assetApi.getAuditLogs).toHaveBeenLastCalledWith(
+      expect.objectContaining({ search: '테스트 노트북' })
+    ));
   });
 
   it('shows an empty state when there are no log entries', async () => {

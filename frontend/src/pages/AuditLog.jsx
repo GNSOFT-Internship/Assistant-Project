@@ -32,6 +32,7 @@ export default function AuditLog() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [actionFilter, setActionFilter] = useState('');
+  const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
 
   const loadLogs = useCallback(async () => {
@@ -41,6 +42,7 @@ export default function AuditLog() {
         page,
         pageSize: PAGE_SIZE,
         action: actionFilter,
+        search,
       });
       const data = response.data.data;
       setLogs(data.items || []);
@@ -50,7 +52,7 @@ export default function AuditLog() {
     } finally {
       setLoading(false);
     }
-  }, [page, actionFilter]);
+  }, [page, actionFilter, search]);
 
   useEffect(() => {
     loadLogs();
@@ -58,7 +60,7 @@ export default function AuditLog() {
 
   useEffect(() => {
     setPage(1);
-  }, [actionFilter]);
+  }, [actionFilter, search]);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -73,7 +75,14 @@ export default function AuditLog() {
       </div>
 
       <div className="card">
-        <div className="flex gap-4 mb-4">
+        <div className="flex flex-col sm:flex-row gap-4 mb-4">
+          <input
+            type="text"
+            placeholder="자산명 검색..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="input flex-1"
+          />
           <select
             value={actionFilter}
             onChange={(e) => setActionFilter(e.target.value)}
@@ -98,6 +107,7 @@ export default function AuditLog() {
                   <th className="table-cell">일시</th>
                   <th className="table-cell">작업자</th>
                   <th className="table-cell">작업</th>
+                  <th className="table-cell">자산명</th>
                   <th className="table-cell">자산번호</th>
                   <th className="table-cell">변경 내용</th>
                 </tr>
@@ -114,6 +124,7 @@ export default function AuditLog() {
                         {ACTION_LABEL[log.action] || log.action}
                       </span>
                     </td>
+                    <td className="table-cell">{log.assetName || '-'}</td>
                     <td className="table-cell">{log.assetCode || '-'}</td>
                     <td className="table-cell max-w-md truncate" title={formatChanges(log.changes)}>
                       {formatChanges(log.changes)}

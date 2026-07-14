@@ -7,3 +7,10 @@ export function formatPercent(rate, { decimals = 1 } = {}) {
   if (rate > PERCENT_DISPLAY_CAP) return `${PERCENT_DISPLAY_CAP}%+`;
   return `${rate.toFixed(decimals)}%`;
 }
+
+// 앱 전체에서 금액은 "1,234,000원" 형식으로 통일한다 (일부 화면에서만 "₩1,234,000"을
+// 쓰던 것을 정리 — 같은 개념이 페이지마다 다르게 보이지 않도록).
+export function formatCurrency(amount) {
+  if (amount == null || Number.isNaN(amount)) return '-';
+  return `${Math.round(amount).toLocaleString()}원`;
+}

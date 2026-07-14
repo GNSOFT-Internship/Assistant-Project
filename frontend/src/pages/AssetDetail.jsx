@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { assetApi, aiApi } from '../services/api';
-import { Calendar, DollarSign, Clock, Package, History, Edit, Trash2, FileText, Send, MessageSquare, Loader } from 'lucide-react';
+import { Calendar, DollarSign, Clock, Package, History, Edit, Trash2, FileText, Send, MessageSquare, Loader, Download } from 'lucide-react';
 import { AssetStatusBadge, MaintenanceTypeBadge } from '../components/StatusBadge';
 import LoadingState from '../components/LoadingState';
 import Modal from '../components/Modal';
@@ -72,6 +72,7 @@ export default function AssetDetail() {
   const [specData, setSpecData] = useState(null);
   const [loadingSpec, setLoadingSpec] = useState(false);
   const [showSpecModal, setShowSpecModal] = useState(false);
+  const [downloadingSpecPdf, setDownloadingSpecPdf] = useState(false);
 
   // AI 고장 진단 Q&A 챗봇 관련 상태
   const [chatHistory, setChatHistory] = useState([]);
@@ -109,6 +110,27 @@ export default function AssetDetail() {
       setShowSpecModal(false);
     } finally {
       setLoadingSpec(false);
+    }
+  };
+
+  const handleDownloadSpecPdf = async () => {
+    setDownloadingSpecPdf(true);
+    try {
+      const response = await aiApi.downloadProcurementSpecPdf(asset.id, specData);
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `조달규격서_RFP_${specData?.title || asset.id}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('조달 규격서 PDF 다운로드 실패:', error);
+      toast.error('PDF 다운로드에 실패했습니다.');
+    } finally {
+      setDownloadingSpecPdf(false);
     }
   };
 
@@ -572,27 +594,27 @@ export default function AssetDetail() {
       </Modal>
 
       {/* AI 작업 지시서 모달 */}
-      {activeWorkOrder && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <style>{`
-            @media print {
-              body * {
-                visibility: hidden;
+      <Modal open={!!activeWorkOrder} onClose={() => setActiveWorkOrder(null)} maxWidth="max-w-2xl">
+        {activeWorkOrder && (
+          <>
+            <style>{`
+              @media print {
+                body * {
+                  visibility: hidden;
+                }
+                #print-work-order, #print-work-order * {
+                  visibility: visible;
+                }
+                #print-work-order {
+                  position: absolute;
+                  left: 0;
+                  top: 0;
+                  width: 100%;
+                  background: white !important;
+                  color: black !important;
+                }
               }
-              #print-work-order, #print-work-order * {
-                visibility: visible;
-              }
-              #print-work-order {
-                position: absolute;
-                left: 0;
-                top: 0;
-                width: 100%;
-                background: white !important;
-                color: black !important;
-              }
-            }
-          `}</style>
-          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto print:p-0 print:max-h-full print:shadow-none print:w-full">
+            `}</style>
             <div className="flex justify-between items-center mb-4 border-b pb-3 print:hidden">
               <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
                 🔧 AI 유지보수 작업 지시서
@@ -665,9 +687,9 @@ export default function AssetDetail() {
               </button>
               <button type="button" onClick={() => setActiveWorkOrder(null)} className="btn btn-secondary">닫기</button>
             </div>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </Modal>
 
       {/* 로딩 인디케이터 */}
       {loadingWO && (
@@ -680,88 +702,84 @@ export default function AssetDetail() {
       )}
 
       {/* AI 조달 규격서 및 RFP 모달 */}
-      {showSpecModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm print:hidden">
-          <div className="card w-full max-w-4xl max-h-[85vh] overflow-y-auto flex flex-col p-6 space-y-4 shadow-2xl border-none">
-            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-              <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-                📋 AI 조달 구매 규격서 & 제안요청서(RFP)
-              </h2>
+      <Modal
+        open={showSpecModal}
+        onClose={() => { setShowSpecModal(false); setSpecData(null); }}
+        maxWidth="max-w-4xl"
+      >
+        <div className="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
+          <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+            📋 AI 조달 구매 규격서 & 제안요청서(RFP)
+          </h2>
+          <button
+            onClick={() => { setShowSpecModal(false); setSpecData(null); }}
+            className="text-slate-400 hover:text-slate-600 font-bold"
+          >
+            닫기
+          </button>
+        </div>
+
+        {loadingSpec ? (
+          <div className="py-12 text-center flex flex-col items-center justify-center gap-3">
+            <div className="w-8 h-8 rounded-full border-4 border-blue-600 border-t-transparent animate-spin"></div>
+            <p className="text-sm text-slate-500 font-medium animate-pulse">Qwen3.5 AI 조달 사양서 및 제안요청서 생성 중...</p>
+          </div>
+        ) : specData ? (
+          <div className="space-y-4">
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col md:flex-row justify-between gap-4">
+              <div>
+                <div className="text-xs text-slate-400 font-semibold uppercase">공고 규격서명</div>
+                <div className="text-lg font-bold text-slate-800 mt-0.5">{specData.title}</div>
+              </div>
+              <div className="text-right min-w-[150px]">
+                <div className="text-xs text-slate-400 font-semibold uppercase">예상 도입 사업비</div>
+                <div className="text-xl font-extrabold text-blue-600 mt-0.5">{specData.budgetEstimate?.toLocaleString()}원</div>
+              </div>
+            </div>
+
+            <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100/50 text-sm text-blue-900 leading-relaxed">
+              <span className="font-bold">💡 규격 설계 및 예산 근거:</span> {specData.rationale}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+              <div className="space-y-2">
+                <h3 className="text-sm font-bold text-slate-700 border-l-4 border-blue-600 pl-2">
+                  1. 조달 기술 규격 사양서
+                </h3>
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs text-slate-700 whitespace-pre-wrap font-mono leading-relaxed max-h-96 overflow-y-auto">
+                  {specData.specifications}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-sm font-bold text-slate-700 border-l-4 border-indigo-600 pl-2">
+                  2. 조달 제안요청서(RFP)
+                </h3>
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs text-slate-700 whitespace-pre-wrap font-mono leading-relaxed max-h-96 overflow-y-auto">
+                  {specData.rfp}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-4 border-t border-slate-100">
               <button
-                onClick={() => {
-                  setShowSpecModal(false);
-                  setSpecData(null);
-                }}
-                className="text-slate-400 hover:text-slate-600 font-bold"
+                onClick={handleDownloadSpecPdf}
+                disabled={downloadingSpecPdf}
+                className="btn btn-primary flex items-center gap-1.5 disabled:opacity-60"
+              >
+                <Download size={14} />
+                {downloadingSpecPdf ? 'PDF 생성 중...' : '규격서/RFP PDF 다운로드'}
+              </button>
+              <button
+                onClick={() => { setShowSpecModal(false); setSpecData(null); }}
+                className="btn btn-secondary"
               >
                 닫기
               </button>
             </div>
-
-            {loadingSpec ? (
-              <div className="py-12 text-center flex flex-col items-center justify-center gap-3">
-                <div className="w-8 h-8 rounded-full border-4 border-blue-600 border-t-transparent animate-spin"></div>
-                <p className="text-sm text-slate-500 font-medium animate-pulse">Qwen3.5 AI 조달 사양서 및 제안요청서 생성 중...</p>
-              </div>
-            ) : specData ? (
-              <div className="space-y-4 overflow-y-auto pr-1">
-                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col md:flex-row justify-between gap-4">
-                  <div>
-                    <div className="text-xs text-slate-400 font-semibold uppercase">공고 규격서명</div>
-                    <div className="text-lg font-bold text-slate-800 mt-0.5">{specData.title}</div>
-                  </div>
-                  <div className="text-right min-w-[150px]">
-                    <div className="text-xs text-slate-400 font-semibold uppercase">예상 도입 사업비</div>
-                    <div className="text-xl font-extrabold text-blue-600 mt-0.5">{specData.budgetEstimate?.toLocaleString()}원</div>
-                  </div>
-                </div>
-
-                <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100/50 text-sm text-blue-900 leading-relaxed">
-                  <span className="font-bold">💡 규격 설계 및 예산 근거:</span> {specData.rationale}
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-                  <div className="space-y-2">
-                    <h3 className="text-sm font-bold text-slate-700 border-l-4 border-blue-600 pl-2">
-                      1. 조달 기술 규격 사양서
-                    </h3>
-                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs text-slate-700 whitespace-pre-wrap font-mono leading-relaxed max-h-96 overflow-y-auto">
-                      {specData.specifications}
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <h3 className="text-sm font-bold text-slate-700 border-l-4 border-indigo-600 pl-2">
-                      2. 조달 제안요청서(RFP)
-                    </h3>
-                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs text-slate-700 whitespace-pre-wrap font-mono leading-relaxed max-h-96 overflow-y-auto">
-                      {specData.rfp}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex justify-end gap-2 pt-4 border-t border-slate-100">
-                  <button
-                    onClick={() => window.print()}
-                    className="btn btn-primary"
-                  >
-                    규격서 인쇄 / PDF 저장
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowSpecModal(false);
-                      setSpecData(null);
-                    }}
-                    className="btn btn-secondary"
-                  >
-                    닫기
-                  </button>
-                </div>
-              </div>
-            ) : null}
           </div>
-        </div>
-      )}
+        ) : null}
+      </Modal>
     </div>
   );
 }

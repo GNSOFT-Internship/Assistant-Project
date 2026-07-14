@@ -85,7 +85,7 @@ def _field_value(asset: models.Asset, field: str):
     return value
 
 
-def audit_to_dto(log: models.AssetAuditLog) -> dict:
+def audit_to_dto(log: models.AssetAuditLog, asset_name: Optional[str] = None) -> dict:
     try:
         changes = json.loads(log.changes) if log.changes else None
     except (TypeError, ValueError):
@@ -94,6 +94,7 @@ def audit_to_dto(log: models.AssetAuditLog) -> dict:
         "id": log.id,
         "assetId": log.asset_id,
         "assetCode": log.asset_code,
+        "assetName": asset_name,
         "action": log.action.value if log.action else None,
         "changedBy": log.changed_by,
         "changes": changes,
@@ -236,6 +237,7 @@ def get_all_audit_logs(
     pageSize: int = 50,
     action: str = "",
     changedBy: str = "",
+    search: str = "",
     _admin: dict = Depends(auth.require_admin),
 ):
     """자산별 이력 화면과 별개로, 시스템 전체에서 누가 언제 무엇을 등록·수정·
@@ -248,6 +250,14 @@ def get_all_audit_logs(
             raise HTTPException(status_code=400, detail="유효하지 않은 action 값입니다.")
     if changedBy:
         query = query.filter(models.AssetAuditLog.changed_by == changedBy)
+    if search:
+        # 자산코드가 아니라 자산명으로만 검색한다 (감사 로그에는 자산코드가 이미 별도
+        # 컬럼으로 표시되므로, 자산명 검색을 별도로 지원해달라는 요구사항).
+        matching_ids = [
+            row[0] for row in
+            db.query(models.Asset.id).filter(models.Asset.asset_name.like(f"%{search}%")).all()
+        ]
+        query = query.filter(models.AssetAuditLog.asset_id.in_(matching_ids))
 
     query = query.order_by(models.AssetAuditLog.created_at.desc())
     total = query.count()
@@ -255,11 +265,16 @@ def get_all_audit_logs(
     page_size = max(1, min(pageSize, 200))
     logs = query.offset((page - 1) * page_size).limit(page_size).all()
 
+    asset_ids = {l.asset_id for l in logs}
+    asset_names = dict(
+        db.query(models.Asset.id, models.Asset.asset_name).filter(models.Asset.id.in_(asset_ids)).all()
+    ) if asset_ids else {}
+
     return {
         "success": True,
         "message": None,
         "data": {
-            "items": [audit_to_dto(l) for l in logs],
+            "items": [audit_to_dto(l, asset_names.get(l.asset_id)) for l in logs],
             "total": total,
             "page": page,
             "pageSize": page_size,

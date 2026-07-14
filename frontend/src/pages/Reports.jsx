@@ -2,6 +2,7 @@ import React from 'react';
 import { reportApi } from '../services/api';
 import { FileText, Download, RefreshCw } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
+import { formatCurrency } from '../utils/format';
 
 export default function Reports() {
   const toast = useToast();
@@ -117,7 +118,7 @@ export default function Reports() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">총 유지보수 비용</span>
-                  <span className="font-medium">₩{Math.round(report.totalMaintenanceCost).toLocaleString()}</span>
+                  <span className="font-medium">{formatCurrency(report.totalMaintenanceCost)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">반복 고장 자산</span>

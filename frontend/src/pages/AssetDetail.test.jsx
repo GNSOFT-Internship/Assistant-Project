@@ -18,6 +18,7 @@ vi.mock('../services/api', () => ({
   },
   aiApi: {
     getProcurementSpec: vi.fn(),
+    downloadProcurementSpecPdf: vi.fn(),
     diagnoseFailure: vi.fn(),
     getWorkOrder: vi.fn(),
   },
@@ -128,5 +129,28 @@ describe('AssetDetail', () => {
 
     await user.click(screen.getByText('닫기'));
     await waitFor(() => expect(screen.queryByText('[작업 지시서] 하드디스크 교체')).not.toBeInTheDocument());
+  });
+
+  it('generates the procurement spec and downloads it as a real PDF, not window.print()', async () => {
+    const user = userEvent.setup();
+    aiApi.getProcurementSpec.mockResolvedValue({
+      data: { title: '노트북 교체 규격서', specifications: '스펙 내용', rfp: 'RFP 내용', budgetEstimate: 1200000, rationale: '근거' },
+    });
+    aiApi.downloadProcurementSpecPdf.mockResolvedValue({ data: new Blob(['%PDF-1.4'], { type: 'application/pdf' }) });
+    renderPage();
+    await waitFor(() => expect(screen.getByText('하드디스크 교체')).toBeInTheDocument());
+
+    await user.click(screen.getByText('AI 조달 규격서/RFP 생성'));
+    await waitFor(() => expect(screen.getByText('노트북 교체 규격서')).toBeInTheDocument());
+
+    await user.click(screen.getByText('규격서/RFP PDF 다운로드'));
+    await waitFor(() => expect(aiApi.downloadProcurementSpecPdf).toHaveBeenCalledWith(
+      SAMPLE_ASSET.id,
+      expect.objectContaining({ title: '노트북 교체 규격서' })
+    ));
+
+    // 헤더/푸터에 동일한 기능의 "닫기" 버튼이 두 개 있으므로 첫 번째만 사용한다.
+    await user.click(screen.getAllByText('닫기')[0]);
+    await waitFor(() => expect(screen.queryByText('노트북 교체 규격서')).not.toBeInTheDocument());
   });
 });

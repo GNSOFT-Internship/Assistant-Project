@@ -108,4 +108,30 @@ describe('AiAssistant', () => {
     // 닫힌 뒤에도 페이지가 정상 상태를 유지하는지(재크래시 없음) 확인
     expect(screen.getByText('전송')).toBeInTheDocument();
   });
+
+  it('shows a danger-styled confirmation before clearing all chat history', async () => {
+    // 회귀 테스트: 대화 기록 전체 삭제는 자산/유지보수 기록 삭제와 마찬가지로
+    // 되돌릴 수 없는 파괴적 동작이므로, 기본 파란 버튼이 아니라 danger 스타일의
+    // 빨간 "삭제" 버튼으로 확인받아야 한다.
+    const user = userEvent.setup();
+    aiApi.askQuestion.mockResolvedValue({
+      data: { data: { answer: '답변입니다.', hasFilter: false, assets: [] } },
+    });
+    chatApi.clearHistory.mockResolvedValue({ data: { success: true } });
+    renderPage();
+    await waitFor(() => expect(screen.getByText('질문을 입력하세요.')).toBeInTheDocument());
+
+    // "대화 초기화" 버튼은 메시지가 하나라도 있어야 나타난다.
+    await user.type(screen.getByPlaceholderText('질문하거나 찾고 싶은 자산을 입력하세요...'), '안녕');
+    await user.click(screen.getByText('전송'));
+    await waitFor(() => expect(screen.getByText('답변입니다.')).toBeInTheDocument());
+
+    await user.click(screen.getByText('대화 초기화'));
+
+    const confirmButton = await screen.findByRole('button', { name: '삭제' });
+    expect(confirmButton).toHaveClass('btn-danger');
+
+    await user.click(confirmButton);
+    await waitFor(() => expect(chatApi.clearHistory).toHaveBeenCalledTimes(1));
+  });
 });
