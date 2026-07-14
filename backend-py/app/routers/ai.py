@@ -465,7 +465,9 @@ def maintenance_analysis(
         1 for r in all_records
         if r.maintenance_date and r.maintenance_date.year == today.year and r.maintenance_date.month == today.month
     )
-    average_cost = (total_cost / total_records) if total_records else 0.0
+    # 원 단위 금액이라 소수점이 나오면 안 되는데, 단순 나눗셈 결과를 그대로 두면
+    # 프론트엔드의 toLocaleString()이 기본값으로 소수점 3자리까지 표시해버린다.
+    average_cost = round(total_cost / total_records) if total_records else 0.0
 
     monthly_costs: dict = {}
     for r in all_records:

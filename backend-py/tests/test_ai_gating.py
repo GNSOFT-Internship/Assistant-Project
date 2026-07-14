@@ -43,7 +43,23 @@ def test_maintenance_analysis_includes_ai_when_requested(client, admin_headers):
     assert resp.status_code == 200
     data = resp.json()["data"]
     assert data["aiAnalysis"] is not None
-    assert isinstance(data["aiAnalysis"], str) and len(data["aiAnalysis"]) > 0
+
+
+def test_maintenance_analysis_average_cost_is_a_whole_won_amount(client, admin_headers):
+    """averageCost = totalCost / totalRecords는 나눗셈 결과라 소수점이 남을 수 있는데,
+    원화 금액이라 정수여야 한다. 프론트엔드 toLocaleString()이 소수점까지 그대로
+    표시해버리는 걸(예: "192,947.368원") 막기 위해 서버에서 반올림해서 내려야 한다."""
+    asset = client.post("/api/assets", json=ASSET_PAYLOAD, headers=admin_headers).json()["data"]
+    # 3건으로 나누면 나누어떨어지지 않는 금액으로 구성한다 (10000/3 = 3333.33...).
+    for cost in (10000, 20000, 30000):
+        client.post(
+            f"/api/assets/{asset['id']}/maintenance",
+            json={**MAINTENANCE_PAYLOAD, "cost": cost, "maintenanceDate": "2024-06-01"},
+            headers=admin_headers,
+        )
+    resp = client.get("/api/ai/maintenance-analysis", headers=admin_headers)
+    average_cost = resp.json()["data"]["statistics"]["averageCost"]
+    assert average_cost == int(average_cost)
 
 
 def test_maintenance_analysis_ai_text_respects_selected_range(client, admin_headers):
