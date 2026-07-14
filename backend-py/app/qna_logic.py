@@ -85,8 +85,22 @@ _ANSWER_SCHEMA = {
                 "'총 자산 수는?', '평균 비용은?' 같은 단순 통계/개수/일반 질문이면 false."
             ),
         },
+        "minPrice": {
+            "type": ["number", "null"],
+            "description": (
+                "질문에 '~원 이상', '~만원 이상', '~보다 비싼' 같은 최소 구매가 조건이 있으면 그 금액을 "
+                "원 단위로 환산해 반환한다 (예: '100만원 이상' → 1000000). 조건이 없으면 null."
+            ),
+        },
+        "maxPrice": {
+            "type": ["number", "null"],
+            "description": (
+                "질문에 '~원 이하', '~만원 이하', '~보다 싼/저렴한' 같은 최대 구매가 조건이 있으면 그 "
+                "금액을 원 단위로 환산해 반환한다 (예: '100만원 이하' → 1000000). 조건이 없으면 null."
+            ),
+        },
     },
-    "required": ["answer", "relevantAssetIds", "hasData", "hasFilter"],
+    "required": ["answer", "relevantAssetIds", "hasData", "hasFilter", "minPrice", "maxPrice"],
     "additionalProperties": False,
 }
 
@@ -98,7 +112,10 @@ _SYSTEM_PROMPT = (
     "부정/결여형 조건이든) hasFilter를 true로 하고 relevantAssetIds에 해당 자산들의 id를 모두 "
     "넣는다. 이때 해당 자산 목록은 화면에 표로 별도 표시되므로, answer 텍스트에는 자산명을 "
     "일일이 나열하지 말고 몇 건인지와 공통 특징만 간결히 요약한다. 단순 통계/개수/일반 질문이면 "
-    "hasFilter를 false로 하고 relevantAssetIds는 빈 배열로 둔다."
+    "hasFilter를 false로 하고 relevantAssetIds는 빈 배열로 둔다. "
+    "질문에 구매가 관련 이상/이하 조건이 있으면 minPrice/maxPrice에 원 단위 금액으로도 반드시 "
+    "채워 넣는다 (relevantAssetIds만으로 가격 비교를 직접 판단하지 말 것 — 실제 비교는 별도 로직이 "
+    "정확히 수행하므로, 여기서는 조건 자체를 숫자로만 정확히 추출하면 된다)."
 )
 
 
@@ -120,9 +137,26 @@ def answer_question(db: Session, question: str) -> dict:
     has_filter = bool(result.get("hasFilter", False))
     relevant_ids = set(result.get("relevantAssetIds", []))
     relevant_assets = [a for a in all_assets if a.id in relevant_ids] if has_filter else []
+    answer = result.get("answer", "답변을 생성하지 못했습니다.")
+
+    min_price = result.get("minPrice")
+    max_price = result.get("maxPrice")
+    if has_filter and (min_price is not None or max_price is not None):
+        # 가격 비교는 LLM이 텍스트만 보고 직접 판단하면 계산 실수(자기모순적 답변)가 나올 수 있으므로,
+        # 조건(minPrice/maxPrice)만 LLM에게서 받고 실제 비교는 코드에서 확정적으로 재계산한다.
+        relevant_assets = [
+            a for a in all_assets
+            if (min_price is None or float(a.purchase_price) >= min_price)
+            and (max_price is None or float(a.purchase_price) <= max_price)
+        ]
+        answer = (
+            f"조건에 맞는 자산은 총 {len(relevant_assets)}건입니다."
+            if relevant_assets
+            else "조건에 맞는 자산이 없습니다."
+        )
 
     return {
-        "answer": result.get("answer", "답변을 생성하지 못했습니다."),
+        "answer": answer,
         "sourceData": _to_source_data(relevant_assets or all_assets),
         "assets": [asset_to_dto(a) for a in relevant_assets],
         "hasData": bool(result.get("hasData", True)),

@@ -58,3 +58,33 @@ def test_fallback_generic_question_has_no_filter(client, admin_headers):
     data = _ask(client, admin_headers, "안녕하세요 오늘 날씨 어때요")
     assert data["hasFilter"] is False
     assert data["assets"] == []
+
+
+def test_price_filter_is_recomputed_by_code_even_if_llm_picks_wrong_assets(client, admin_headers, monkeypatch):
+    """LLM이 가격 조건과 무관한 잘못된 relevantAssetIds를 내놓아도, minPrice/maxPrice가 있으면
+    코드가 실제 구매가를 기준으로 다시 계산해 정확한 결과를 반환해야 한다 (자기모순 답변 방지)."""
+    cheap = client.post("/api/assets", json={**IT_ASSET, "assetCode": "TEST-QNA-CHEAP", "purchasePrice": 500000}, headers=admin_headers).json()["data"]
+    expensive_a = client.post("/api/assets", json={**IT_ASSET, "assetCode": "TEST-QNA-EXP-A", "purchasePrice": 1610000}, headers=admin_headers).json()["data"]
+    expensive_b = client.post("/api/assets", json={**IT_ASSET, "assetCode": "TEST-QNA-EXP-B", "purchasePrice": 1450000}, headers=admin_headers).json()["data"]
+
+    from app import qna_logic
+
+    monkeypatch.setattr(qna_logic.llm, "is_configured", lambda: True)
+    monkeypatch.setattr(
+        qna_logic.llm,
+        "ask_json",
+        lambda *args, **kwargs: {
+            # LLM이 실제로 100만원이 넘는 자산 2건을 잘못 골라 넣은 상황을 재현한다.
+            "answer": "100만원 이하인 IT 장비는 2건입니다.",
+            "relevantAssetIds": [expensive_a["id"], expensive_b["id"]],
+            "hasData": True,
+            "hasFilter": True,
+            "minPrice": None,
+            "maxPrice": 1000000,
+        },
+    )
+
+    data = _ask(client, admin_headers, "100만원 이하인 IT 장비 찾기")
+    codes = {a["assetCode"] for a in data["assets"]}
+    assert codes == {"TEST-QNA-CHEAP"}
+    assert "1건" in data["answer"]
