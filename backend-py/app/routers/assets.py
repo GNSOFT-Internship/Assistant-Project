@@ -306,7 +306,9 @@ def import_assets_excel(
     """엑셀 내보내기(/export)와 같은 컬럼 형식으로 자산을 대량 등록한다.
     행 단위로 검증해서 실패한 행은 건너뛰고, 성공한 행까지는 그대로 반영한다."""
     try:
-        df = pd.read_excel(io.BytesIO(file.file.read()))
+        # 업로드 전체를 bytes로 읽어 BytesIO에 복사하는 대신, pandas가 파일 객체를
+        # 직접 받아 스트리밍하도록 한다 (MemoryMax 제한 하에서 큰 엑셀도 안전하게 처리).
+        df = pd.read_excel(file.file)
     except Exception:
         raise HTTPException(status_code=400, detail="엑셀 파일을 읽을 수 없습니다. xlsx 형식을 확인해주세요.")
 

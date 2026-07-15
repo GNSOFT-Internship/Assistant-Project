@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import re
+import shutil
 import uuid
 from datetime import date, datetime
 
@@ -234,9 +235,11 @@ async def upload_file(
         filename = _safe_stored_filename(original_filename)
         file_path = os.path.join(settings.UPLOAD_DIRECTORY, filename)
 
-        contents = await file.read()
+        # 업로드 전체를 메모리에 올렸다가 쓰지 않고, 청크 단위로 바로 디스크에 흘려보낸다.
+        # 서비스가 systemd MemoryMax로 제한돼 있어서, 큰 파일을 한 번에 메모리로
+        # 읽으면 그 한도를 넘겨 프로세스가 강제 종료될 수 있다.
         with open(file_path, "wb") as f:
-            f.write(contents)
+            shutil.copyfileobj(file.file, f)
 
         file_upload = models.FileUpload(
             filename=filename,

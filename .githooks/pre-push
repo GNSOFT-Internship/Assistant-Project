@@ -1,0 +1,20 @@
+#!/bin/bash
+# pre-push 훅: 백엔드/프론트엔드 테스트가 하나라도 실패하면 push 자체를 막는다.
+#
+# git은 훅을 자동으로 동기화하지 않으므로, 이 파일을 고치면 실제로 쓰는
+# .git/hooks/pre-push 도 다시 설치해야 반영된다:
+#
+#   cp .githooks/pre-push .git/hooks/pre-push && chmod +x .git/hooks/pre-push
+#
+# 급하게 훅을 건너뛰어야 하면 `git push --no-verify`를 쓴다 (AGENTS.md 4번 규칙을
+# 우회하는 것이니, 그럴 만한 이유가 있을 때만 쓴다).
+
+set -e
+
+echo "[pre-push] 백엔드 테스트 실행 중..."
+(cd backend-py && python -m pytest tests/ -q)
+
+echo "[pre-push] 프론트엔드 테스트 실행 중..."
+(cd frontend && npx vitest run)
+
+echo "[pre-push] 테스트 통과 — push를 진행합니다."
