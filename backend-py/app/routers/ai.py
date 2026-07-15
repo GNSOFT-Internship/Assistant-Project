@@ -919,31 +919,35 @@ def simulate_budget(request: schemas.BudgetSimulationRequest, db: Session = Depe
     all_assets = db.query(models.Asset).all()
     all_records = db.query(models.MaintenanceRecord).all()
 
-    categories = [
-        "IT 장비", "사무기기", "설비", "전기설비", "안전설비", "보안장비", "가구", "측정장비"
-    ]
+    # 카테고리는 고정 8종이 아니라(엑셀 일괄 등록 등으로 다른 이름의 카테고리가 들어올 수 있음),
+    # 실제 등록된 자산의 카테고리를 그대로 사용한다. 그래야 표준 8종에 안 맞는 자산도
+    # 조용히 누락되지 않고 예산 배분 계산에 포함된다 (get_budget_forecast와 동일한 방식).
+    categories = sorted({a.category for a in all_assets if a.category})
 
-    asset_by_cat: dict = {}
-    cost_by_cat: dict = {}
-    expired_by_cat: dict = {}
+    if not categories:
+        return schemas.BudgetSimulationResponse(
+            allocations=[],
+            totalAllocated=0.0,
+            summary="등록된 자산이 없어 카테고리별로 배분할 대상이 없습니다.",
+        )
 
-    for cat in categories:
-        asset_by_cat[cat] = 0
-        cost_by_cat[cat] = 0.0
-        expired_by_cat[cat] = 0
+    asset_by_cat: dict = {cat: 0 for cat in categories}
+    cost_by_cat: dict = {cat: 0.0 for cat in categories}
+    expired_by_cat: dict = {cat: 0 for cat in categories}
 
     today = date.today()
     for a in all_assets:
-        if a.category in asset_by_cat:
-            asset_by_cat[a.category] += 1
-            used_years = calc_used_years(a.purchase_date, today)
-            if used_years > a.useful_life:
-                expired_by_cat[a.category] += 1
+        if not a.category:
+            continue
+        asset_by_cat[a.category] += 1
+        used_years = calc_used_years(a.purchase_date, today)
+        if used_years > a.useful_life:
+            expired_by_cat[a.category] += 1
 
     asset_by_id = {a.id: a for a in all_assets}
     for r in all_records:
         asset = asset_by_id.get(r.asset_id)
-        if asset and asset.category in cost_by_cat:
+        if asset and asset.category:
             cost_by_cat[asset.category] += float(r.cost or 0.0)
 
     if not llm.is_configured():

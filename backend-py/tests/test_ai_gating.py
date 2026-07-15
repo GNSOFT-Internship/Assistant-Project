@@ -136,6 +136,10 @@ def test_get_budget_forecast(client, admin_headers):
 
 
 def test_simulate_budget(client, admin_headers):
+    # 카테고리별 배분은 실제 등록된 자산의 카테고리를 기준으로 계산되므로,
+    # 배분 대상이 존재하려면 최소 한 건은 자산이 있어야 한다.
+    _seed_one_maintenance_record(client, admin_headers)
+
     resp = client.post("/api/ai/budgets/simulate", json={"totalBudget": 50000000.0}, headers=admin_headers)
     assert resp.status_code == 200
     data = resp.json()
@@ -143,6 +147,28 @@ def test_simulate_budget(client, admin_headers):
     assert len(data["allocations"]) > 0
     assert "totalAllocated" in data
     assert "summary" in data
+
+
+def test_simulate_budget_includes_non_standard_categories(client, admin_headers):
+    """표준 8종 카테고리(IT 장비/사무기기/설비/전기설비/안전설비/보안장비/가구/측정장비)에
+    없는 카테고리로 등록된 자산도 예산 배분 계산에서 조용히 누락되면 안 된다."""
+    client.post("/api/assets", json={**ASSET_PAYLOAD, "assetCode": "TEST-GATE-CAT", "category": "네트워크장비"}, headers=admin_headers)
+
+    resp = client.post("/api/ai/budgets/simulate", json={"totalBudget": 10000000.0}, headers=admin_headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    categories = [a["category"] for a in data["allocations"]]
+    assert "네트워크장비" in categories
+
+
+def test_simulate_budget_with_no_assets_returns_empty_allocations(client, admin_headers):
+    """등록된 자산이 하나도 없으면 배분할 카테고리가 없으니 빈 배분 목록을 반환해야지,
+    존재하지도 않는 고정 카테고리들에 예산을 나눠주면 안 된다."""
+    resp = client.post("/api/ai/budgets/simulate", json={"totalBudget": 10000000.0}, headers=admin_headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["allocations"] == []
+    assert data["totalAllocated"] == 0
 
 
 def test_simulate_budget_never_exceeds_total_budget(client, admin_headers):
