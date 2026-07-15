@@ -339,6 +339,15 @@ def process_file(
     file_upload = db.query(models.FileUpload).filter(models.FileUpload.id == file_id).first()
     if file_upload is None:
         raise HTTPException(status_code=404, detail="File not found")
+    if file_upload.applied:
+        # 이미 적용된 파일을 재분석하면 extracted_data가 통째로 덮어써져
+        # appliedMaintenanceRecordIds가 사라진다. 그러면 이후 "적용 취소"가
+        # 지울 기록을 찾지 못해 조용히 0건 삭제로 끝나고, 다시 "적용"하면
+        # 기존 기록은 그대로 둔 채 똑같은 기록이 중복 생성된다. 재분석 자체를 막아 차단한다.
+        raise HTTPException(
+            status_code=400,
+            detail="이미 적용된 파일입니다. 먼저 적용을 취소한 후 다시 분석해주세요.",
+        )
 
     file_upload.status = models.UploadStatus.PROCESSING
     db.commit()
@@ -529,7 +538,14 @@ def apply_file(
     db: Session = Depends(get_db),
     current_user: dict = Depends(auth.require_admin),
 ):
-    file_upload = db.query(models.FileUpload).filter(models.FileUpload.id == file_id).first()
+    # 같은 파일에 대해 "적용" 요청이 거의 동시에 두 번 들어와도(더블클릭 등) 한쪽만
+    # applied=False 상태를 보고 처리하도록, 행 잠금으로 뒤의 요청을 앞의 커밋 이후로 미룬다.
+    file_upload = (
+        db.query(models.FileUpload)
+        .filter(models.FileUpload.id == file_id)
+        .with_for_update()
+        .first()
+    )
     if file_upload is None:
         raise HTTPException(status_code=404, detail="File not found")
 
@@ -644,7 +660,13 @@ def unapply_file(
     db: Session = Depends(get_db),
     current_user: dict = Depends(auth.require_admin),
 ):
-    file_upload = db.query(models.FileUpload).filter(models.FileUpload.id == file_id).first()
+    # apply_file과 동일하게 행 잠금을 걸어 "적용 취소" 더블클릭 등으로 인한 동시 요청을 직렬화한다.
+    file_upload = (
+        db.query(models.FileUpload)
+        .filter(models.FileUpload.id == file_id)
+        .with_for_update()
+        .first()
+    )
     if file_upload is None:
         raise HTTPException(status_code=404, detail="File not found")
     if not file_upload.applied:
@@ -654,6 +676,21 @@ def unapply_file(
         result = json.loads(file_upload.extracted_data) if file_upload.extracted_data else {}
     except (TypeError, ValueError):
         result = {}
+
+    if "appliedMaintenanceRecordIds" not in result:
+        # applied=True인데 되돌릴 기록 id 목록 자체가 없는 상태다. 정상적으로 적용됐다면
+        # apply_file/batch_apply_files가 항상 이 키를 남기므로(생성 건수가 0이어도 빈 배열로),
+        # 키가 아예 없다는 건 적용 이후 재분석으로 extracted_data가 덮어써져 추적 정보가
+        # 유실됐다는 뜻이다. 이 경우 0건 삭제로 조용히 "성공" 처리하면 실제로 존재하는
+        # 유지보수 기록이 고아 상태로 방치되므로, 명확히 실패로 알린다.
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "적용 취소할 유지보수 기록 정보를 찾을 수 없습니다 "
+                "(적용 이후 파일을 다시 분석해 추적 정보가 유실된 것으로 보입니다). "
+                "관리자에게 문의해주세요."
+            ),
+        )
 
     record_ids = result.get("appliedMaintenanceRecordIds", [])
     deleted_count = 0

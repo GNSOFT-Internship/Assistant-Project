@@ -103,6 +103,18 @@ def _reset_ai_rate_limit():
 
 
 @pytest.fixture()
+def db_session(client):
+    """client 픽스처가 라우터에 주입해둔 것과 동일한 세션을 테스트에서도 직접 써야 할 때
+    (예: 방어 로직을 검증하기 위해 일부러 비정상 데이터 상태를 만들어야 하는 경우) 사용한다."""
+    from app.database import get_db
+    from app.main import app
+
+    override = app.dependency_overrides[get_db]
+    session = next(override())
+    yield session
+
+
+@pytest.fixture()
 def admin_headers(client):
     resp = client.post("/api/auth/login", json={"username": "admin", "password": "admin123"})
     token = resp.json()["data"]["token"]

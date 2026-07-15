@@ -15,7 +15,24 @@ export default function FileUpload() {
   const [uploading, setUploading] = useState(false);
   const [applyingAll, setApplyingAll] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+  // 분석/적용/적용취소 요청이 진행 중인 파일 id 집합. 서버 응답이 오기 전 같은 파일을
+  // 다시 눌러 중복 요청(중복 적용 등)이 나가는 것을 막는 용도.
+  const [pendingIds, setPendingIds] = useState(new Set());
   const fileInputRef = useRef(null);
+
+  const withPending = async (id, fn) => {
+    if (pendingIds.has(id)) return;
+    setPendingIds((prev) => new Set(prev).add(id));
+    try {
+      await fn();
+    } finally {
+      setPendingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }
+  };
 
   useEffect(() => {
     loadFiles();
@@ -90,25 +107,27 @@ export default function FileUpload() {
     }
   };
 
-  const handleProcess = async (id) => {
+  const handleProcess = (id) => withPending(id, async () => {
     try {
       await fileApi.process(id);
       loadFiles();
     } catch (error) {
       console.error('분석 실패:', error);
-      toast.error('파일 분석 실패');
+      toast.error(error.response?.data?.detail || '파일 분석 실패');
     }
-  };
+  });
 
   const handleApply = async (id) => {
     if (!(await confirmDialog('적용하시겠습니까?'))) return;
-    try {
-      await fileApi.apply(id);
-      loadFiles();
-    } catch (error) {
-      console.error('적용 실패:', error);
-      toast.error('파일 적용 실패');
-    }
+    await withPending(id, async () => {
+      try {
+        await fileApi.apply(id);
+        loadFiles();
+      } catch (error) {
+        console.error('적용 실패:', error);
+        toast.error(error.response?.data?.detail || '파일 적용 실패');
+      }
+    });
   };
 
   const handleBatchApply = async () => {
@@ -156,14 +175,16 @@ export default function FileUpload() {
 
   const handleUnapply = async (id) => {
     if (!(await confirmDialog('적용을 취소하면 이 파일로 등록된 유지보수 기록이 모두 삭제됩니다. 계속할까요?', { danger: true, confirmLabel: '적용 취소' }))) return;
-    try {
-      const response = await fileApi.unapply(id);
-      toast.success(response.data.message);
-      loadFiles();
-    } catch (error) {
-      console.error('적용 취소 실패:', error);
-      toast.error('적용 취소 실패');
-    }
+    await withPending(id, async () => {
+      try {
+        const response = await fileApi.unapply(id);
+        toast.success(response.data.message);
+        loadFiles();
+      } catch (error) {
+        console.error('적용 취소 실패:', error);
+        toast.error(error.response?.data?.detail || '적용 취소 실패');
+      }
+    });
   };
 
   const handleDelete = async (id) => {
@@ -313,6 +334,7 @@ export default function FileUpload() {
                     {file.status === 'PENDING' && (
                       <button
                         onClick={() => handleProcess(file.id)}
+                        disabled={pendingIds.has(file.id)}
                         className="btn btn-secondary flex items-center gap-2"
                       >
                         <Play size={14} /> 분석
@@ -321,6 +343,7 @@ export default function FileUpload() {
                     {file.status === 'COMPLETED' && !file.applied && (
                       <button
                         onClick={() => handleApply(file.id)}
+                        disabled={pendingIds.has(file.id)}
                         className="btn btn-primary flex items-center gap-2"
                       >
                         <CheckCircle size={14} /> 적용
@@ -329,6 +352,7 @@ export default function FileUpload() {
                     {file.applied && (
                       <button
                         onClick={() => handleUnapply(file.id)}
+                        disabled={pendingIds.has(file.id)}
                         className="btn btn-secondary flex items-center gap-2"
                       >
                         <XCircle size={14} /> 적용 취소
@@ -336,6 +360,7 @@ export default function FileUpload() {
                     )}
                     <button
                       onClick={() => handleDelete(file.id)}
+                      disabled={pendingIds.has(file.id)}
                       className="btn btn-danger flex items-center gap-2"
                     >
                       <XCircle size={14} /> 삭제

@@ -147,6 +147,43 @@ def test_safe_stored_filename_strips_path_traversal_segments():
     assert joined.startswith("uploads")
 
 
+def test_reprocessing_an_applied_file_is_rejected(client, admin_headers):
+    """적용된 파일을 재분석하면 appliedMaintenanceRecordIds가 담긴 extracted_data가
+    통째로 덮어써져, 이후 적용취소가 지울 대상을 못 찾고 재적용 시 중복 생성으로
+    이어지는 버그가 있었다. 재분석 자체를 막아 원천 차단한다."""
+    client.post("/api/assets", json=ASSET_PAYLOAD, headers=admin_headers)
+    file_id = _upload_csv(client, admin_headers)
+    client.post(f"/api/files/{file_id}/process", headers=admin_headers)
+    client.post(f"/api/files/{file_id}/apply", headers=admin_headers)
+
+    reprocess_resp = client.post(f"/api/files/{file_id}/process", headers=admin_headers)
+    assert reprocess_resp.status_code == 400
+
+    # 재분석이 거부됐으니 재적용 시도도 "이미 적용됨"으로 막혀야지, 중복 생성되면 안 된다
+    reapply_resp = client.post(f"/api/files/{file_id}/apply", headers=admin_headers)
+    assert reapply_resp.status_code == 400
+
+
+def test_unapply_fails_loudly_when_tracking_info_is_missing(client, admin_headers, db_session):
+    """과거 버그(또는 데이터 이관 등)로 applied=True인데 appliedMaintenanceRecordIds
+    추적 정보 자체가 사라진 상태라면, 0건 삭제로 조용히 "성공" 처리해 실제 존재하는
+    유지보수 기록을 고아로 방치하지 말고 명확히 에러를 내야 한다."""
+    from app import models
+
+    client.post("/api/assets", json=ASSET_PAYLOAD, headers=admin_headers)
+    file_id = _upload_csv(client, admin_headers)
+    client.post(f"/api/files/{file_id}/process", headers=admin_headers)
+    client.post(f"/api/files/{file_id}/apply", headers=admin_headers)
+
+    # 추적 정보가 유실된 상태를 직접 재현한다 (재분석 재현이 이제 막혔으므로 DB를 직접 조작)
+    file_upload = db_session.query(models.FileUpload).filter(models.FileUpload.id == file_id).first()
+    file_upload.extracted_data = '{"kind": "maintenance_records", "records": []}'
+    db_session.commit()
+
+    unapply_resp = client.post(f"/api/files/{file_id}/unapply", headers=admin_headers)
+    assert unapply_resp.status_code == 409
+
+
 def test_unknown_file_id_returns_404_not_400(client, admin_headers):
     """존재하지 않는 file_id는 요청 자체가 잘못된 게 아니라 리소스가 없는 것이므로,
     자산/유지보수 API와 동일하게 400이 아니라 404를 반환해야 한다."""
