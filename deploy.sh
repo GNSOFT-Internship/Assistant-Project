@@ -64,6 +64,20 @@ echo
 
 echo "=== 4. 배포 후 검증 ==="
 
+# systemctl restart 직후 몇 초간은 uvicorn이 아직 리스닝을 시작하기 전이라
+# nginx가 502를 반환하는 정상적인 과도기가 있다. 재시작을 한 경우, 응답이
+# 401(정상)이 될 때까지 몇 번 재시도해서 이 과도기를 실패로 오판하지 않는다.
+if echo "$CHANGED_FILES" | grep -q '^backend-py/'; then
+  for i in 1 2 3 4 5; do
+    API_HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$SITE_URL/api/dashboard")
+    if [ "$API_HTTP_CODE" = "401" ]; then
+      break
+    fi
+    echo "  API 응답 $API_HTTP_CODE — 아직 기동 중일 수 있어 2초 후 재시도 ($i/5)"
+    sleep 2
+  done
+fi
+
 SITE_HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$SITE_URL/")
 echo "사이트 응답: $SITE_HTTP_CODE"
 
