@@ -6,6 +6,11 @@ import { useToast } from '../context/ToastContext';
 import { formatPercent } from '../utils/format';
 import LoadingState from '../components/LoadingState';
 
+const CURRENT_YEAR = new Date().getFullYear();
+// 선택된 연도 기준 앞뒤 1년씩(3개)만 보이던 걸, 지금 연도 기준 과거 10년~이후 1년까지
+// 넓게 목록에 담아 드롭다운을 스크롤해서 더 먼 연도도 바로 고를 수 있게 한다.
+const YEAR_OPTIONS = Array.from({ length: 12 }, (_, i) => CURRENT_YEAR + 1 - i);
+
 export default function Budget() {
   const { user } = useAuth();
   const toast = useToast();
@@ -150,7 +155,7 @@ export default function Budget() {
             onChange={(e) => setYear(parseInt(e.target.value, 10))}
             className="input w-32"
           >
-            {[year - 1, year, year + 1].map((y) => (
+            {YEAR_OPTIONS.map((y) => (
               <option key={y} value={y}>{y}년</option>
             ))}
           </select>
