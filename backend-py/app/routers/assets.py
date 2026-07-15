@@ -8,7 +8,7 @@ import pandas as pd
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import ValidationError
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -486,12 +486,23 @@ def get_asset_maintenance_history(
     page_size = max(1, min(pageSize, 200))
     records = query.offset((page - 1) * page_size).limit(page_size).all()
 
+    # "누적 수리비" 같은 합계는 화면에 보이는 페이지(최대 200건)가 아니라 그 자산의
+    # 전체 유지보수 기록을 기준으로 계산해야 하므로, 페이지네이션과 별개로
+    # SQL SUM()으로 전체 합계를 구해 함께 내려준다.
+    total_cost = float(
+        db.query(func.sum(models.MaintenanceRecord.cost))
+        .filter(models.MaintenanceRecord.asset_id == asset_id)
+        .scalar()
+        or 0.0
+    )
+
     return {
         "success": True,
         "message": None,
         "data": {
             "items": [maintenance_to_dto(r) for r in records],
             "total": total,
+            "totalCost": total_cost,
             "page": page,
             "pageSize": page_size,
         },

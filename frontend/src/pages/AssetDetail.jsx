@@ -61,6 +61,11 @@ export default function AssetDetail() {
   const isAdmin = user?.role === 'ADMIN';
   const [asset, setAsset] = useState(null);
   const [maintenance, setMaintenance] = useState([]);
+  // "누적 수리비"/"유지보수 건수"는 maintenance 목록(최대 200건 페이지)이 아니라
+  // 서버가 전체 기록 기준으로 집계해 내려주는 값을 그대로 쓴다 — 그래야 한 자산의
+  // 유지보수 기록이 페이지 크기를 넘어도 합계가 조용히 줄어들지 않는다.
+  const [maintenanceTotal, setMaintenanceTotal] = useState(0);
+  const [maintenanceTotalCost, setMaintenanceTotalCost] = useState(0);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingRecord, setEditingRecord] = useState(null);
@@ -195,7 +200,10 @@ export default function AssetDetail() {
   const loadMaintenance = async () => {
     try {
       const response = await assetApi.getMaintenanceHistory(id);
-      setMaintenance(response.data.data?.items || []);
+      const data = response.data.data || {};
+      setMaintenance(data.items || []);
+      setMaintenanceTotal(data.total || 0);
+      setMaintenanceTotalCost(data.totalCost || 0);
     } catch (error) {
       console.error('유지보수 이력 로드 실패:', error);
     } finally {
@@ -263,8 +271,6 @@ export default function AssetDetail() {
 
   const usageYears = asset.purchaseDate ? 
     Math.floor((new Date() - new Date(asset.purchaseDate)) / (1000 * 60 * 60 * 24 * 365)) : 0;
-
-  const totalMaintenanceCost = maintenance.reduce((sum, m) => sum + (m.cost || 0), 0);
 
   return (
     <div className="space-y-6">
@@ -343,7 +349,7 @@ export default function AssetDetail() {
                 <DollarSign className="text-green-600" size={20} />
                 <div>
                   <div className="text-sm text-gray-500">누적 수리비</div>
-                  <div className="font-medium">{totalMaintenanceCost.toLocaleString()}원</div>
+                  <div className="font-medium">{maintenanceTotalCost.toLocaleString()}원</div>
                 </div>
               </div>
               <div className="flex items-center gap-3">
@@ -357,7 +363,7 @@ export default function AssetDetail() {
                 <Package className="text-purple-600" size={20} />
                 <div>
                   <div className="text-sm text-gray-500">유지보수 건수</div>
-                  <div className="font-medium">{maintenance.length}건</div>
+                  <div className="font-medium">{maintenanceTotal}건</div>
                 </div>
               </div>
             </div>

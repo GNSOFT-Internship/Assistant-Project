@@ -74,7 +74,9 @@ describe('AssetDetail', () => {
     localStorage.clear();
     seedAdmin();
     assetApi.getById.mockResolvedValue({ data: { data: SAMPLE_ASSET } });
-    assetApi.getMaintenanceHistory.mockResolvedValue({ data: { data: { items: [SAMPLE_RECORD] } } });
+    assetApi.getMaintenanceHistory.mockResolvedValue({
+      data: { data: { items: [SAMPLE_RECORD], total: 1, totalCost: 30000 } },
+    });
     assetApi.getHistory.mockResolvedValue({ data: { data: { items: [] } } });
   });
 
@@ -82,6 +84,17 @@ describe('AssetDetail', () => {
     renderPage();
     await waitFor(() => expect(screen.getByRole('heading', { name: '노트북 Dell Latitude 5520' })).toBeInTheDocument());
     expect(screen.getByText('하드디스크 교체')).toBeInTheDocument();
+  });
+
+  it('shows the server-aggregated total count/cost, not just the loaded page length', async () => {
+    // 한 자산의 유지보수 기록이 한 페이지(최대 200건)를 넘을 수 있으므로, 요약 숫자는
+    // 로드된 items 배열이 아니라 서버가 집계해 내려주는 total/totalCost를 써야 한다.
+    assetApi.getMaintenanceHistory.mockResolvedValue({
+      data: { data: { items: [SAMPLE_RECORD], total: 250, totalCost: 12345000 } },
+    });
+    renderPage();
+    await waitFor(() => expect(screen.getByText('250건')).toBeInTheDocument());
+    expect(screen.getByText('12,345,000원')).toBeInTheDocument();
   });
 
   it('opens the maintenance record edit modal pre-filled and closes it without crashing', async () => {

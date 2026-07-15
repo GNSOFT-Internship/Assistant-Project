@@ -110,6 +110,23 @@ def test_add_update_delete_maintenance_record_and_history(client, admin_headers)
     assert actions.count("DELETE") == 1
 
 
+def test_maintenance_total_cost_reflects_all_records_not_just_the_returned_page(client, admin_headers):
+    # totalCost는 pageSize로 잘린 items가 아니라 그 자산의 전체 유지보수 기록 합계여야 한다.
+    asset = _create_asset(client, admin_headers, assetCode="TEST-ASSET-006")
+    asset_id = asset["id"]
+
+    for cost in (30000, 50000, 70000):
+        payload = {**MAINTENANCE_PAYLOAD, "cost": cost}
+        resp = client.post(f"/api/assets/{asset_id}/maintenance", json=payload, headers=admin_headers)
+        assert resp.status_code == 200
+
+    resp = client.get(f"/api/assets/{asset_id}/maintenance", params={"pageSize": 1}, headers=admin_headers)
+    data = resp.json()["data"]
+    assert len(data["items"]) == 1
+    assert data["total"] == 3
+    assert data["totalCost"] == 150000
+
+
 def test_update_maintenance_record_not_found_returns_404(client, admin_headers):
     asset = _create_asset(client, admin_headers, assetCode="TEST-ASSET-006")
     resp = client.put(
