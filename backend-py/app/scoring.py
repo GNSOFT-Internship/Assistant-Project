@@ -18,9 +18,11 @@ def calc_used_years(purchase_date: date, today: date = None) -> int:
 
 
 def compute_replacement_metrics(asset: "models.Asset", records: list, today: date = None) -> dict:
-    """자산의 교체 우선순위 점수와 관련 지표를 계산한다.
+    """자산의 교체 우선순위 점수(0~100점 만점)와 관련 지표를 계산한다.
 
     ai.py의 교체추천과 reports.py의 월간 보고서가 동일한 공식을 공유한다.
+    구성: 사용기간 비율 35점 + 수리비 비율 35점 + 유지보수 횟수 15점 + 교체필요 상태 15점.
+    각 비율 항목은 100%(1.0)를 넘겨도 만점(해당 배점)으로 고정해 총점이 100점을 넘지 않는다.
     """
     today = today or date.today()
     used_years = calc_used_years(asset.purchase_date, today)
@@ -29,9 +31,13 @@ def compute_replacement_metrics(asset: "models.Asset", records: list, today: dat
     repair_ratio = (repair_cost / price) if price > 0 else 0.0
     maintenance_count = len(records)
 
-    score = (used_years / max(asset.useful_life, 1)) * 40 + repair_ratio * 40 + min(maintenance_count, 10) * 2
+    age_ratio = min(used_years / max(asset.useful_life, 1), 1.0)
+    capped_repair_ratio = min(repair_ratio, 1.0)
+    maintenance_ratio = min(maintenance_count, 10) / 10
+
+    score = age_ratio * 35 + capped_repair_ratio * 35 + maintenance_ratio * 15
     if asset.status == models.AssetStatus.REPLACEMENT_NEEDED:
-        score += 20
+        score += 15
 
     return {
         "usedYears": used_years,
