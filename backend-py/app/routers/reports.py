@@ -1,7 +1,8 @@
 import calendar
 import io
+import json
 import logging
-from datetime import date, datetime
+from datetime import date, datetime, time
 from typing import Optional, Tuple
 
 from fastapi import APIRouter, Body, Depends, HTTPException
@@ -57,6 +58,40 @@ _REPORT_SYSTEM_PROMPT = (
 )
 
 
+def _historical_field_by_asset(
+    db: Session, asset_ids: list, field: str, as_of: date
+) -> dict:
+    """자산의 카테고리/상태 감사로그 이력을 거슬러 올라가, as_of 날짜 말 기준 실제 값을
+    재구성한다. 자산 수정 시 항상 변경 전/후 값을 감사로그에 남기므로(assets.py의
+    _TRACKED_FIELDS), 그 날짜까지의 변경 이력 중 가장 마지막 값이 "그 시점의 값"이다.
+    이력이 없는(그 시점 이전에 감사로그 자체가 없는) 자산은 호출부에서 현재 값으로
+    대체해야 한다."""
+    if not asset_ids:
+        return {}
+    as_of_end = datetime.combine(as_of, time.max)
+    logs = (
+        db.query(models.AssetAuditLog)
+        .filter(
+            models.AssetAuditLog.asset_id.in_(asset_ids),
+            models.AssetAuditLog.created_at <= as_of_end,
+        )
+        .order_by(models.AssetAuditLog.created_at.asc())
+        .all()
+    )
+    value_by_asset: dict = {}
+    for log in logs:
+        if not log.changes:
+            continue
+        try:
+            changes = json.loads(log.changes)
+        except (TypeError, ValueError):
+            continue
+        field_change = changes.get(field)
+        if field_change and field_change.get("new") is not None:
+            value_by_asset[log.asset_id] = field_change["new"]
+    return value_by_asset
+
+
 def _build_report_data(db: Session, year: int, month: int) -> dict:
     month_start = date(year, month, 1)
     month_end = date(year, month, calendar.monthrange(year, month)[1])
@@ -79,11 +114,20 @@ def _build_report_data(db: Session, year: int, month: int) -> dict:
     # 비용/반복고장 통계는 "그 달에 실제로 발생한" 이력만을 대상으로 한다 (진짜 월간 통계).
     month_records = [r for r in records_up_to_month if month_start <= r.maintenance_date <= month_end]
 
+    # "자산 현황"은 지금 시점이 아니라 그 달 말 기준으로 보여줘야 진짜 월간 보고서다.
+    # 카테고리/상태는 나중에 수정될 수 있으므로, 감사로그로 그 시점 값을 재구성하고
+    # (그 시점 이전에 이력 자체가 없으면 부득이 현재 값으로 대체한다).
+    asset_ids = [a.id for a in all_assets]
+    historical_status = _historical_field_by_asset(db, asset_ids, "status", month_end)
+    historical_category = _historical_field_by_asset(db, asset_ids, "category", month_end)
+
     by_category: dict = {}
     by_status: dict = {}
     for a in all_assets:
-        by_category[a.category] = by_category.get(a.category, 0) + 1
-        by_status[a.status.value] = by_status.get(a.status.value, 0) + 1
+        category = historical_category.get(a.id, a.category)
+        status = historical_status.get(a.id, a.status.value)
+        by_category[category] = by_category.get(category, 0) + 1
+        by_status[status] = by_status.get(status, 0) + 1
 
     total_maintenance_cost = sum(float(r.cost) if r.cost is not None else 0.0 for r in month_records)
     cost_by_month: dict = {}

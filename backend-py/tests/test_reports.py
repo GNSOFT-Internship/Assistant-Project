@@ -4,6 +4,8 @@ reportlab로 실제 PDF 바이트를 생성하는 경로라, 한글 폰트 설�
 따라 조용히 깨질 수 있어 최소한 200 응답과 유효한 PDF 시그니처를 확인한다.
 """
 
+from datetime import datetime
+
 ASSET_PAYLOAD = {
     "assetName": "보고서 테스트 자산",
     "assetCode": "TEST-REPORT-001",
@@ -180,6 +182,43 @@ def test_monthly_report_narrative_endpoint_generates_from_given_data_without_hit
     assert isinstance(data["executiveSummary"], str) and len(data["executiveSummary"]) > 0
     assert len(data["keyIssues"]) >= 1
     assert len(data["recommendations"]) >= 1
+
+
+def test_monthly_report_status_reflects_historical_value_not_current(client, admin_headers, db_session):
+    """과거 달의 보고서를 조회하면 "지금" 상태가 아니라 "그 시점"의 상태가 나와야 한다.
+
+    감사로그에 CREATE/UPDATE 시점의 status 변경 이력이 남으므로, 그 이력을 거슬러
+    올라가 특정 시점의 값을 재구성한다. created_at을 직접 조작해, 자산이
+    2024-01(ACTIVE로 생성)과 2024-06(REPLACEMENT_NEEDED로 변경) 사이에 있었던
+    것처럼 재현한다.
+    """
+    from app import models
+
+    asset = _create_asset(client, admin_headers, assetCode="TEST-REPORT-HIST", status="ACTIVE")
+    update_payload = {**ASSET_PAYLOAD, "assetCode": "TEST-REPORT-HIST", "status": "REPLACEMENT_NEEDED"}
+    resp = client.put(f"/api/assets/{asset['id']}", json=update_payload, headers=admin_headers)
+    assert resp.status_code == 200
+
+    logs = (
+        db_session.query(models.AssetAuditLog)
+        .filter(models.AssetAuditLog.asset_id == asset["id"])
+        .order_by(models.AssetAuditLog.created_at.asc())
+        .all()
+    )
+    assert len(logs) == 2  # CREATE, UPDATE
+    logs[0].created_at = datetime(2024, 1, 15)
+    logs[1].created_at = datetime(2024, 6, 15)
+    db_session.commit()
+
+    # 상태 변경 이전 시점(3월)을 조회하면 아직 ACTIVE였어야 한다
+    before_resp = client.get("/api/reports/monthly", params={"year": 2024, "month": 3}, headers=admin_headers)
+    before_data = before_resp.json()["data"]
+    assert before_data["byStatus"].get("REPLACEMENT_NEEDED", 0) == 0
+
+    # 상태 변경 이후 시점(7월)을 조회하면 REPLACEMENT_NEEDED로 반영되어야 한다
+    after_resp = client.get("/api/reports/monthly", params={"year": 2024, "month": 7}, headers=admin_headers)
+    after_data = after_resp.json()["data"]
+    assert after_data["byStatus"].get("REPLACEMENT_NEEDED", 0) >= 1
 
 
 def test_monthly_report_narrative_requires_auth(client):
