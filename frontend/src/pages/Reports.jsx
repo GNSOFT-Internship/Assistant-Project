@@ -4,24 +4,30 @@ import { FileText, Download, RefreshCw } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { formatCurrency } from '../utils/format';
 
+const now = new Date();
+const currentPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
 export default function Reports() {
   const toast = useToast();
   const [generating, setGenerating] = React.useState(false);
   const [loading, setLoading] = React.useState(true);
   const [report, setReport] = React.useState(null);
   const [loadingAiSummary, setLoadingAiSummary] = React.useState(false);
+  const [period, setPeriod] = React.useState(currentPeriod); // "YYYY-MM"
+
+  const [year, month] = period.split('-').map(Number);
 
   const loadPreview = React.useCallback(async () => {
     setLoading(true);
     try {
-      const response = await reportApi.getMonthly();
+      const response = await reportApi.getMonthly({ year, month });
       setReport(response.data.data);
     } catch (error) {
       console.error('보고서 미리보기 로드 실패:', error);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [year, month]);
 
   React.useEffect(() => {
     loadPreview();
@@ -45,13 +51,13 @@ export default function Reports() {
   const handleGenerate = async () => {
     setGenerating(true);
     try {
-      const response = await reportApi.downloadPdf();
+      const response = await reportApi.downloadPdf({ year, month });
 
       const blob = new Blob([response.data], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `자산관리_보고서_${new Date().toISOString().split('T')[0]}.pdf`;
+      link.download = `자산관리_보고서_${period}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -72,17 +78,30 @@ export default function Reports() {
       <div className="card">
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-2xl font-bold">AI 보고서 자동 생성</h1>
-          <button onClick={loadPreview} className="btn btn-secondary flex items-center gap-2" disabled={loading}>
-            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-            새로고침
-          </button>
+          <div className="flex items-center gap-2">
+            <label htmlFor="report-period" className="text-sm text-gray-600">
+              보고 대상 월
+            </label>
+            <input
+              id="report-period"
+              type="month"
+              value={period}
+              max={currentPeriod}
+              onChange={(e) => setPeriod(e.target.value)}
+              className="border rounded px-2 py-1 text-sm"
+            />
+            <button onClick={loadPreview} className="btn btn-secondary flex items-center gap-2" disabled={loading}>
+              <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+              새로고침
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="border rounded-lg p-6">
             <div className="flex items-center gap-3 mb-4">
               <FileText className="text-blue-600" size={32} />
-              <h2 className="text-lg font-semibold">월간 자산관리 보고서</h2>
+              <h2 className="text-lg font-semibold">월간 자산관리 보고서 ({year}년 {month}월)</h2>
             </div>
             <ul className="space-y-2 text-sm text-gray-600 mb-6">
               <li>• 자산 현황 요약</li>
@@ -119,7 +138,7 @@ export default function Reports() {
                   <span className="font-medium text-red-600">{replacementCount} 개</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">총 유지보수 비용</span>
+                  <span className="text-gray-600">{month}월 유지보수 비용</span>
                   <span className="font-medium">{formatCurrency(report.totalMaintenanceCost)}</span>
                 </div>
                 <div className="flex justify-between">

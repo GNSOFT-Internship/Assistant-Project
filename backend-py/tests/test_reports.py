@@ -42,7 +42,11 @@ def _create_asset(client, admin_headers, **overrides):
 
 
 def test_monthly_report_totals_and_status_breakdown_match_actual_data(client, admin_headers):
-    """총 자산 수/상태별 집계/누적 비용이 실제로 등록한 데이터와 정확히 일치하는지 확인한다."""
+    """총 자산 수/상태별 집계/그 달 유지보수 비용이 실제로 등록한 데이터와 정확히 일치하는지 확인한다.
+
+    유지보수 비용은 이제 "그 달에 실제로 발생한" 이력만 집계하므로(진짜 월간 통계),
+    두 건 모두 같은 달(2024-05)에 두고 그 달을 명시적으로 조회한다.
+    """
     _create_asset(client, admin_headers, assetCode="TEST-REPORT-A", status="ACTIVE")
     _create_asset(client, admin_headers, assetCode="TEST-REPORT-B", status="ACTIVE")
     replacement_needed = _create_asset(client, admin_headers, assetCode="TEST-REPORT-C", status="REPLACEMENT_NEEDED")
@@ -54,11 +58,11 @@ def test_monthly_report_totals_and_status_breakdown_match_actual_data(client, ad
     )
     client.post(
         f"/api/assets/{replacement_needed['id']}/maintenance",
-        json={"maintenanceDate": "2024-06-01", "maintenanceType": "REPAIR", "cost": 20000, "description": "수리2"},
+        json={"maintenanceDate": "2024-05-20", "maintenanceType": "REPAIR", "cost": 20000, "description": "수리2"},
         headers=admin_headers,
     )
 
-    resp = client.get("/api/reports/monthly", headers=admin_headers)
+    resp = client.get("/api/reports/monthly", params={"year": 2024, "month": 5}, headers=admin_headers)
     assert resp.status_code == 200
     data = resp.json()["data"]
 
@@ -109,7 +113,12 @@ def test_monthly_report_repeated_failure_count_requires_two_or_more_repairs(clie
 
 
 def test_monthly_report_includes_repeated_failure_asset_detail_and_category_cost(client, admin_headers):
-    """반복 고장 자산은 이름/코드/횟수/누적비용까지, 카테고리별 비용도 함께 내려줘야 한다."""
+    """반복 고장 자산은 이름/코드/횟수/누적비용까지, 그 달 카테고리별 비용도 함께 내려줘야 한다.
+
+    반복 고장 집계(failureCount/totalCost)는 그 달 시점까지의 누적 이력을 보므로 서로 다른
+    달에 걸쳐 있어도 되지만, costByCategory는 "그 달에 실제로 발생한" 비용만 집계하므로
+    두 수리 모두 같은 달(2024-05)에 두고 그 달을 명시적으로 조회한다.
+    """
     asset = _create_asset(client, admin_headers, assetCode="TEST-REPORT-DETAIL", category="IT 장비")
     client.post(
         f"/api/assets/{asset['id']}/maintenance",
@@ -118,11 +127,11 @@ def test_monthly_report_includes_repeated_failure_asset_detail_and_category_cost
     )
     client.post(
         f"/api/assets/{asset['id']}/maintenance",
-        json={"maintenanceDate": "2024-06-01", "maintenanceType": "REPAIR", "cost": 15000, "description": "수리B"},
+        json={"maintenanceDate": "2024-05-20", "maintenanceType": "REPAIR", "cost": 15000, "description": "수리B"},
         headers=admin_headers,
     )
 
-    resp = client.get("/api/reports/monthly", headers=admin_headers)
+    resp = client.get("/api/reports/monthly", params={"year": 2024, "month": 5}, headers=admin_headers)
     data = resp.json()["data"]
 
     detail = next((a for a in data["repeatedFailureAssets"] if a["assetCode"] == "TEST-REPORT-DETAIL"), None)

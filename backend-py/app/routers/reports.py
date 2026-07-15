@@ -1,8 +1,9 @@
+import calendar
 import io
 import logging
 from datetime import date, datetime
 
-from fastapi import APIRouter, Body, Depends
+from fastapi import APIRouter, Body, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
@@ -55,11 +56,27 @@ _REPORT_SYSTEM_PROMPT = (
 )
 
 
-def _build_report_data(db: Session) -> dict:
-    today = date.today()
-    all_assets = db.query(models.Asset).all()
-    all_records = db.query(models.MaintenanceRecord).all()
+def _build_report_data(db: Session, year: int, month: int) -> dict:
+    month_start = date(year, month, 1)
+    month_end = date(year, month, calendar.monthrange(year, month)[1])
+
+    # 그 달 시점에 존재했던(구매된) 자산만을 모집단으로 삼는다.
+    all_assets = db.query(models.Asset).filter(models.Asset.purchase_date <= month_end).all()
     assets_by_id = {a.id: a for a in all_assets}
+
+    # 교체 추천 점수는 "그 달 시점까지의 누적 이력"을 근거로 계산해야 하므로
+    # month_end까지의 전체 이력을 별도로 모아둔다.
+    records_up_to_month = (
+        db.query(models.MaintenanceRecord)
+        .filter(models.MaintenanceRecord.maintenance_date <= month_end)
+        .all()
+    )
+    records_by_asset: dict = {}
+    for r in records_up_to_month:
+        records_by_asset.setdefault(r.asset_id, []).append(r)
+
+    # 비용/반복고장 통계는 "그 달에 실제로 발생한" 이력만을 대상으로 한다 (진짜 월간 통계).
+    month_records = [r for r in records_up_to_month if month_start <= r.maintenance_date <= month_end]
 
     by_category: dict = {}
     by_status: dict = {}
@@ -67,17 +84,15 @@ def _build_report_data(db: Session) -> dict:
         by_category[a.category] = by_category.get(a.category, 0) + 1
         by_status[a.status.value] = by_status.get(a.status.value, 0) + 1
 
-    records_by_asset: dict = {}
-    for r in all_records:
-        records_by_asset.setdefault(r.asset_id, []).append(r)
-
-    total_maintenance_cost = sum(float(r.cost) if r.cost is not None else 0.0 for r in all_records)
+    total_maintenance_cost = sum(float(r.cost) if r.cost is not None else 0.0 for r in month_records)
     cost_by_month: dict = {}
-    cost_by_category: dict = {}
-    for r in all_records:
+    for r in records_up_to_month:
         cost = float(r.cost) if r.cost is not None else 0.0
         month_key = f"{r.maintenance_date.year}-{r.maintenance_date.month:02d}"
         cost_by_month[month_key] = cost_by_month.get(month_key, 0.0) + cost
+    cost_by_category: dict = {}
+    for r in month_records:
+        cost = float(r.cost) if r.cost is not None else 0.0
         asset = assets_by_id.get(r.asset_id)
         if asset:
             cost_by_category[asset.category] = cost_by_category.get(asset.category, 0.0) + cost
@@ -85,7 +100,7 @@ def _build_report_data(db: Session) -> dict:
     replacement_candidates = []
     for a in all_assets:
         records = records_by_asset.get(a.id, [])
-        metrics = compute_replacement_metrics(a, records, today=today)
+        metrics = compute_replacement_metrics(a, records, today=month_end)
         replacement_candidates.append({
             "assetName": a.asset_name,
             "assetCode": a.asset_code,
@@ -97,9 +112,11 @@ def _build_report_data(db: Session) -> dict:
     replacement_candidates.sort(key=lambda r: r["score"], reverse=True)
     top_candidates = replacement_candidates[:5]
 
+    # 반복 고장은 "그 달에 두 번 이상"이 아니라 "그 달 시점까지 누적으로 두 번 이상 고장난"
+    # 자산을 가리키는 것이 자연스러우므로(교체추천과 같은 관점), 누적 이력을 사용한다.
     failure_count_by_asset: dict = {}
     failure_cost_by_asset: dict = {}
-    for r in all_records:
+    for r in records_up_to_month:
         if r.maintenance_type == models.MaintenanceType.REPAIR:
             failure_count_by_asset[r.asset_id] = failure_count_by_asset.get(r.asset_id, 0) + 1
             failure_cost_by_asset[r.asset_id] = failure_cost_by_asset.get(r.asset_id, 0.0) + (
@@ -121,6 +138,8 @@ def _build_report_data(db: Session) -> dict:
 
     return {
         "generatedAt": datetime.now().isoformat(),
+        "reportYear": year,
+        "reportMonth": month,
         "totalAssets": len(all_assets),
         "byCategory": by_category,
         "byStatus": by_status,
@@ -167,9 +186,13 @@ def _build_fallback_narrative(report_data: dict) -> dict:
     if len(recommendations) < 3:
         recommendations.append("다음 분기 예산 수립 시 교체 추천 상위 자산을 우선순위에 반영하는 것을 권장합니다.")
 
+    report_year = report_data.get("reportYear")
+    report_month = report_data.get("reportMonth")
+    period_label = f"{report_year}년 {report_month}월" if report_year and report_month else "이번 달"
+
     return {
         "executiveSummary": (
-            f"총 {report_data['totalAssets']}개 자산을 관리 중이며, 누적 유지보수 비용은 "
+            f"{period_label} 기준 총 {report_data['totalAssets']}개 자산을 관리 중이며, {period_label} 유지보수 비용은 "
             f"{report_data['totalMaintenanceCost']:,.0f}원입니다. 반복 고장 자산은 {report_data['repeatedFailureCount']}건입니다."
         ),
         "keyIssues": key_issues,
@@ -206,13 +229,17 @@ def _generate_narrative(report_data: dict) -> dict:
         category_cost_text = ", ".join(
             f"{k}: {v:,.0f}원" for k, v in report_data["costByCategory"].items()
         ) or "없음"
+        report_year = report_data.get("reportYear")
+        report_month = report_data.get("reportMonth")
+        period_label = f"{report_year}년 {report_month}월" if report_year and report_month else "이번 달"
         user_message = (
-            f"자산 현황: 총 {report_data['totalAssets']}건, 카테고리별 {report_data['byCategory']}, "
+            f"보고 대상 월: {period_label}\n"
+            f"자산 현황({period_label} 시점): 총 {report_data['totalAssets']}건, 카테고리별 {report_data['byCategory']}, "
             f"상태별 {report_data['byStatus']}\n"
-            f"누적 유지보수 비용: {report_data['totalMaintenanceCost']:,.0f}원\n"
-            f"월별 비용: {report_data['costByMonth']}\n"
-            f"카테고리별 유지보수 비용: {category_cost_text}\n"
-            f"반복 고장 자산 목록 (2회 이상):\n{repeat_text}\n"
+            f"{period_label} 유지보수 비용: {report_data['totalMaintenanceCost']:,.0f}원\n"
+            f"월별 비용 추이: {report_data['costByMonth']}\n"
+            f"{period_label} 카테고리별 유지보수 비용: {category_cost_text}\n"
+            f"반복 고장 자산 목록 ({period_label} 시점까지 누적 2회 이상):\n{repeat_text}\n"
             f"교체 추천 상위 목록:\n{candidates_text}"
         )
         # 딥씽킹 모델(effort=high)은 사고 과정만 수 분이 걸려 응답이 느리다. 보고서는 즉시 응답이 중요하므로
@@ -226,9 +253,24 @@ def _generate_narrative(report_data: dict) -> dict:
         return fallback
 
 
+def _resolve_year_month(year: int | None, month: int | None) -> tuple[int, int]:
+    today = date.today()
+    year = year or today.year
+    month = month or today.month
+    if not (1 <= month <= 12):
+        raise HTTPException(status_code=400, detail="month는 1~12 사이여야 합니다.")
+    return year, month
+
+
 @router.get("/monthly")
-def get_monthly_report(db: Session = Depends(get_db), includeAi: bool = False):
-    report_data = _build_report_data(db)
+def get_monthly_report(
+    db: Session = Depends(get_db),
+    includeAi: bool = False,
+    year: int | None = None,
+    month: int | None = None,
+):
+    year, month = _resolve_year_month(year, month)
+    report_data = _build_report_data(db, year, month)
     narrative = _generate_narrative(report_data) if includeAi else {
         "executiveSummary": None,
         "keyIssues": None,
@@ -261,6 +303,7 @@ def _build_pdf(report_data: dict, narrative: dict) -> bytes:
 
     elements = [
         Paragraph("공공시설 자산관리 월간 보고서", title_style),
+        Paragraph(f"보고 대상 월: {report_data['reportYear']}년 {report_data['reportMonth']}월", body_style),
         Paragraph(f"생성일: {report_data['generatedAt'][:19].replace('T', ' ')}", body_style),
         Spacer(1, 8 * mm),
         Paragraph("1. 요약", heading_style),
@@ -292,7 +335,11 @@ def _build_pdf(report_data: dict, narrative: dict) -> bytes:
     elements.append(Spacer(1, 4 * mm))
 
     elements.append(Paragraph("3. 유지보수 비용 분석", heading_style))
-    elements.append(Paragraph(f"누적 유지보수 비용: {report_data['totalMaintenanceCost']:,.0f}원", body_style))
+    elements.append(Paragraph(
+        f"{report_data['reportYear']}년 {report_data['reportMonth']}월 유지보수 비용: "
+        f"{report_data['totalMaintenanceCost']:,.0f}원",
+        body_style,
+    ))
     month_table_data = [["연월", "비용"]] + [
         [k, f"{v:,.0f}원"] for k, v in sorted(report_data["costByMonth"].items())
     ]
@@ -362,11 +409,12 @@ def _build_pdf(report_data: dict, narrative: dict) -> bytes:
 
 
 @router.get("/monthly/pdf")
-def get_monthly_report_pdf(db: Session = Depends(get_db)):
-    report_data = _build_report_data(db)
+def get_monthly_report_pdf(db: Session = Depends(get_db), year: int | None = None, month: int | None = None):
+    year, month = _resolve_year_month(year, month)
+    report_data = _build_report_data(db, year, month)
     narrative = _generate_narrative(report_data)
     pdf_bytes = _build_pdf(report_data, narrative)
-    filename = f"asset-report-{date.today().isoformat()}.pdf"
+    filename = f"asset-report-{year}-{month:02d}.pdf"
     return StreamingResponse(
         io.BytesIO(pdf_bytes),
         media_type="application/pdf",
