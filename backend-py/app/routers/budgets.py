@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .. import auth, models, schemas
@@ -42,10 +43,24 @@ def set_budget(
     if budget is None:
         budget = models.Budget(year=year, month=month, allocated_amount=request.allocatedAmount)
         db.add(budget)
+        try:
+            db.commit()
+        except IntegrityError:
+            # 같은 연/월에 대한 저장 요청이 동시에 두 번 들어와(예: 두 관리자가 같은 순간 저장)
+            # 유니크 제약(uq_budget_year_month)에 걸린 경우, 500으로 실패시키는 대신
+            # 그새 다른 요청이 만든 행을 다시 조회해 업데이트로 전환한다.
+            db.rollback()
+            budget = (
+                db.query(models.Budget)
+                .filter(models.Budget.year == year, models.Budget.month == month)
+                .first()
+            )
+            budget.allocated_amount = request.allocatedAmount
+            db.commit()
     else:
         budget.allocated_amount = request.allocatedAmount
+        db.commit()
 
-    db.commit()
     db.refresh(budget)
     return {"success": True, "message": "Budget saved", "data": budget_to_dto(budget)}
 
