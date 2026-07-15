@@ -78,7 +78,7 @@ export default function AssetDetail() {
   const [chatHistory, setChatHistory] = useState([]);
   const [chatInput, setChatInput] = useState('');
   const [loadingChat, setLoadingChat] = useState(false);
-  const chatEndRef = useRef(null);
+  const chatContainerRef = useRef(null);
 
   // 자산 로드 시 챗봇 첫 환영 메시지 초기화
   useEffect(() => {
@@ -93,9 +93,15 @@ export default function AssetDetail() {
     }
   }, [asset]);
 
-  // 대화 추가 시 자동 스크롤
+  // 대화 추가 시 자동 스크롤 (사용자가 위로 스크롤해서 이전 대화를 보는 중이면 방해하지 않도록,
+  // 채팅창 자체 스크롤만 조정하고 이미 하단 근처일 때만 내린다)
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const container = chatContainerRef.current;
+    if (!container) return;
+    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+    if (distanceFromBottom < 100) {
+      container.scrollTop = container.scrollHeight;
+    }
   }, [chatHistory]);
 
   const handleGenerateSpec = async (assetId) => {
@@ -365,7 +371,7 @@ export default function AssetDetail() {
             </h3>
 
             {/* Chat Messages Log */}
-            <div className="flex-1 overflow-y-auto space-y-3 pr-1 text-xs scrollbar-hide">
+            <div ref={chatContainerRef} className="flex-1 overflow-y-auto space-y-3 pr-1 text-xs scrollbar-hide">
               {chatHistory.map((msg, index) => (
                 <div
                   key={index}
@@ -391,7 +397,6 @@ export default function AssetDetail() {
                   <span>진단 답변 생각 중...</span>
                 </div>
               )}
-              <div ref={chatEndRef} />
             </div>
 
             {/* Chat Input Field */}

@@ -18,14 +18,17 @@ export default function AiAssistant() {
   const [viewingAsset, setViewingAsset] = useState(null);
   const [viewingMaintenance, setViewingMaintenance] = useState([]);
   const [loadingAssetDetail, setLoadingAssetDetail] = useState(false);
-  const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
+  // 사용자가 위로 스크롤해서 이전 대화를 보는 중이면 방해하지 않도록,
+  // 메시지창 자체 스크롤만 조정하고 이미 하단 근처일 때만 내린다
   useEffect(() => {
-    scrollToBottom();
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+    if (distanceFromBottom < 100) {
+      container.scrollTop = container.scrollHeight;
+    }
   }, [messages]);
 
   useEffect(() => {
@@ -219,7 +222,7 @@ export default function AiAssistant() {
           </div>
         </div>
 
-        <div className="border rounded-lg h-[28rem] overflow-y-auto p-4 bg-white space-y-4">
+        <div ref={messagesContainerRef} className="border rounded-lg h-[28rem] overflow-y-auto p-4 bg-white space-y-4">
           {loadingHistory ? (
             <div className="h-full flex items-center justify-center text-gray-500">
               대화 기록을 불러오는 중...
@@ -291,8 +294,6 @@ export default function AiAssistant() {
               </div>
             </div>
           )}
-
-          <div ref={messagesEndRef} />
         </div>
 
         <form onSubmit={handleSend} className="flex gap-2 mt-4">
