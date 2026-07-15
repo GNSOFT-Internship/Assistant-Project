@@ -2,6 +2,7 @@ import calendar
 import io
 import logging
 from datetime import date, datetime
+from typing import Optional, Tuple
 
 from fastapi import APIRouter, Body, Depends, HTTPException
 from fastapi.responses import StreamingResponse
@@ -253,7 +254,7 @@ def _generate_narrative(report_data: dict) -> dict:
         return fallback
 
 
-def _resolve_year_month(year: int | None, month: int | None) -> tuple[int, int]:
+def _resolve_year_month(year: Optional[int], month: Optional[int]) -> Tuple[int, int]:
     today = date.today()
     year = year or today.year
     month = month or today.month
@@ -266,8 +267,8 @@ def _resolve_year_month(year: int | None, month: int | None) -> tuple[int, int]:
 def get_monthly_report(
     db: Session = Depends(get_db),
     includeAi: bool = False,
-    year: int | None = None,
-    month: int | None = None,
+    year: Optional[int] = None,
+    month: Optional[int] = None,
 ):
     year, month = _resolve_year_month(year, month)
     report_data = _build_report_data(db, year, month)
@@ -409,7 +410,7 @@ def _build_pdf(report_data: dict, narrative: dict) -> bytes:
 
 
 @router.get("/monthly/pdf")
-def get_monthly_report_pdf(db: Session = Depends(get_db), year: int | None = None, month: int | None = None):
+def get_monthly_report_pdf(db: Session = Depends(get_db), year: Optional[int] = None, month: Optional[int] = None):
     year, month = _resolve_year_month(year, month)
     report_data = _build_report_data(db, year, month)
     narrative = _generate_narrative(report_data)
