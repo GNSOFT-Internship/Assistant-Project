@@ -2,6 +2,7 @@ import random
 from datetime import datetime
 
 from fastapi import APIRouter, Depends
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from .. import models
@@ -13,19 +14,31 @@ router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
 @router.get("")
 def get_dashboard_data(db: Session = Depends(get_db)):
-    all_assets = db.query(models.Asset).all()
-    total_assets = len(all_assets)
-    active_assets = sum(1 for a in all_assets if a.status == models.AssetStatus.ACTIVE)
-    replacement_needed_assets = sum(1 for a in all_assets if a.status == models.AssetStatus.REPLACEMENT_NEEDED)
+    # 자산/유지보수 기록 전체를 파이썬 메모리로 퍼올려 len()/sum()으로 계산하는 대신,
+    # DB 엔진에서 count()/sum() 스칼라 값만 가져온다.
+    total_assets = db.query(func.count(models.Asset.id)).scalar()
+    active_assets = (
+        db.query(func.count(models.Asset.id))
+        .filter(models.Asset.status == models.AssetStatus.ACTIVE)
+        .scalar()
+    )
+    replacement_needed_assets = (
+        db.query(func.count(models.Asset.id))
+        .filter(models.Asset.status == models.AssetStatus.REPLACEMENT_NEEDED)
+        .scalar()
+    )
 
     now = datetime.now()
-    records = db.query(models.MaintenanceRecord).all()
-    current_month_records = [
-        r for r in records
-        if r.maintenance_date and r.maintenance_date.month == now.month and r.maintenance_date.year == now.year
-    ]
-    current_month_cost = sum(float(r.cost) if r.cost is not None else 0.0 for r in current_month_records)
-    new_failure_count = sum(1 for r in current_month_records if r.maintenance_type == models.MaintenanceType.REPAIR)
+    current_month_query = db.query(models.MaintenanceRecord).filter(
+        func.extract("year", models.MaintenanceRecord.maintenance_date) == now.year,
+        func.extract("month", models.MaintenanceRecord.maintenance_date) == now.month,
+    )
+    current_month_cost = float(
+        current_month_query.with_entities(func.sum(models.MaintenanceRecord.cost)).scalar() or 0.0
+    )
+    new_failure_count = current_month_query.filter(
+        models.MaintenanceRecord.maintenance_type == models.MaintenanceType.REPAIR
+    ).count()
 
     operation_rate = (active_assets * 100.0 / total_assets) if total_assets > 0 else 100.0
 
