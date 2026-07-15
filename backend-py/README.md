@@ -53,3 +53,6 @@
   `ADMIN` 역할만 호출할 수 있고, `USER` 역할은 조회만 가능합니다.
 - `backend-py/tests/`에 pytest 기반 자동화 테스트가 있습니다 (`cd backend-py && pytest`). GitHub Actions로
   `backend-py` 변경 시마다 자동 실행됩니다.
+- 프로덕션 배포는 저장소 루트의 `deploy.sh`를 서버에서 실행합니다 (`sudo bash /root/Assistant-Project/deploy.sh`).
+  git pull 이후 바뀐 부분(`backend-py/`, `frontend/`)만 골라 재시작/재빌드하고, 배포 후 사이트·API 응답과
+  백엔드 트레이스백 여부까지 자동으로 확인합니다.
