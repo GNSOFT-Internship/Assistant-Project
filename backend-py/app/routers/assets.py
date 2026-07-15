@@ -230,6 +230,18 @@ def export_assets(
     )
 
 
+@router.get("/categories")
+def get_asset_categories(db: Session = Depends(get_db)):
+    """자산 등록/필터 화면의 카테고리 목록. category는 자유 문자열 컬럼이라(엑셀 일괄
+    등록 시 임의의 값이 들어올 수 있음) 프론트엔드에 고정 목록을 하드코딩하면 실제
+    데이터와 어긋날 수 있으므로, 실제로 쓰이고 있는 값을 DB에서 그대로 가져온다."""
+    categories = [
+        row[0] for row in
+        db.query(models.Asset.category).distinct().order_by(models.Asset.category).all()
+    ]
+    return {"success": True, "message": None, "data": categories}
+
+
 @router.get("/audit-logs")
 def get_all_audit_logs(
     db: Session = Depends(get_db),

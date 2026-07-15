@@ -110,6 +110,15 @@ def test_add_update_delete_maintenance_record_and_history(client, admin_headers)
     assert actions.count("DELETE") == 1
 
 
+def test_asset_categories_endpoint_reflects_actual_data_not_a_hardcoded_list(client, admin_headers):
+    # category는 자유 문자열 컬럼이라 엑셀 일괄 등록 등으로 임의의 값이 들어올 수 있다.
+    # 프론트엔드 필터/등록 폼의 카테고리 목록은 이 엔드포인트가 내려주는 실제 값을 써야 한다.
+    _create_asset(client, admin_headers, assetCode="TEST-ASSET-CAT-1", category="드론")
+    resp = client.get("/api/assets/categories", headers=admin_headers)
+    assert resp.status_code == 200
+    assert "드론" in resp.json()["data"]
+
+
 def test_maintenance_total_cost_reflects_all_records_not_just_the_returned_page(client, admin_headers):
     # totalCost는 pageSize로 잘린 items가 아니라 그 자산의 전체 유지보수 기록 합계여야 한다.
     asset = _create_asset(client, admin_headers, assetCode="TEST-ASSET-006")

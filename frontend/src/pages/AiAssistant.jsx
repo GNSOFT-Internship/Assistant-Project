@@ -85,7 +85,7 @@ export default function AiAssistant() {
 
   const handleSend = async (e) => {
     e.preventDefault();
-    if (!input.trim()) return;
+    if (!input.trim() || loading) return;
 
     const question = input;
     setMessages((prev) => [...prev, { type: 'user', content: question }]);
@@ -302,9 +302,10 @@ export default function AiAssistant() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="질문하거나 찾고 싶은 자산을 입력하세요..."
+            disabled={loading}
             className="input flex-1"
           />
-          <button type="submit" className="btn btn-primary flex items-center gap-2">
+          <button type="submit" disabled={loading || !input.trim()} className="btn btn-primary flex items-center gap-2">
             <Send size={16} /> 전송
           </button>
         </form>

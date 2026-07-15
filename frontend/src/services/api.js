@@ -47,6 +47,7 @@ api.interceptors.response.use(
 
 export const assetApi = {
   getAll: (params) => api.get('/assets', { params }),
+  getCategories: () => api.get('/assets/categories'),
   exportExcel: (params) => api.get('/assets/export', { params, responseType: 'blob' }),
   importExcel: (file) => {
     const formData = new FormData();

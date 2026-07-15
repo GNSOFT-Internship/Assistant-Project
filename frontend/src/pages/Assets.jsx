@@ -18,6 +18,9 @@ export default function Assets() {
   const confirmDialog = useConfirm();
   const isAdmin = user?.role === 'ADMIN';
   const [assets, setAssets] = useState([]);
+  // category는 자유 문자열 컬럼이라 엑셀 일괄 등록으로 임의의 값이 들어올 수 있으므로,
+  // 필터/등록 폼에 쓰는 카테고리 목록은 하드코딩하지 않고 실제 DB에 있는 값을 가져온다.
+  const [categories, setCategories] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [searchInput, setSearchInput] = useState('');
@@ -90,6 +93,12 @@ export default function Assets() {
     loadAssets();
   }, [loadAssets]);
 
+  useEffect(() => {
+    assetApi.getCategories()
+      .then((response) => setCategories(response.data.data || []))
+      .catch((error) => console.error('카테고리 목록 로드 실패:', error));
+  }, []);
+
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   const handleSubmit = async (e) => {
@@ -102,6 +111,10 @@ export default function Assets() {
       }
       setShowModal(false);
       loadAssets();
+      // 새 카테고리를 직접 입력했을 수 있으므로, 필터/자동완성 목록에도 반영되도록 다시 불러온다.
+      assetApi.getCategories()
+        .then((response) => setCategories(response.data.data || []))
+        .catch((error) => console.error('카테고리 목록 로드 실패:', error));
       resetForm();
     } catch (error) {
       console.error('저장 실패:', error);
@@ -260,14 +273,9 @@ export default function Assets() {
             className="input sm:w-40"
           >
             <option value="">전체 카테고리</option>
-            <option value="IT 장비">IT 장비</option>
-            <option value="사무기기">사무기기</option>
-            <option value="설비">설비</option>
-            <option value="전기설비">전기설비</option>
-            <option value="안전설비">안전설비</option>
-            <option value="가구">가구</option>
-            <option value="보안장비">보안장비</option>
-            <option value="측정장비">측정장비</option>
+            {categories.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
           </select>
         </div>
 
@@ -398,20 +406,20 @@ export default function Assets() {
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">카테고리</label>
-                <select
+                <input
+                  type="text"
+                  required
+                  list="asset-category-options"
                   className="input"
+                  placeholder="기존 카테고리를 선택하거나 새 카테고리를 입력하세요"
                   value={formData.category}
                   onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                >
-                  <option value="IT 장비">IT 장비</option>
-                  <option value="사무기기">사무기기</option>
-                  <option value="설비">설비</option>
-                  <option value="전기설비">전기설비</option>
-                  <option value="안전설비">안전설비</option>
-                  <option value="가구">가구</option>
-                  <option value="보안장비">보안장비</option>
-                  <option value="측정장비">측정장비</option>
-                </select>
+                />
+                <datalist id="asset-category-options">
+                  {categories.map((c) => (
+                    <option key={c} value={c} />
+                  ))}
+                </datalist>
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">위치</label>

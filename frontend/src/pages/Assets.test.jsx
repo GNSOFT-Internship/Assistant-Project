@@ -11,6 +11,7 @@ import { assetApi } from '../services/api';
 vi.mock('../services/api', () => ({
   assetApi: {
     getAll: vi.fn(),
+    getCategories: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
     delete: vi.fn(),
@@ -57,6 +58,7 @@ describe('Assets', () => {
     vi.clearAllMocks();
     localStorage.clear();
     assetApi.getAll.mockResolvedValue({ data: { data: { items: [SAMPLE_ASSET], total: 1, page: 1, pageSize: 20 } } });
+    assetApi.getCategories.mockResolvedValue({ data: { data: ['IT 장비', '가구'] } });
   });
 
   it('renders the asset list', async () => {
