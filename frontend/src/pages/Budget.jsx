@@ -186,7 +186,17 @@ export default function Budget() {
                 const key = `${year}-${String(month).padStart(2, '0')}`;
                 const spent = monthlyCosts[key] || 0;
                 const allocated = budgets[month];
-                const rate = allocated ? (spent / allocated) * 100 : null;
+                // allocated가 정확히 0원인 달에 지출이 있으면(가장 위험한 초과 상태),
+                // 이전의 진위값(truthy) 검사(`allocated ? ... : null`)로는 0을 "값 없음"과
+                // 똑같이 취급해 소진율 배지 자체가 안 보였다. 배정액이 없는 경우(null)와
+                // 배정 0원+지출 0원(표시할 것 없음)만 "-"로 두고, 배정 0원인데 지출이 있으면
+                // 무한대 초과율로 계산해 항상 경고 배지가 뜨도록 한다.
+                const rate =
+                  allocated == null || (allocated === 0 && spent === 0)
+                    ? null
+                    : allocated > 0
+                    ? (spent / allocated) * 100
+                    : Infinity;
                 return (
                   <tr key={month} className="border-t">
                     <td className="table-cell font-medium">{month}월</td>

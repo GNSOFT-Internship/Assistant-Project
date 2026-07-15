@@ -60,6 +60,32 @@ describe('Budget', () => {
     await waitFor(() => expect(screen.getByText('999%+')).toBeInTheDocument());
   });
 
+  it('still flags an over-budget warning when the allocated amount is exactly zero', async () => {
+    // 배정액을 0원으로 뒀는데 지출이 발생한, 가장 위험한 케이스. 이전에는 진위값(truthy)
+    // 검사 때문에 0을 "배정 없음"과 똑같이 취급해 경고 배지 자체가 안 보였다.
+    seedAdmin();
+    budgetApi.getAll.mockResolvedValue({
+      data: { data: [{ id: 1, year: CURRENT_YEAR, month: 7, allocatedAmount: 0 }] },
+    });
+    renderPage();
+    await waitFor(() => expect(screen.getByText('250,000원')).toBeInTheDocument());
+    expect(screen.getByText('999%+')).toBeInTheDocument();
+  });
+
+  it('shows no consumption badge when both the allocated amount and spending are zero', async () => {
+    seedAdmin();
+    budgetApi.getAll.mockResolvedValue({
+      data: { data: [{ id: 1, year: CURRENT_YEAR, month: 7, allocatedAmount: 0 }] },
+    });
+    aiApi.getMaintenanceAnalysis.mockResolvedValue({
+      data: { data: { costTrend: { monthlyCosts: {} } } },
+    });
+    renderPage();
+    await waitFor(() => expect(screen.getByDisplayValue('0')).toBeInTheDocument());
+    expect(screen.queryByText('999%+')).not.toBeInTheDocument();
+    expect(screen.queryByText('0.0%')).not.toBeInTheDocument();
+  });
+
   it('hides the input fields and save buttons for a non-admin user', async () => {
     seedUser();
     renderPage();
