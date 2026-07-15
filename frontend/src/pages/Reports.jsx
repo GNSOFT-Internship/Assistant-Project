@@ -5,7 +5,10 @@ import { useToast } from '../context/ToastContext';
 import { formatCurrency } from '../utils/format';
 
 const now = new Date();
-const currentPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+const CURRENT_YEAR = now.getFullYear();
+const CURRENT_MONTH = now.getMonth() + 1;
+const YEAR_OPTIONS = Array.from({ length: 6 }, (_, i) => CURRENT_YEAR - i);
+const MONTH_OPTIONS = Array.from({ length: 12 }, (_, i) => i + 1);
 
 export default function Reports() {
   const toast = useToast();
@@ -13,9 +16,16 @@ export default function Reports() {
   const [loading, setLoading] = React.useState(true);
   const [report, setReport] = React.useState(null);
   const [loadingAiSummary, setLoadingAiSummary] = React.useState(false);
-  const [period, setPeriod] = React.useState(currentPeriod); // "YYYY-MM"
+  const [year, setYear] = React.useState(CURRENT_YEAR);
+  const [month, setMonth] = React.useState(CURRENT_MONTH);
 
-  const [year, month] = period.split('-').map(Number);
+  const handleYearChange = (newYear) => {
+    setYear(newYear);
+    // 현재 연도로 바꿨는데 이미 선택된 월이 미래 달이면 이번 달로 당겨온다
+    if (newYear === CURRENT_YEAR && month > CURRENT_MONTH) {
+      setMonth(CURRENT_MONTH);
+    }
+  };
 
   const loadPreview = React.useCallback(async () => {
     setLoading(true);
@@ -57,7 +67,7 @@ export default function Reports() {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `자산관리_보고서_${period}.pdf`;
+      link.download = `자산관리_보고서_${year}-${String(month).padStart(2, '0')}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -79,17 +89,31 @@ export default function Reports() {
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-2xl font-bold">AI 보고서 자동 생성</h1>
           <div className="flex items-center gap-2">
-            <label htmlFor="report-period" className="text-sm text-gray-600">
-              보고 대상 월
+            <label htmlFor="report-year" className="text-sm text-gray-600">
+              보고 대상
             </label>
-            <input
-              id="report-period"
-              type="month"
-              value={period}
-              max={currentPeriod}
-              onChange={(e) => setPeriod(e.target.value)}
+            <select
+              id="report-year"
+              value={year}
+              onChange={(e) => handleYearChange(Number(e.target.value))}
               className="border rounded px-2 py-1 text-sm"
-            />
+            >
+              {YEAR_OPTIONS.map((y) => (
+                <option key={y} value={y}>{y}년</option>
+              ))}
+            </select>
+            <select
+              id="report-month"
+              value={month}
+              onChange={(e) => setMonth(Number(e.target.value))}
+              className="border rounded px-2 py-1 text-sm"
+            >
+              {MONTH_OPTIONS.map((m) => (
+                <option key={m} value={m} disabled={year === CURRENT_YEAR && m > CURRENT_MONTH}>
+                  {m}월
+                </option>
+              ))}
+            </select>
             <button onClick={loadPreview} className="btn btn-secondary flex items-center gap-2" disabled={loading}>
               <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
               새로고침
