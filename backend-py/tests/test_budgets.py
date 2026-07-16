@@ -70,3 +70,8 @@ def test_get_all_budgets_sorted_desc(client, admin_headers):
 def test_get_all_budgets_requires_auth(client):
     resp = client.get("/api/budgets")
     assert resp.status_code == 401
+
+
+def test_set_budget_rejects_negative_amount(client, admin_headers):
+    resp = client.put("/api/budgets/2026/10", json={"allocatedAmount": -1}, headers=admin_headers)
+    assert resp.status_code == 422

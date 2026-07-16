@@ -92,7 +92,7 @@ class QnARequest(BaseModel):
 
 
 class BudgetRequest(BaseModel):
-    allocatedAmount: float
+    allocatedAmount: float = Field(ge=0)
 
 
 class QnAResponse(BaseModel):
