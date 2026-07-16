@@ -467,7 +467,7 @@ def maintenance_analysis(
     )
     # 원 단위 금액이라 소수점이 나오면 안 되는데, 단순 나눗셈 결과를 그대로 두면
     # 프론트엔드의 toLocaleString()이 기본값으로 소수점 3자리까지 표시해버린다.
-    average_cost = round(total_cost / total_records) if total_records else 0.0
+    average_cost = float(round(total_cost / total_records)) if total_records else 0.0
 
     monthly_costs: dict = {}
     for r in all_records:
@@ -1232,11 +1232,16 @@ def diagnose_asset_failure(request: schemas.DiagnosticsRequest, db: Session = De
         return StreamingResponse(iter([reply]), media_type="text/plain; charset=utf-8")
 
     def _stream():
+        streamed_any = False
         try:
             for piece in llm.ask_text_stream(_DIAGNOSE_SYSTEM_PROMPT, prompt):
+                streamed_any = True
                 yield piece
         except Exception:
             logger.warning("AI 고장 진단 Q&A 호출 실패, 폴백 적용", exc_info=True)
-            yield "AI 엔진 통신 중 오류가 발생하여 기본 점검 모드로 자동 전환되었습니다.\n\n기기의 입출력 단자 상태와 배선 상태를 우선적으로 육안 검사해 주시기 바랍니다."
+            # 이미 일부 답변이 스트리밍된 뒤에 오류가 나면, 폴백 문구를 바로 이어붙이지 않고
+            # 줄바꿈으로 분리해 두 내용이 한 문장처럼 뒤섞여 보이지 않게 한다.
+            prefix = "\n\n---\n" if streamed_any else ""
+            yield f"{prefix}AI 엔진 통신 중 오류가 발생하여 기본 점검 모드로 자동 전환되었습니다.\n\n기기의 입출력 단자 상태와 배선 상태를 우선적으로 육안 검사해 주시기 바랍니다."
 
     return StreamingResponse(_stream(), media_type="text/plain; charset=utf-8")
