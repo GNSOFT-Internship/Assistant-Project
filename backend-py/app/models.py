@@ -180,3 +180,16 @@ class WorkOrder(Base):
     safety_precautions = Column(Text, nullable=True)  # JSON array string
     estimated_time = Column(String(100), nullable=True)
     created_at = Column(DateTime, server_default=func.now())
+
+
+class AssetReplacementReason(Base):
+    """교체 우선순위 추천 사유(AI 생성 텍스트) 캐시.
+
+    metrics_hash가 마지막 생성 시점과 동일하면(=근거 수치가 안 바뀌었으면) AI를
+    다시 호출하지 않고 저장된 reason을 재사용한다."""
+    __tablename__ = "asset_replacement_reason"
+
+    asset_id = Column(BigInteger, ForeignKey("asset.id", ondelete="CASCADE"), primary_key=True)
+    metrics_hash = Column(String(64), nullable=False)
+    reason = Column(Text, nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())

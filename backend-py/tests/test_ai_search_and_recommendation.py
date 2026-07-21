@@ -114,6 +114,52 @@ def test_replacement_recommendation_respects_budget_cap(client, admin_headers):
         assert rec["purchasePrice"] <= 100000
 
 
+def test_replacement_recommendation_reason_is_cached_until_metrics_change(client, admin_headers, monkeypatch):
+    """근거 수치(사용기간/수리비율/고장횟수/점수)가 안 바뀌었으면 AI를 다시 호출하지 않고
+    DB에 저장된 이유 문구를 재사용해야 한다. 수치가 바뀌면 그때는 다시 호출해야 한다."""
+    asset = _create_asset(client, admin_headers, assetCode="TEST-REC-CACHE", purchasePrice=500000)
+    client.post(f"/api/assets/{asset['id']}/maintenance", json=MAINTENANCE_PAYLOAD, headers=admin_headers)
+
+    from app.routers import ai as ai_router
+
+    call_count = {"n": 0}
+
+    def fake_ask_json(system, user_message, schema, **kwargs):
+        call_count["n"] += 1
+        return {
+            "overallAnalysis": f"AI 총평 #{call_count['n']}",
+            "reasons": [{"assetId": asset["id"], "reason": f"AI 생성 이유 #{call_count['n']}"}],
+        }
+
+    monkeypatch.setattr(ai_router.llm, "is_configured", lambda: True)
+    monkeypatch.setattr(ai_router.llm, "ask_json", fake_ask_json)
+
+    resp1 = client.post("/api/ai/replacement-recommendation", json={}, headers=admin_headers)
+    assert resp1.status_code == 200
+    reason1 = resp1.json()["data"]["recommendations"][0]["reason"]
+    assert reason1 == "AI 생성 이유 #1"
+    assert call_count["n"] == 1
+
+    # 두 번째 호출: 근거 수치가 그대로이므로 AI를 다시 부르지 않고 캐시된 문구를 재사용해야 한다.
+    resp2 = client.post("/api/ai/replacement-recommendation", json={}, headers=admin_headers)
+    assert resp2.status_code == 200
+    reason2 = resp2.json()["data"]["recommendations"][0]["reason"]
+    assert reason2 == "AI 생성 이유 #1"
+    assert call_count["n"] == 1
+
+    # 유지보수 기록을 추가해 근거 수치(고장횟수 등)를 바꾸면 캐시가 무효화되어 다시 호출되어야 한다.
+    client.post(
+        f"/api/assets/{asset['id']}/maintenance",
+        json={**MAINTENANCE_PAYLOAD, "maintenanceDate": "2024-08-01"},
+        headers=admin_headers,
+    )
+    resp3 = client.post("/api/ai/replacement-recommendation", json={}, headers=admin_headers)
+    assert resp3.status_code == 200
+    reason3 = resp3.json()["data"]["recommendations"][0]["reason"]
+    assert reason3 == "AI 생성 이유 #2"
+    assert call_count["n"] == 2
+
+
 def test_failure_assets_returns_occurrence_counts_sorted_desc(client, admin_headers):
     asset_a = _create_asset(client, admin_headers, assetCode="TEST-FAIL-A")
     asset_b = _create_asset(client, admin_headers, assetCode="TEST-FAIL-B")

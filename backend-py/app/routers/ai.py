@@ -1,3 +1,4 @@
+import hashlib
 import io
 import json
 import logging
@@ -292,6 +293,16 @@ _REASON_SYSTEM_PROMPT = (
 )
 
 
+def _replacement_metrics_hash(metrics: dict, useful_life: int) -> str:
+    """이유 텍스트가 인용하는 근거 수치들의 해시. 자산의 사용기간/내용연수/수리비율/고장횟수/
+    점수 중 하나라도 바뀌면 값이 달라져, 캐시된 AI 문구를 재사용해도 되는지 판단하는 키로 쓴다."""
+    key = (
+        f"{metrics['usedYears']}|{useful_life}|{metrics['maintenanceCount']}|"
+        f"{round(metrics['repairRatio'], 2)}|{metrics['score']}"
+    )
+    return hashlib.sha256(key.encode()).hexdigest()
+
+
 @router.post("/replacement-recommendation")
 def replacement_recommendation(request: ReplacementRequest, db: Session = Depends(get_db)):
     budget = request.budget
@@ -317,6 +328,7 @@ def replacement_recommendation(request: ReplacementRequest, db: Session = Depend
             "totalRepairCost": metrics["repairCost"],
             "purchasePrice": metrics["price"],
             "score": metrics["score"],
+            "_metricsHash": _replacement_metrics_hash(metrics, asset.useful_life),
             "reason": (
                 f"사용기간 {metrics['usedYears']}년(내용연수 {asset.useful_life}년), "
                 f"수리비가 구매가의 {metrics['repairRatio'] * 100:.0f}% 수준이며 "
@@ -346,7 +358,26 @@ def replacement_recommendation(request: ReplacementRequest, db: Session = Depend
         else f"총 {len(recommendations)}건의 교체 우선순위 추천 결과입니다."
     )
 
-    if recommendations and llm.is_configured():
+    cached_rows = {}
+    all_cached = False
+    if recommendations:
+        cached_rows = {
+            row.asset_id: row
+            for row in db.query(models.AssetReplacementReason)
+            .filter(models.AssetReplacementReason.asset_id.in_([r["assetId"] for r in recommendations]))
+            .all()
+        }
+        all_cached = all(
+            (cached_rows.get(r["assetId"]) is not None and cached_rows[r["assetId"]].metrics_hash == r["_metricsHash"])
+            for r in recommendations
+        )
+        if all_cached:
+            # 추천된 자산들의 근거 수치가 지난번 생성 시점과 전부 동일하므로 AI를
+            # 다시 호출하지 않고 저장된 문구를 그대로 재사용한다.
+            for rec in recommendations:
+                rec["reason"] = cached_rows[rec["assetId"]].reason
+
+    if recommendations and not all_cached and llm.is_configured():
         try:
             summary_input = "\n".join(
                 f"assetId={r['assetId']} | {r['assetName']} | 사용기간={r['usedYears']}년/{r['usefulLife']}년 | "
@@ -366,8 +397,25 @@ def replacement_recommendation(request: ReplacementRequest, db: Session = Depend
                 if rec["assetId"] in reason_by_id:
                     rec["reason"] = reason_by_id[rec["assetId"]]
             ai_analysis = llm_result.get("overallAnalysis", ai_analysis)
+
+            for rec in recommendations:
+                cached = cached_rows.get(rec["assetId"])
+                if cached is not None:
+                    cached.metrics_hash = rec["_metricsHash"]
+                    cached.reason = rec["reason"]
+                else:
+                    db.add(models.AssetReplacementReason(
+                        asset_id=rec["assetId"],
+                        metrics_hash=rec["_metricsHash"],
+                        reason=rec["reason"],
+                    ))
+            db.commit()
         except Exception:
+            db.rollback()
             logger.warning("교체 추천 AI 서술 생성 실패, 규칙 기반 문구 유지", exc_info=True)
+
+    for rec in recommendations:
+        rec.pop("_metricsHash", None)
 
     return {
         "success": True,
