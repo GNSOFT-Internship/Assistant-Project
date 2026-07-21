@@ -130,8 +130,11 @@ def _build_report_data(db: Session, year: int, month: int) -> dict:
         by_status[status] = by_status.get(status, 0) + 1
 
     total_maintenance_cost = sum(float(r.cost) if r.cost is not None else 0.0 for r in month_records)
+    # "월별 비용 추이"는 그 달과 무관한 과거 전체 이력이 아니라, 보고 대상 월 자체의
+    # 비용만 담아야 진짜 "그 달" 보고서다 (반복 고장/교체 추천은 원래부터 구매 이후
+    # 누적 이력을 근거로 계산하는 지표라 그대로 둔다).
     cost_by_month: dict = {}
-    for r in records_up_to_month:
+    for r in month_records:
         cost = float(r.cost) if r.cost is not None else 0.0
         month_key = f"{r.maintenance_date.year}-{r.maintenance_date.month:02d}"
         cost_by_month[month_key] = cost_by_month.get(month_key, 0.0) + cost

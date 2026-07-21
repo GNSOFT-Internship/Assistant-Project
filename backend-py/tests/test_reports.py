@@ -143,6 +143,28 @@ def test_monthly_report_includes_repeated_failure_asset_detail_and_category_cost
     assert data["costByCategory"].get("IT 장비", 0) >= 25000
 
 
+def test_monthly_report_cost_by_month_only_includes_the_reported_month(client, admin_headers):
+    """'월별 비용 추이'는 보고 대상 월과 무관한 과거 전체 이력이 아니라, 그 달 자체의
+    비용만 담아야 한다(반복 고장/교체 추천처럼 구매 이후 누적 이력을 보는 지표와는 다름)."""
+    asset = _create_asset(client, admin_headers, assetCode="TEST-REPORT-COSTBYMONTH")
+    client.post(
+        f"/api/assets/{asset['id']}/maintenance",
+        json={"maintenanceDate": "2023-01-15", "maintenanceType": "REPAIR", "cost": 999000, "description": "작년 수리"},
+        headers=admin_headers,
+    )
+    client.post(
+        f"/api/assets/{asset['id']}/maintenance",
+        json={"maintenanceDate": "2024-05-10", "maintenanceType": "REPAIR", "cost": 40000, "description": "이번 달 수리"},
+        headers=admin_headers,
+    )
+
+    resp = client.get("/api/reports/monthly", params={"year": 2024, "month": 5}, headers=admin_headers)
+    data = resp.json()["data"]
+
+    assert "2023-01" not in data["costByMonth"]
+    assert set(data["costByMonth"].keys()) == {"2024-05"}
+
+
 def test_monthly_report_pdf_reflects_new_sections(client, admin_headers):
     """반복 고장 자산/카테고리별 비용 섹션이 추가된 뒤에도 PDF가 정상 생성되는지 확인한다."""
     asset = _create_asset(client, admin_headers, assetCode="TEST-REPORT-PDF-DETAIL")
