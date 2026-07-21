@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { aiApi, assetApi } from '../services/api';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
@@ -37,6 +37,13 @@ export default function Maintenance() {
   const endMonth = buildYearMonth(endYear, endMonthNum);
   const rangeInvalid = Boolean(startMonth && endMonth && startMonth > endMonth);
 
+  // 요청을 보낸 뒤 응답이 오기 전에 사용자가 기간을 또 바꾸면, 먼저 보낸(이제는 낡은)
+  // 요청의 응답이 나중에 도착해 최신 상태를 덮어쓸 수 있다(네트워크 순서는 요청 순서와
+  // 다를 수 있으므로). 응답을 반영하기 직전에 "그 사이 기간이 바뀌지 않았는지"를 이
+  // ref로 확인해서, 바뀌었으면 그 응답은 버린다.
+  const currentRangeRef = useRef('');
+  currentRangeRef.current = `${startMonth}|${endMonth}`;
+
   useEffect(() => {
     if (rangeInvalid) {
       setLoading(false);
@@ -48,10 +55,13 @@ export default function Maintenance() {
   }, [startMonth, endMonth, rangeInvalid]);
 
   const loadAnalysis = async () => {
+    const requestedRange = currentRangeRef.current;
     setLoading(true);
     try {
       const response = await aiApi.getMaintenanceAnalysis({ startMonth, endMonth });
-      setAnalysis(response.data.data);
+      // 응답을 반영하는 것만 막는다 — 로딩 상태까지 막아버리면 최신 요청이 없는 한
+      // 화면이 계속 로딩 중으로 멈춰버린다.
+      if (currentRangeRef.current === requestedRange) setAnalysis(response.data.data);
     } catch (error) {
       console.error('분석 로드 실패:', error);
     } finally {
@@ -60,13 +70,18 @@ export default function Maintenance() {
   };
 
   const handleLoadAiAnalysis = async () => {
+    const requestedRange = currentRangeRef.current;
     setLoadingAiAnalysis(true);
     try {
       const response = await aiApi.getMaintenanceAnalysis({ startMonth, endMonth, includeAi: true });
-      setAiAnalysis(response.data.data?.aiAnalysis || 'AI 분석 결과를 가져오지 못했습니다.');
+      // 응답을 반영하는 것만 막는다 — 로딩 상태까지 막아버리면 버튼이 "분석 중..."에서
+      // 영원히 멈춰버린다(그 사이 최신 기간에 대해 다시 누른 요청도 없다면).
+      if (currentRangeRef.current === requestedRange) {
+        setAiAnalysis(response.data.data?.aiAnalysis || 'AI 분석 결과를 가져오지 못했습니다.');
+      }
     } catch (error) {
       console.error('AI 분석 로드 실패:', error);
-      setAiAnalysis('AI 분석 중 오류가 발생했습니다.');
+      if (currentRangeRef.current === requestedRange) setAiAnalysis('AI 분석 중 오류가 발생했습니다.');
     } finally {
       setLoadingAiAnalysis(false);
     }
@@ -175,6 +190,7 @@ export default function Maintenance() {
                 <select
                   value={startYear}
                   onChange={(e) => setStartYear(e.target.value)}
+                  disabled={loadingAiAnalysis}
                   className="input py-1 text-sm w-auto"
                 >
                   <option value="">년도</option>
@@ -183,6 +199,7 @@ export default function Maintenance() {
                 <select
                   value={startMonthNum}
                   onChange={(e) => setStartMonthNum(e.target.value)}
+                  disabled={loadingAiAnalysis}
                   className="input py-1 text-sm w-auto"
                 >
                   <option value="">월</option>
@@ -192,6 +209,7 @@ export default function Maintenance() {
                 <select
                   value={endYear}
                   onChange={(e) => setEndYear(e.target.value)}
+                  disabled={loadingAiAnalysis}
                   className="input py-1 text-sm w-auto"
                 >
                   <option value="">년도</option>
@@ -200,13 +218,14 @@ export default function Maintenance() {
                 <select
                   value={endMonthNum}
                   onChange={(e) => setEndMonthNum(e.target.value)}
+                  disabled={loadingAiAnalysis}
                   className="input py-1 text-sm w-auto"
                 >
                   <option value="">월</option>
                   {MONTH_OPTIONS.map((m) => <option key={m} value={m}>{m}월</option>)}
                 </select>
                 {(startMonth || endMonth) && (
-                  <button onClick={resetRange} className="btn btn-secondary py-1 px-2 text-xs">전체 기간</button>
+                  <button onClick={resetRange} disabled={loadingAiAnalysis} className="btn btn-secondary py-1 px-2 text-xs">전체 기간</button>
                 )}
               </div>
             </div>

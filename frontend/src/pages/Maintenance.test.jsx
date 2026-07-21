@@ -92,6 +92,56 @@ describe('Maintenance', () => {
     await waitFor(() => expect(screen.getByText("'HDD 오류' 발생 자산")).toBeInTheDocument());
   });
 
+  it('shows the AI analysis text after clicking the analyze button', async () => {
+    const user = userEvent.setup();
+    aiApi.getMaintenanceAnalysis.mockImplementation((params = {}) => {
+      if (params.includeAi) {
+        return Promise.resolve({ data: { data: { aiAnalysis: '반복 고장 자산이 발견되었습니다.' } } });
+      }
+      return Promise.resolve({ data: { data: ANALYSIS } });
+    });
+
+    renderPage();
+    await waitFor(() => expect(screen.getByText('AI 유지보수 분석')).toBeInTheDocument());
+
+    await user.click(screen.getByText('AI 분석하기'));
+
+    await waitFor(() => expect(screen.getByText('반복 고장 자산이 발견되었습니다.')).toBeInTheDocument());
+  });
+
+  it('disables the period controls while an AI analysis request is in flight', async () => {
+    // AI 분석은 실제 토큰을 쓰는 호출이라, 응답이 오기 전에 기간을 바꿔서 그 결과를
+    // 버리게 되면 이미 쓴 토큰이 낭비된다. 그러니 애초에 기간을 못 바꾸게 막아서
+    // "선택한 기간과 다른 AI 분석 결과가 나오는" 레이스 자체가 발생하지 않게 한다.
+    const user = userEvent.setup();
+    let resolveAiCall;
+    const aiCallPromise = new Promise((resolve) => {
+      resolveAiCall = resolve;
+    });
+
+    aiApi.getMaintenanceAnalysis.mockImplementation((params = {}) => {
+      if (params.includeAi) return aiCallPromise;
+      return Promise.resolve({ data: { data: ANALYSIS } });
+    });
+
+    renderPage();
+    await waitFor(() => expect(screen.getByText('AI 유지보수 분석')).toBeInTheDocument());
+
+    await user.click(screen.getByText('AI 분석하기'));
+    expect(screen.getByText('분석 중...')).toBeInTheDocument();
+
+    const [startYearSelect, startMonthSelect, endYearSelect, endMonthSelect] = screen.getAllByRole('combobox');
+    expect(startYearSelect).toBeDisabled();
+    expect(startMonthSelect).toBeDisabled();
+    expect(endYearSelect).toBeDisabled();
+    expect(endMonthSelect).toBeDisabled();
+
+    resolveAiCall({ data: { data: { aiAnalysis: '분석 결과입니다.' } } });
+
+    await waitFor(() => expect(screen.getByText('분석 결과입니다.')).toBeInTheDocument());
+    expect(screen.getAllByRole('combobox')[0]).not.toBeDisabled();
+  });
+
   it('shows a validation message when the end month is before the start month', async () => {
     renderPage();
     await waitFor(() => expect(screen.getByText('AI 유지보수 분석')).toBeInTheDocument());
