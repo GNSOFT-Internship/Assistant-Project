@@ -106,8 +106,27 @@ _ANSWER_SCHEMA = {
                 "minPrice/maxPrice와 함께 쓰일 때 정확도를 위해 반드시 채운다."
             ),
         },
+        "keyword": {
+            "type": ["string", "null"],
+            "description": (
+                "'노트북', '프린터', 'CCTV'처럼 카테고리보다 더 구체적인 특정 제품/자산명 조건이 "
+                "있으면 그 키워드(자산명에서 부분 일치), 없으면 null. 카테고리 자체를 묻는 질문이면 "
+                "category만 쓰고 keyword는 null로 둔다."
+            ),
+        },
+        "minUsedYears": {
+            "type": ["integer", "null"],
+            "description": "'3년 이상 사용한'처럼 최소 사용기간(년) 조건이 있으면 그 값, 없으면 null.",
+        },
+        "maxUsedYears": {
+            "type": ["integer", "null"],
+            "description": "'2년 이하로 사용한'처럼 최대 사용기간(년) 조건이 있으면 그 값, 없으면 null.",
+        },
     },
-    "required": ["answer", "relevantAssetIds", "hasData", "hasFilter", "minPrice", "maxPrice", "category"],
+    "required": [
+        "answer", "relevantAssetIds", "hasData", "hasFilter", "minPrice", "maxPrice", "category",
+        "keyword", "minUsedYears", "maxUsedYears",
+    ],
     "additionalProperties": False,
 }
 
@@ -123,7 +142,10 @@ _SYSTEM_PROMPT = (
     "질문에 구매가 관련 이상/이하 조건이 있으면 minPrice/maxPrice에 원 단위 금액으로, 카테고리 "
     "조건이 있으면 category에도 반드시 채워 넣는다 (relevantAssetIds만으로 가격/카테고리 비교를 "
     "직접 판단하지 말 것 — 실제 비교는 별도 로직이 정확히 수행하므로, 여기서는 조건 자체를 "
-    "정확히 추출하면 된다)."
+    "정확히 추출하면 된다). '노트북', '프린터'처럼 카테고리보다 구체적인 제품 조건이 있으면 "
+    "keyword에도 반드시 채워 넣는다 (예: '노트북'을 category='IT 장비'로만 넓게 잡지 말고 "
+    "keyword='노트북'도 함께 채운다). 사용기간 이상/이하 조건이 있으면 minUsedYears/maxUsedYears에도 "
+    "정확히 채운다."
 )
 
 
@@ -151,6 +173,9 @@ def answer_question(db: Session, question: str) -> dict:
     min_price = result.get("minPrice")
     max_price = result.get("maxPrice")
     category = result.get("category")
+    keyword = result.get("keyword")
+    min_used_years = result.get("minUsedYears")
+    max_used_years = result.get("maxUsedYears")
     if category:
         # "노트북"처럼 카테고리가 아니라 제품명/키워드를 category에 잘못 채워 넣는 경우,
         # 실제 DB 카테고리 값과 무관한 문자열로 재필터링하면 원래 맞았던 relevantAssetIds
@@ -158,15 +183,23 @@ def answer_question(db: Session, question: str) -> dict:
         real_categories = {a.category for a in all_assets if a.category}
         if not any(category.lower() in c.lower() for c in real_categories):
             category = None
-    if has_filter and (min_price is not None or max_price is not None or category):
-        # 가격/카테고리 비교는 LLM이 텍스트만 보고 직접 판단하면 계산 실수(예: 카테고리 조건을
-        # 놓치거나 가격을 잘못 비교해 자기모순적 답변)가 나올 수 있으므로, 조건 자체만 LLM에게서
-        # 받고 실제 비교는 코드에서 전체 자산을 대상으로 확정적으로 재계산한다.
+    has_recomputable_condition = (
+        min_price is not None or max_price is not None or category or keyword
+        or min_used_years is not None or max_used_years is not None
+    )
+    if has_filter and has_recomputable_condition:
+        # 가격/카테고리/제품 키워드/사용기간 비교는 LLM이 텍스트만 보고 직접 판단하면 계산
+        # 실수(예: "노트북"을 "IT 장비" 전체로 넓게 해석)가 나올 수 있으므로, 조건 자체만
+        # LLM에게서 받고 실제 비교는 코드에서 전체 자산을 대상으로 확정적으로 재계산한다.
+        today = date.today()
         relevant_assets = [
             a for a in all_assets
             if (min_price is None or float(a.purchase_price) >= min_price)
             and (max_price is None or float(a.purchase_price) <= max_price)
             and (not category or category.lower() in (a.category or "").lower())
+            and (not keyword or keyword.lower() in (a.asset_name or "").lower())
+            and (min_used_years is None or calc_used_years(a.purchase_date, today) >= min_used_years)
+            and (max_used_years is None or calc_used_years(a.purchase_date, today) <= max_used_years)
         ]
         answer = (
             f"조건에 맞는 자산은 총 {len(relevant_assets)}건입니다."
