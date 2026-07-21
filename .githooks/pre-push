@@ -16,7 +16,18 @@ set -e
 # Ubuntu에 별도로 구성해둔 Python 3.12 가상환경(/tmp/venv312)으로 돌린다.
 echo "[pre-push] 백엔드 테스트 실행 중 (WSL)..."
 REPO_DIR_WIN="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-REPO_DIR_WSL="/mnt/$(echo "${REPO_DIR_WIN}" | sed -E 's#^/([a-zA-Z])/#\1/#; s#^([a-zA-Z])/#\L\1/#')"
+REPO_DIR_WIN="${REPO_DIR_WIN//\\//}"  # 혹시 모를 백슬래시를 슬래시로
+if [[ "${REPO_DIR_WIN}" =~ ^([A-Za-z]):/(.*)$ ]]; then
+  # 네이티브 Windows 스타일 경로 (예: D:/Project-Git/Assistant-Project)
+  drive="${BASH_REMATCH[1],,}"
+  REPO_DIR_WSL="/mnt/${drive}/${BASH_REMATCH[2]}"
+elif [[ "${REPO_DIR_WIN}" =~ ^/([A-Za-z])/(.*)$ ]]; then
+  # MSYS(Git Bash) 스타일 경로 (예: /d/Project-Git/Assistant-Project)
+  drive="${BASH_REMATCH[1],,}"
+  REPO_DIR_WSL="/mnt/${drive}/${BASH_REMATCH[2]}"
+else
+  REPO_DIR_WSL="${REPO_DIR_WIN}"
+fi
 wsl -d Ubuntu -- bash -lc "cd '${REPO_DIR_WSL}/backend-py' && /tmp/venv312/bin/python -m pytest tests/ -q"
 
 echo "[pre-push] 프론트엔드 테스트 실행 중..."
