@@ -151,6 +151,13 @@ def answer_question(db: Session, question: str) -> dict:
     min_price = result.get("minPrice")
     max_price = result.get("maxPrice")
     category = result.get("category")
+    if category:
+        # "노트북"처럼 카테고리가 아니라 제품명/키워드를 category에 잘못 채워 넣는 경우,
+        # 실제 DB 카테고리 값과 무관한 문자열로 재필터링하면 원래 맞았던 relevantAssetIds
+        # 결과까지 "없음"으로 덮어써버린다. 실제 존재하는 카테고리와 매치될 때만 신뢰한다.
+        real_categories = {a.category for a in all_assets if a.category}
+        if not any(category.lower() in c.lower() for c in real_categories):
+            category = None
     if has_filter and (min_price is not None or max_price is not None or category):
         # 가격/카테고리 비교는 LLM이 텍스트만 보고 직접 판단하면 계산 실수(예: 카테고리 조건을
         # 놓치거나 가격을 잘못 비교해 자기모순적 답변)가 나올 수 있으므로, 조건 자체만 LLM에게서

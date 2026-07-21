@@ -90,6 +90,40 @@ def test_price_filter_is_recomputed_by_code_even_if_llm_picks_wrong_assets(clien
     assert "1건" in data["answer"]
 
 
+def test_category_field_ignored_when_it_does_not_match_any_real_category(client, admin_headers, monkeypatch):
+    """LLM이 '노트북'처럼 실제 카테고리(예: 'IT 장비')가 아니라 제품명/키워드를 category에
+    잘못 채워 넣으면, 그 값으로 재필터링해 원래 맞았던 relevantAssetIds 결과를 "없음"으로
+    덮어써버리는 회귀를 막는다. category가 실제 DB 카테고리와 무관하면 무시하고 LLM이
+    고른 relevantAssetIds를 그대로 신뢰해야 한다."""
+    laptop = client.post(
+        "/api/assets",
+        json={**IT_ASSET, "assetCode": "TEST-QNA-LAPTOP", "purchaseDate": "2018-01-01"},
+        headers=admin_headers,
+    ).json()["data"]
+
+    from app import qna_logic
+
+    monkeypatch.setattr(qna_logic.llm, "is_configured", lambda: True)
+    monkeypatch.setattr(
+        qna_logic.llm,
+        "ask_json",
+        lambda *args, **kwargs: {
+            "answer": "3년 이상 사용한 노트북은 1건입니다.",
+            "relevantAssetIds": [laptop["id"]],
+            "hasData": True,
+            "hasFilter": True,
+            "minPrice": None,
+            "maxPrice": None,
+            "category": "노트북",  # 실제 카테고리는 "IT 장비"이지 "노트북"이 아니다.
+        },
+    )
+
+    data = _ask(client, admin_headers, "3년 이상 사용한 노트북 보여줘")
+    codes = {a["assetCode"] for a in data["assets"]}
+    assert codes == {"TEST-QNA-LAPTOP"}
+    assert "없습니다" not in data["answer"]
+
+
 def test_price_filter_combined_with_category_excludes_other_categories(client, admin_headers, monkeypatch):
     """가격 조건과 카테고리 조건이 함께 걸린 질문("100만원 이하인 IT 장비")에서, 가격만
     코드로 재계산하고 카테고리 조건을 놓치면 IT가 아닌 저가 자산까지 섞여 나오는 회귀를 막는다."""
