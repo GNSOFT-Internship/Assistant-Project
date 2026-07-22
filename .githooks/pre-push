@@ -13,7 +13,9 @@ set -e
 
 # 이 PC의 Windows용 Python은 Windows Defender Application Control(WDAC)이
 # numpy(pandas 의존성)의 컴파일된 DLL 실행을 차단해서 쓸 수 없다. 대신 WSL
-# Ubuntu에 별도로 구성해둔 Python 3.12 가상환경(/tmp/venv312)으로 돌린다.
+# Ubuntu에 별도로 구성해둔 Python 3.12 가상환경으로 돌린다. /tmp가 아니라
+# 홈 디렉터리(~/venv312)에 둔 이유는, WSL이 재시작되면 /tmp가 비워져서
+# 가상환경을 매번 다시 만들어야 했기 때문이다.
 echo "[pre-push] 백엔드 테스트 실행 중 (WSL)..."
 REPO_DIR_WIN="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 REPO_DIR_WIN="${REPO_DIR_WIN//\\//}"  # 혹시 모를 백슬래시를 슬래시로
@@ -28,7 +30,7 @@ elif [[ "${REPO_DIR_WIN}" =~ ^/([A-Za-z])/(.*)$ ]]; then
 else
   REPO_DIR_WSL="${REPO_DIR_WIN}"
 fi
-wsl -d Ubuntu -- bash -lc "cd '${REPO_DIR_WSL}/backend-py' && /tmp/venv312/bin/python -m pytest tests/ -q"
+wsl -d Ubuntu -- bash -lc "cd '${REPO_DIR_WSL}/backend-py' && ~/venv312/bin/python -m pytest tests/ -q"
 
 echo "[pre-push] 프론트엔드 테스트 실행 중..."
 (cd frontend && npx vitest run)
