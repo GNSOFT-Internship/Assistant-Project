@@ -27,6 +27,10 @@ export default function Reports() {
     }
   };
 
+  // handleLoadAiSummary는 응답이 오면 "현재" report 상태에 병합하므로(setReport(prev => ...)),
+  // 요청이 떠 있는 동안 연/월이 바뀌면 예전 기간의 AI 요약이 새 기간의 통계 위에 잘못
+  // 덮어써질 수 있다. AI 호출은 토큰 비용이 들어서 응답을 받은 뒤 버리는 것보다, 요청이
+  // 진행되는 동안 연/월 선택 자체를 막아 애초에 바뀔 수 없게 한다.
   const loadPreview = React.useCallback(async () => {
     setLoading(true);
     try {
@@ -96,6 +100,7 @@ export default function Reports() {
               id="report-year"
               value={year}
               onChange={(e) => handleYearChange(Number(e.target.value))}
+              disabled={loadingAiSummary}
               className="border rounded px-2 py-1 text-sm"
             >
               {YEAR_OPTIONS.map((y) => (
@@ -106,6 +111,7 @@ export default function Reports() {
               id="report-month"
               value={month}
               onChange={(e) => setMonth(Number(e.target.value))}
+              disabled={loadingAiSummary}
               className="border rounded px-2 py-1 text-sm"
             >
               {MONTH_OPTIONS.map((m) => (
@@ -114,7 +120,7 @@ export default function Reports() {
                 </option>
               ))}
             </select>
-            <button onClick={loadPreview} className="btn btn-secondary flex items-center gap-2" disabled={loading}>
+            <button onClick={loadPreview} className="btn btn-secondary flex items-center gap-2" disabled={loading || loadingAiSummary}>
               <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
               새로고침
             </button>

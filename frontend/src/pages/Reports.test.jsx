@@ -74,6 +74,37 @@ describe('Reports', () => {
     expect(reportApi.getNarrative).toHaveBeenCalledWith(expect.objectContaining({ totalAssets: 25 }));
   });
 
+  it('disables the year/month selects while an AI summary request is in flight', async () => {
+    // handleLoadAiSummary는 응답이 오면 "현재" report 상태에 병합한다(setReport(prev => ...)).
+    // 요청이 떠 있는 동안 연/월을 바꿀 수 있으면, 늦게 도착한 예전 기간의 AI 요약이 새
+    // 기간의 통계 위에 잘못 덮어써진다(실제로 유지보수 분석 페이지에서 발생했던 것과
+    // 같은 종류의 레이스). AI 호출은 토큰 비용이 드니 응답을 버리는 대신 애초에
+    // 연/월을 못 바꾸게 막아야 한다.
+    const user = userEvent.setup();
+    let resolveAiCall;
+    const aiCallPromise = new Promise((resolve) => {
+      resolveAiCall = resolve;
+    });
+    reportApi.getNarrative.mockReturnValue(aiCallPromise);
+
+    renderPage();
+    await waitFor(() => expect(screen.getByText('AI 요약 보기')).toBeInTheDocument());
+
+    await user.click(screen.getByText('AI 요약 보기'));
+    expect(screen.getByText('생성 중...')).toBeInTheDocument();
+
+    expect(screen.getByLabelText('보고 대상')).toBeDisabled();
+    expect(document.getElementById('report-month')).toBeDisabled();
+    expect(screen.getByText('새로고침')).toBeDisabled();
+
+    resolveAiCall({
+      data: { data: { executiveSummary: '요약입니다.', keyIssues: ['문제1'], recommendations: ['권장1'] } },
+    });
+
+    await waitFor(() => expect(screen.getByText('요약입니다.')).toBeInTheDocument());
+    expect(screen.getByLabelText('보고 대상')).not.toBeDisabled();
+  });
+
   it('triggers a PDF download when the download button is clicked', async () => {
     const user = userEvent.setup();
     reportApi.downloadPdf.mockResolvedValue({ data: new Blob(['%PDF'], { type: 'application/pdf' }) });
