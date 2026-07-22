@@ -144,7 +144,7 @@ export default function Layout() {
   return (
     <div className="min-h-screen bg-slate-50">
       <nav className="sticky top-0 z-30 bg-white/70 backdrop-blur-md border-b border-slate-100">
-        <div className="max-w-7xl mx-auto px-4">
+        <div className="max-w-7xl 2xl:max-w-[1680px] mx-auto px-4">
           <div className="flex justify-between h-16">
             <div className="flex items-center min-w-0 flex-1">
               <div className="flex-shrink-0 flex items-center gap-2">
@@ -222,7 +222,7 @@ export default function Layout() {
           </div>
         </div>
       </nav>
-      <main className="max-w-7xl mx-auto py-6 px-4">
+      <main className="max-w-7xl 2xl:max-w-[1680px] mx-auto py-6 px-4">
         <Outlet />
       </main>
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} navItems={menuItems} />
