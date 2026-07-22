@@ -264,10 +264,10 @@ export default function Maintenance() {
           <div className="border rounded-lg p-4">
             <h3 className="font-semibold mb-4">월별 비용 추이</h3>
             <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={costData}>
+              <BarChart data={costData} margin={{ left: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" />
-                <YAxis tickFormatter={(value) => value.toLocaleString()} />
+                <YAxis width={80} tick={{ fontSize: 12 }} tickFormatter={(value) => value.toLocaleString()} />
                 <Tooltip
                   formatter={(value) => [`${value.toLocaleString()}원`, '유지보수 비용']}
                 />
