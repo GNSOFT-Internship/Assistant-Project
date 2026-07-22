@@ -119,17 +119,32 @@ def seed_data():
         print("Generating 150 realistic assets...")
         assets = []
         asset_count = 150
-        
+
         # 카테고리 골고루 분배 생성
         categories = list(TEMPLATES.keys())
-        
+        # 자산번호만 보고도 카테고리를 알 수 있도록 카테고리별 접두사 + 그 카테고리
+        # 안에서의 순번을 붙인다 (scratch_rename_asset_codes_by_category.py와 동일한 체계).
+        prefix_by_category = {
+            "IT 장비": "IT",
+            "사무기기": "OFF",
+            "설비": "FAC",
+            "전기설비": "ELEC",
+            "안전설비": "SAFE",
+            "보안장비": "SEC",
+            "가구": "FUR",
+            "측정장비": "MEAS",
+        }
+        code_counters = {}
+
         for i in range(1, asset_count + 1):
             category = categories[(i - 1) % len(categories)]
             template_list = TEMPLATES[category]
             name, base_price, useful_life = random.choice(template_list)
-            
+
             asset_name = name
-            asset_code = f"ASSET-{i:03d}"
+            prefix = prefix_by_category[category]
+            code_counters[prefix] = code_counters.get(prefix, 0) + 1
+            asset_code = f"{prefix}-{code_counters[prefix]:03d}"
             location = random.choice(LOCATIONS)
             responsible = f"{random.choice(['김', '이', '박', '최', '정', '강'])}{random.choice(['민수', '영희', '철수', '동현', '서연', '준우', '혜진'])}"
             
