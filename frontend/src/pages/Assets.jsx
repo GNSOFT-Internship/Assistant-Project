@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { assetApi, fileApi } from '../services/api';
 import {
-  Plus, Edit, Trash2, Eye, ChevronLeft, ChevronRight, Download, Upload, ArrowUp, ArrowDown, ArrowUpDown,
+  Plus, Edit, Trash2, ChevronLeft, ChevronRight, Download, Upload, ArrowUp, ArrowDown, ArrowUpDown,
   FileText, CheckCircle, XCircle, Loader, Play,
 } from 'lucide-react';
 import { AssetStatusBadge, FileStatusBadge } from '../components/StatusBadge';
@@ -454,7 +454,7 @@ export default function Assets() {
         <div className="flex flex-col sm:flex-row gap-4 mb-4">
           <input
             type="text"
-            placeholder="자산명/자산번호 검색..."
+            placeholder="자산명 검색..."
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             className="input flex-1"
@@ -483,9 +483,6 @@ export default function Assets() {
                 <th className="table-cell cursor-pointer select-none" onClick={() => handleSort('assetName')}>
                   <span className="flex items-center gap-1">자산명 <SortIcon column="assetName" /></span>
                 </th>
-                <th className="table-cell cursor-pointer select-none" onClick={() => handleSort('assetCode')}>
-                  <span className="flex items-center gap-1">자산번호 <SortIcon column="assetCode" /></span>
-                </th>
                 <th className="table-cell">카테고리</th>
                 <th className="table-cell">위치</th>
                 <th className="table-cell cursor-pointer select-none" onClick={() => handleSort('purchaseDate')}>
@@ -508,7 +505,6 @@ export default function Assets() {
                   onClick={() => navigate(`/assets/${asset.id}`)}
                 >
                   <td className="table-cell font-medium">{asset.assetName}</td>
-                  <td className="table-cell">{asset.assetCode}</td>
                   <td className="table-cell">{asset.category}</td>
                   <td className="table-cell">{asset.location}</td>
                   <td className="table-cell">{asset.purchaseDate?.split('T')[0]}</td>
@@ -517,12 +513,6 @@ export default function Assets() {
                     <AssetStatusBadge status={asset.status} />
                   </td>
                   <td className="table-cell" onClick={(e) => e.stopPropagation()}>
-                    <button
-                      onClick={() => navigate(`/assets/${asset.id}`)}
-                      className="p-2 hover:bg-gray-100 rounded"
-                    >
-                      <Eye size={16} />
-                    </button>
                     {isAdmin && (
                       <>
                         <button

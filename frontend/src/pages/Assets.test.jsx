@@ -123,8 +123,8 @@ describe('Assets', () => {
     await waitFor(() => expect(screen.getByText('노트북 Dell Latitude 5520')).toBeInTheDocument());
 
     const editButtons = document.querySelectorAll('tbody tr td:last-child button');
-    // eye, edit, delete 순서 중 두 번째가 수정 버튼
-    await user.click(editButtons[1]);
+    // edit, delete 순서 중 첫 번째가 수정 버튼
+    await user.click(editButtons[0]);
 
     expect(screen.getByRole('heading', { name: '자산 수정' })).toBeInTheDocument();
     expect(screen.getByDisplayValue('노트북 Dell Latitude 5520')).toBeInTheDocument();
@@ -137,7 +137,7 @@ describe('Assets', () => {
     await waitFor(() => expect(screen.getByText('노트북 Dell Latitude 5520')).toBeInTheDocument());
 
     const deleteButtons = document.querySelectorAll('tbody tr td:last-child button');
-    await user.click(deleteButtons[2]);
+    await user.click(deleteButtons[1]);
 
     expect(screen.getByText('정말 삭제하시겠습니까?')).toBeInTheDocument();
     await user.click(screen.getByText('취소'));
@@ -153,7 +153,7 @@ describe('Assets', () => {
     await waitFor(() => expect(screen.getByText('노트북 Dell Latitude 5520')).toBeInTheDocument());
 
     const deleteButtons = document.querySelectorAll('tbody tr td:last-child button');
-    await user.click(deleteButtons[2]);
+    await user.click(deleteButtons[1]);
     await user.click(screen.getByText('삭제'));
 
     await waitFor(() => expect(assetApi.delete).toHaveBeenCalledWith(1));
