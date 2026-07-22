@@ -3,7 +3,7 @@ import { Link, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   LayoutDashboard, Package, Wrench, Lightbulb, MessageSquare,
-  Upload, FileText, LogOut, Wallet, ChevronLeft, ChevronRight, ScrollText, Search, Keyboard
+  FileText, LogOut, Wallet, ChevronLeft, ChevronRight, ScrollText, Search, Keyboard
 } from 'lucide-react';
 import CommandPalette from './CommandPalette';
 import ShortcutRecorderModal from './ShortcutRecorderModal';
@@ -123,7 +123,6 @@ export default function Layout() {
     { path: '/maintenance', label: '유지보수 분석', icon: Wrench },
     { path: '/recommendations', label: '교체 추천', icon: Lightbulb },
     { path: '/qa', label: 'AI 어시스턴트', icon: MessageSquare },
-    { path: '/files', label: '파일 업로드', icon: Upload },
     { path: '/reports', label: '보고서', icon: FileText },
     { path: '/budget', label: '예산 관리', icon: Wallet },
     ...(user?.role === 'ADMIN' ? [{ path: '/audit-log', label: '감사 로그', icon: ScrollText }] : []),

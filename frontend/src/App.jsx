@@ -13,7 +13,6 @@ const AssetDetail = lazy(() => import('./pages/AssetDetail'));
 const Maintenance = lazy(() => import('./pages/Maintenance'));
 const Recommendations = lazy(() => import('./pages/Recommendations'));
 const AiAssistant = lazy(() => import('./pages/AiAssistant'));
-const FileUpload = lazy(() => import('./pages/FileUpload'));
 const Reports = lazy(() => import('./pages/Reports'));
 const Budget = lazy(() => import('./pages/Budget'));
 const AuditLog = lazy(() => import('./pages/AuditLog'));
@@ -98,14 +97,8 @@ function App() {
                       </Suspense>
                     }
                   />
-                  <Route
-                    path="files"
-                    element={
-                      <Suspense fallback={null}>
-                        <FileUpload />
-                      </Suspense>
-                    }
-                  />
+                  {/* 파일 업로드 기능은 자산 관리 페이지로 합쳐졌다. 예전 링크/북마크는 그쪽으로 보낸다. */}
+                  <Route path="files" element={<Navigate to="/assets" replace />} />
                   <Route
                     path="reports"
                     element={
