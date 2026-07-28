@@ -49,11 +49,6 @@ export const assetApi = {
   getAll: (params) => api.get('/assets', { params }),
   getCategories: () => api.get('/assets/categories'),
   exportExcel: (params) => api.get('/assets/export', { params, responseType: 'blob' }),
-  importExcel: (file) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    return api.post('/assets/import', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-  },
   getById: (id) => api.get(`/assets/${id}`),
   create: (data) => api.post('/assets', data),
   update: (id, data) => api.put(`/assets/${id}`, data),

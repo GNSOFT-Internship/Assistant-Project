@@ -309,26 +309,14 @@ _IMPORT_COLUMN_MAP = {
 _IMPORT_REQUIRED_COLUMNS = {"자산번호", "자산명", "카테고리", "구매일", "구매가", "내용연수(년)"}
 
 
-@router.post("/import")
-def import_assets_excel(
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(auth.require_admin),
-):
-    """엑셀 내보내기(/export)와 같은 컬럼 형식으로 자산을 대량 등록한다.
-    행 단위로 검증해서 실패한 행은 건너뛰고, 성공한 행까지는 그대로 반영한다."""
-    try:
-        # 업로드 전체를 bytes로 읽어 BytesIO에 복사하는 대신, pandas가 파일 객체를
-        # 직접 받아 스트리밍하도록 한다 (MemoryMax 제한 하에서 큰 엑셀도 안전하게 처리).
-        df = pd.read_excel(file.file)
-    except Exception:
-        raise HTTPException(status_code=400, detail="엑셀 파일을 읽을 수 없습니다. xlsx 형식을 확인해주세요.")
-
+def parse_asset_import_rows(df) -> tuple[list[dict], list[dict]]:
+    """자산 등록용 엑셀 DataFrame을 행 단위로 검증한다 (DB에 쓰지 않음).
+    반환값: (검증된 자산 payload 목록, 실패한 행의 오류 목록)"""
     missing = _IMPORT_REQUIRED_COLUMNS - set(df.columns)
     if missing:
-        raise HTTPException(status_code=400, detail=f"필수 컬럼이 없습니다: {', '.join(sorted(missing))}")
+        raise ValueError(f"필수 컬럼이 없습니다: {', '.join(sorted(missing))}")
 
-    created = 0
+    valid_rows: list[dict] = []
     errors: list[dict] = []
 
     for idx, row in df.iterrows():
@@ -358,6 +346,18 @@ def import_assets_excel(
             errors.append({"row": excel_row_no, "error": str(e)})
             continue
 
+        valid_rows.append({"row": excel_row_no, "assetRequest": asset_req.model_dump()})
+
+    return valid_rows, errors
+
+
+def create_assets_from_rows(db: Session, rows: list[dict], changed_by: Optional[str]) -> tuple[int, list[dict]]:
+    """parse_asset_import_rows가 검증해둔 행들을 실제로 DB에 등록한다."""
+    created = 0
+    errors: list[dict] = []
+
+    for item in rows:
+        asset_req = schemas.AssetRequest(**item["assetRequest"])
         asset = models.Asset(
             asset_name=asset_req.assetName,
             asset_code=asset_req.assetCode,
@@ -375,15 +375,41 @@ def import_assets_excel(
             db.flush()
         except IntegrityError:
             db.rollback()
-            errors.append({"row": excel_row_no, "error": f"자산번호 '{asset_req.assetCode}'가 이미 존재합니다."})
+            errors.append({"row": item["row"], "error": f"자산번호 '{asset_req.assetCode}'가 이미 존재합니다."})
             continue
 
         _log_change(
-            db, asset, models.AuditAction.CREATE, current_user.get("username"),
+            db, asset, models.AuditAction.CREATE, changed_by,
             {field: {"old": None, "new": _field_value(asset, field)} for field, _ in _TRACKED_FIELDS},
         )
         db.commit()
         created += 1
+
+    return created, errors
+
+
+@router.post("/import")
+def import_assets_excel(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(auth.require_admin),
+):
+    """엑셀 내보내기(/export)와 같은 컬럼 형식으로 자산을 대량 등록한다.
+    행 단위로 검증해서 실패한 행은 건너뛰고, 성공한 행까지는 그대로 반영한다."""
+    try:
+        # 업로드 전체를 bytes로 읽어 BytesIO에 복사하는 대신, pandas가 파일 객체를
+        # 직접 받아 스트리밍하도록 한다 (MemoryMax 제한 하에서 큰 엑셀도 안전하게 처리).
+        df = pd.read_excel(file.file)
+    except Exception:
+        raise HTTPException(status_code=400, detail="엑셀 파일을 읽을 수 없습니다. xlsx 형식을 확인해주세요.")
+
+    try:
+        valid_rows, parse_errors = parse_asset_import_rows(df)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    created, create_errors = create_assets_from_rows(db, valid_rows, current_user.get("username"))
+    errors = parse_errors + create_errors
 
     message = f"{created}건 등록 완료"
     if errors:

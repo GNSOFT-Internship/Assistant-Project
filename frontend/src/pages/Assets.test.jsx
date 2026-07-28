@@ -16,7 +16,6 @@ vi.mock('../services/api', () => ({
     update: vi.fn(),
     delete: vi.fn(),
     exportExcel: vi.fn(),
-    importExcel: vi.fn(),
   },
   fileApi: {
     getAll: vi.fn(),
@@ -98,7 +97,6 @@ describe('Assets', () => {
     renderPage();
     await waitFor(() => expect(screen.getByText('노트북 Dell Latitude 5520')).toBeInTheDocument());
     expect(screen.queryByText('자산 등록')).not.toBeInTheDocument();
-    expect(screen.queryByText('엑셀 일괄 등록')).not.toBeInTheDocument();
     expect(screen.getByText('파일 업로드는 관리자만 가능합니다. 아래에서 업로드된 파일을 조회할 수 있습니다.')).toBeInTheDocument();
     expect(screen.queryByText('컴퓨터에서 파일 선택')).not.toBeInTheDocument();
   });
@@ -159,7 +157,7 @@ describe('Assets', () => {
     await waitFor(() => expect(assetApi.delete).toHaveBeenCalledWith(1));
   });
 
-  describe('유지보수 내역서/견적서 업로드 (구 파일 업로드 페이지)', () => {
+  describe('파일 업로드 (자산 등록 / 유지보수 내역서·견적서, 자동 판별)', () => {
     it('shows an empty state when there are no uploaded files', async () => {
       seedAdmin();
       renderPage();
@@ -208,6 +206,35 @@ describe('Assets', () => {
       renderPage();
       await waitFor(() => expect(screen.getByText('적용됨')).toBeInTheDocument());
       expect(screen.getByText('적용 취소')).toBeInTheDocument();
+    });
+
+    it('renders auto-detected asset-registration files without an unapply button', async () => {
+      seedAdmin();
+      fileApi.getAll.mockResolvedValue({
+        data: {
+          data: [{
+            id: 2,
+            originalFilename: 'sample_asset_registration.xlsx',
+            fileType: 'EXCEL',
+            status: 'COMPLETED',
+            applied: true,
+            extractedSummary: {
+              kind: 'asset_registration',
+              totalRows: 1,
+              validRows: 1,
+              errorRowCount: 0,
+              errorRows: [],
+              duplicateAssetCodes: [],
+              rows: [{ row: 2, assetCode: 'FILEREG-001', assetName: '테스트 자산', category: 'IT 장비', assetExists: false }],
+              appliedAssetCount: 1,
+            },
+          }],
+        },
+      });
+      renderPage();
+      await waitFor(() => expect(screen.getByText('sample_asset_registration.xlsx')).toBeInTheDocument());
+      expect(screen.getByText('등록된 자산: 1건')).toBeInTheDocument();
+      expect(screen.queryByText('적용 취소')).not.toBeInTheDocument();
     });
   });
 });

@@ -191,3 +191,82 @@ def test_unknown_file_id_returns_404_not_400(client, admin_headers):
     assert client.post("/api/files/999999/apply", headers=admin_headers).status_code == 404
     assert client.post("/api/files/999999/unapply", headers=admin_headers).status_code == 404
     assert client.delete("/api/files/999999", headers=admin_headers).status_code == 404
+
+
+def _make_asset_registration_excel(rows):
+    import pandas as pd
+
+    df = pd.DataFrame(rows)
+    buffer = io.BytesIO()
+    df.to_excel(buffer, index=False)
+    buffer.seek(0)
+    return buffer
+
+
+def _upload_asset_registration_excel(client, admin_headers, rows):
+    buffer = _make_asset_registration_excel(rows)
+    files = {"file": ("assets.xlsx", buffer, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
+    resp = client.post("/api/files/upload", files=files, headers=admin_headers)
+    assert resp.status_code == 200, resp.text
+    return resp.json()["data"]["id"]
+
+
+def test_asset_registration_excel_is_auto_detected_and_applies_creates_assets(client, admin_headers):
+    """자산 등록용 엑셀(자산번호/자산명/... 컬럼)을 업로드하면, 유지보수 내역 업로드와
+    같은 드롭존/파이프라인을 타면서도 컬럼 구성만 보고 자동으로 자산 등록으로 처리돼야 한다."""
+    file_id = _upload_asset_registration_excel(client, admin_headers, [
+        {
+            "자산번호": "FILEREG-001", "자산명": "업로드 자동판별 프린터", "카테고리": "IT 장비",
+            "위치": "1층", "담당자": "홍길동", "구매일": "2022-01-15",
+            "구매가": 500000, "내용연수(년)": 5, "상태": "ACTIVE", "설명": None,
+        },
+    ])
+
+    process_resp = client.post(f"/api/files/{file_id}/process", headers=admin_headers)
+    assert process_resp.status_code == 200
+    summary = process_resp.json()["data"]["extractedSummary"]
+    assert summary["kind"] == "asset_registration"
+    assert summary["validRows"] == 1
+    assert summary["rows"][0]["assetCode"] == "FILEREG-001"
+    assert summary["rows"][0]["assetExists"] is False
+
+    apply_resp = client.post(f"/api/files/{file_id}/apply", headers=admin_headers)
+    assert apply_resp.status_code == 200
+    assert apply_resp.json()["data"]["extractedSummary"]["appliedAssetCount"] == 1
+
+    resp = client.get("/api/assets?search=FILEREG-001", headers=admin_headers)
+    codes = [i["assetCode"] for i in resp.json()["data"]["items"]]
+    assert "FILEREG-001" in codes
+
+
+def test_asset_registration_apply_skips_duplicate_asset_codes(client, admin_headers):
+    client.post("/api/assets", json={**ASSET_PAYLOAD, "assetCode": "FILEREG-DUP"}, headers=admin_headers)
+    file_id = _upload_asset_registration_excel(client, admin_headers, [
+        {
+            "자산번호": "FILEREG-DUP", "자산명": "중복 자산", "카테고리": "IT 장비",
+            "위치": "1층", "담당자": "홍길동", "구매일": "2022-01-15",
+            "구매가": 500000, "내용연수(년)": 5, "상태": "ACTIVE", "설명": None,
+        },
+    ])
+    client.post(f"/api/files/{file_id}/process", headers=admin_headers)
+
+    apply_resp = client.post(f"/api/files/{file_id}/apply", headers=admin_headers)
+    assert apply_resp.status_code == 200
+    assert apply_resp.json()["data"]["extractedSummary"]["appliedAssetCount"] == 0
+
+
+def test_asset_registration_unapply_is_rejected(client, admin_headers):
+    """등록된 자산은 다른 자산과 동일하게 취급돼야 하므로, 파일 적용 취소로 무더기
+    삭제되지 않게 명시적으로 막는다."""
+    file_id = _upload_asset_registration_excel(client, admin_headers, [
+        {
+            "자산번호": "FILEREG-002", "자산명": "적용취소 테스트", "카테고리": "IT 장비",
+            "위치": "1층", "담당자": "홍길동", "구매일": "2022-01-15",
+            "구매가": 500000, "내용연수(년)": 5, "상태": "ACTIVE", "설명": None,
+        },
+    ])
+    client.post(f"/api/files/{file_id}/process", headers=admin_headers)
+    client.post(f"/api/files/{file_id}/apply", headers=admin_headers)
+
+    unapply_resp = client.post(f"/api/files/{file_id}/unapply", headers=admin_headers)
+    assert unapply_resp.status_code == 400

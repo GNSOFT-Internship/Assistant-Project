@@ -5,7 +5,9 @@ import re
 import shutil
 import uuid
 from datetime import date, datetime
+from typing import Optional
 
+import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -13,7 +15,13 @@ from sqlalchemy.orm import Session
 from .. import auth, models
 from ..config import settings
 from ..database import get_db
-from .assets import _log_change, _maintenance_summary
+from .assets import (
+    _IMPORT_REQUIRED_COLUMNS,
+    _log_change,
+    _maintenance_summary,
+    create_assets_from_rows,
+    parse_asset_import_rows,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +73,26 @@ def file_to_response(f: models.FileUpload) -> dict:
                     "records": parsed.get("records", []),
                     "appliedRecordCount": parsed.get("appliedRecordCount"),
                 }
+            elif parsed.get("kind") == "asset_registration":
+                extracted_summary = {
+                    "kind": "asset_registration",
+                    "totalRows": parsed.get("totalRows"),
+                    "validRows": parsed.get("validRows"),
+                    "errorRowCount": len(parsed.get("errorRows", [])),
+                    "errorRows": parsed.get("errorRows", []),
+                    "duplicateAssetCodes": parsed.get("duplicateAssetCodes", []),
+                    "rows": [
+                        {
+                            "row": r["row"],
+                            "assetCode": r["assetRequest"]["assetCode"],
+                            "assetName": r["assetRequest"]["assetName"],
+                            "category": r["assetRequest"]["category"],
+                            "assetExists": r.get("assetExists", False),
+                        }
+                        for r in parsed.get("rows", [])
+                    ],
+                    "appliedAssetCount": parsed.get("appliedAssetCount"),
+                }
             elif parsed.get("kind") == "pdf_quote":
                 extracted_summary = {
                     "kind": "pdf_quote",
@@ -111,14 +139,25 @@ def _find_column(columns, aliases):
     return None
 
 
-def _parse_spreadsheet(file_path: str, file_type: models.FileType):
-    import pandas as pd
+def _detect_spreadsheet_kind(columns) -> Optional[str]:
+    """업로드된 엑셀/CSV가 '자산 등록'용인지 '유지보수 내역'용인지 컬럼 구성만 보고 판별한다.
+    자산 등록은 자산관리 페이지 상단의 엑셀 내보내기(/export)와 같은 형식(자산번호/자산명/...)을,
+    유지보수 내역은 자산코드+정비일 컬럼을 쓰기 때문에 컬럼명이 겹치지 않아 자동 판별이 가능하다."""
+    cols = {str(c).strip() for c in columns}
+    if _IMPORT_REQUIRED_COLUMNS <= cols:
+        return "asset_registration"
+    if _find_column(columns, COLUMN_ALIASES["asset_code"]) and _find_column(columns, COLUMN_ALIASES["maintenance_date"]):
+        return "maintenance_records"
+    return None
 
+
+def _read_spreadsheet_df(file_path: str, file_type: models.FileType, *, as_str: bool):
     if file_type == models.FileType.CSV:
-        df = pd.read_csv(file_path, dtype=str, keep_default_na=False)
-    else:
-        df = pd.read_excel(file_path, dtype=str, keep_default_na=False)
+        return pd.read_csv(file_path, dtype=str, keep_default_na=False) if as_str else pd.read_csv(file_path)
+    return pd.read_excel(file_path, dtype=str, keep_default_na=False) if as_str else pd.read_excel(file_path)
 
+
+def _parse_maintenance_rows(df):
     col_map = {}
     for field, aliases in COLUMN_ALIASES.items():
         found = _find_column(df.columns, aliases)
@@ -262,29 +301,67 @@ async def upload_file(
 def _process_file_task_logic(file_upload: models.FileUpload, db: Session):
     try:
         if file_upload.file_type in (models.FileType.EXCEL, models.FileType.CSV):
-            rows, errors = _parse_spreadsheet(file_upload.file_path, file_upload.file_type)
+            # 헤더만 먼저 훑어서 '자산 등록'용 엑셀인지 '유지보수 내역'용인지 판별한다.
+            # 두 형식은 컬럼 구성이 겹치지 않아(자산번호 vs 자산코드) 자동 판별이 가능하다.
+            header_df = _read_spreadsheet_df(file_upload.file_path, file_upload.file_type, as_str=True)
+            kind = _detect_spreadsheet_kind(header_df.columns)
 
-            asset_codes = {r["assetCode"] for r in rows}
-            existing_codes = set()
-            if asset_codes:
-                existing_codes = {
-                    a.asset_code
-                    for a in db.query(models.Asset.asset_code)
-                    .filter(models.Asset.asset_code.in_(asset_codes))
-                    .all()
+            if kind == "asset_registration":
+                # 자산 등록 파싱(assets.py)은 날짜/숫자를 pandas 기본 타입 추론으로 다루므로,
+                # 문자열로 강제 변환한 header_df가 아니라 원본 타입 그대로 다시 읽는다.
+                asset_df = _read_spreadsheet_df(file_upload.file_path, file_upload.file_type, as_str=False)
+                valid_rows, errors = parse_asset_import_rows(asset_df)
+
+                asset_codes = {r["assetRequest"]["assetCode"] for r in valid_rows}
+                existing_codes = set()
+                if asset_codes:
+                    existing_codes = {
+                        a.asset_code
+                        for a in db.query(models.Asset.asset_code)
+                        .filter(models.Asset.asset_code.in_(asset_codes))
+                        .all()
+                    }
+                for r in valid_rows:
+                    r["assetExists"] = r["assetRequest"]["assetCode"] in existing_codes
+
+                result = {
+                    "kind": "asset_registration",
+                    "filename": file_upload.original_filename,
+                    "totalRows": len(valid_rows) + len(errors),
+                    "validRows": len(valid_rows),
+                    "errorRows": errors,
+                    "duplicateAssetCodes": sorted({r["assetRequest"]["assetCode"] for r in valid_rows if r["assetExists"]}),
+                    "rows": valid_rows,
                 }
-            for r in rows:
-                r["assetExists"] = r["assetCode"] in existing_codes
+            elif kind == "maintenance_records":
+                rows, errors = _parse_maintenance_rows(header_df)
 
-            result = {
-                "kind": "maintenance_records",
-                "filename": file_upload.original_filename,
-                "totalRows": len(rows) + len(errors),
-                "validRows": len(rows),
-                "errorRows": errors,
-                "unmatchedAssetCodes": sorted({r["assetCode"] for r in rows if not r["assetExists"]}),
-                "records": rows,
-            }
+                asset_codes = {r["assetCode"] for r in rows}
+                existing_codes = set()
+                if asset_codes:
+                    existing_codes = {
+                        a.asset_code
+                        for a in db.query(models.Asset.asset_code)
+                        .filter(models.Asset.asset_code.in_(asset_codes))
+                        .all()
+                    }
+                for r in rows:
+                    r["assetExists"] = r["assetCode"] in existing_codes
+
+                result = {
+                    "kind": "maintenance_records",
+                    "filename": file_upload.original_filename,
+                    "totalRows": len(rows) + len(errors),
+                    "validRows": len(rows),
+                    "errorRows": errors,
+                    "unmatchedAssetCodes": sorted({r["assetCode"] for r in rows if not r["assetExists"]}),
+                    "records": rows,
+                }
+            else:
+                raise ValueError(
+                    "지원하지 않는 파일 형식입니다. 자산 등록용 엑셀(자산번호/자산명/카테고리/구매일/구매가/내용연수(년)) "
+                    "또는 유지보수 내역용 파일(자산코드/정비일)의 컬럼 구성을 확인해주세요."
+                )
         else:
             text = _parse_pdf(file_upload.file_path)
             quote = _parse_pdf_quote(text)
@@ -484,6 +561,17 @@ def batch_apply_files(
                 result["appliedMaintenanceRecordIds"] = created_ids
                 file_upload.extracted_data = json.dumps(result, ensure_ascii=False)
 
+            elif result.get("kind") == "asset_registration":
+                created_count, create_errors = create_assets_from_rows(db, result.get("rows", []), changed_by)
+                result["appliedAssetCount"] = created_count
+                result["applyErrors"] = create_errors
+                file_upload.extracted_data = json.dumps(result, ensure_ascii=False)
+                if create_errors:
+                    errors.append(
+                        f"{file_upload.original_filename}: {len(create_errors)}건 등록 실패 "
+                        f"({'; '.join(e['error'] for e in create_errors[:3])})"
+                    )
+
             elif result.get("kind") == "pdf_quote":
                 asset = assets_by_code.get(result["assetCode"]) if result.get("assetCode") else None
                 if asset is not None and result.get("totalAmount") is not None:
@@ -603,6 +691,11 @@ def apply_file(
         result["appliedRecordCount"] = created_count
         result["appliedMaintenanceRecordIds"] = created_ids
         file_upload.extracted_data = json.dumps(result, ensure_ascii=False)
+    elif result.get("kind") == "asset_registration":
+        created_count, create_errors = create_assets_from_rows(db, result.get("rows", []), changed_by)
+        result["appliedAssetCount"] = created_count
+        result["applyErrors"] = create_errors
+        file_upload.extracted_data = json.dumps(result, ensure_ascii=False)
     elif result.get("kind") == "pdf_quote":
         asset = None
         if result.get("assetCode"):
@@ -648,6 +741,10 @@ def apply_file(
     message = "File applied successfully"
     if result.get("kind") == "maintenance_records":
         message = f"유지보수 기록 {created_count}건이 등록되었습니다."
+    elif result.get("kind") == "asset_registration":
+        message = f"자산 {created_count}건이 등록되었습니다."
+        if result.get("applyErrors"):
+            message += f" ({len(result['applyErrors'])}건 실패: 이미 존재하는 자산번호)"
     elif result.get("kind") == "pdf_quote":
         message = (
             f"견적서 기반 유지보수 기록이 등록되었습니다." if created_count else
@@ -679,6 +776,15 @@ def unapply_file(
         result = json.loads(file_upload.extracted_data) if file_upload.extracted_data else {}
     except (TypeError, ValueError):
         result = {}
+
+    if result.get("kind") == "asset_registration":
+        # 등록된 자산은 다른 자산과 마찬가지로 유지보수 기록/감사로그가 쌓일 수 있으므로,
+        # 파일 적용 취소로 조용히 무더기 삭제하지 않는다. 되돌리려면 자산 목록에서
+        # 개별적으로 삭제해야 한다.
+        raise HTTPException(
+            status_code=400,
+            detail="자산 등록 파일은 적용 취소를 지원하지 않습니다. 등록된 자산은 자산 목록에서 개별적으로 삭제해주세요.",
+        )
 
     if "appliedMaintenanceRecordIds" not in result:
         # applied=True인데 되돌릴 기록 id 목록 자체가 없는 상태다. 정상적으로 적용됐다면

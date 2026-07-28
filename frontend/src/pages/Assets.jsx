@@ -33,14 +33,13 @@ export default function Assets() {
   const [sortOrder, setSortOrder] = useState('asc');
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
-  const [importing, setImporting] = useState(false);
-  const fileInputRef = useRef(null);
   const [showModal, setShowModal] = useState(false);
   const [editingAsset, setEditingAsset] = useState(null);
 
-  // 유지보수 내역서(엑셀)/견적서(PDF) 업로드 및 AI 분석 — 원래 별도 페이지였던
-  // "파일 업로드" 기능. 신규 자산 등록용 엑셀(위의 importing 상태)과는 별개로,
-  // 기존 자산에 유지보수 기록을 추가하는 기능이라 데이터 성격이 다르다.
+  // 신규 자산 등록용 엑셀과 기존 자산의 유지보수 내역서(엑셀)/견적서(PDF)는 원래
+  // 서로 다른 업로드 입구(상단 "엑셀 일괄 등록" 버튼 vs 이 드롭존)를 썼지만, 두 기능이
+  // 헷갈린다는 피드백에 따라 이 드롭존 하나로 합쳤다. 어떤 파일인지는 서버가 컬럼
+  // 구성을 보고 자동으로 판별한다(자산번호/자산명/... vs 자산코드/정비일).
   const [docFiles, setDocFiles] = useState([]);
   const [uploadingDocs, setUploadingDocs] = useState(false);
   const [applyingAllDocs, setApplyingAllDocs] = useState(false);
@@ -215,6 +214,7 @@ export default function Assets() {
       try {
         await fileApi.apply(id);
         loadDocFiles();
+        loadAssets();
       } catch (error) {
         console.error('적용 실패:', error);
         toast.error(error.response?.data?.detail || '파일 적용 실패');
@@ -239,6 +239,7 @@ export default function Assets() {
       await fileApi.batchApply(applicableIds);
       toast.success('일괄 적용이 완료되었습니다.');
       loadDocFiles();
+      loadAssets();
     } catch (error) {
       console.error('일괄 적용 실패:', error);
       toast.error('일괄 적용 중 오류가 발생했습니다.');
@@ -378,38 +379,6 @@ export default function Assets() {
     }
   };
 
-  const handleImportClick = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleImportFileChange = async (e) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
-
-    setImporting(true);
-    try {
-      const response = await assetApi.importExcel(file);
-      const { created, failed } = response.data.data;
-      let msg = `${created}건 등록 완료`;
-      if (failed.length > 0) {
-        const detail = failed.slice(0, 5).map((f) => `${f.row}행: ${f.error}`).join('\n');
-        msg += `\n${failed.length}건 실패\n${detail}${failed.length > 5 ? '\n...' : ''}`;
-      }
-      if (failed.length > 0) {
-        toast.error(msg, 8000);
-      } else {
-        toast.success(msg);
-      }
-      loadAssets();
-    } catch (error) {
-      console.error('엑셀 가져오기 실패:', error);
-      toast.error(error.response?.data?.detail || '엑셀 가져오기 중 오류가 발생했습니다.');
-    } finally {
-      setImporting(false);
-    }
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center flex-wrap gap-2">
@@ -423,28 +392,12 @@ export default function Assets() {
             <Download size={16} /> {exporting ? '내보내는 중...' : '엑셀 내보내기'}
           </button>
           {isAdmin && (
-            <>
-              <input
-                type="file"
-                ref={fileInputRef}
-                accept=".xlsx"
-                className="hidden"
-                onChange={handleImportFileChange}
-              />
-              <button
-                onClick={handleImportClick}
-                disabled={importing}
-                className="btn btn-secondary flex items-center gap-2"
-              >
-                <Upload size={16} /> {importing ? '가져오는 중...' : '엑셀 일괄 등록'}
-              </button>
-              <button
-                onClick={() => { resetForm(); setShowModal(true); }}
-                className="btn btn-primary flex items-center gap-2"
-              >
-                <Plus size={16} /> 자산 등록
-              </button>
-            </>
+            <button
+              onClick={() => { resetForm(); setShowModal(true); }}
+              className="btn btn-primary flex items-center gap-2"
+            >
+              <Plus size={16} /> 자산 등록
+            </button>
           )}
         </div>
       </div>
@@ -562,7 +515,7 @@ export default function Assets() {
       </div>
 
       <div className="card">
-        <h2 className="text-lg font-semibold mb-4">유지보수 내역서 / 견적서 업로드 (AI 분석)</h2>
+        <h2 className="text-lg font-semibold mb-4">파일 업로드 (자산 등록 / 유지보수 내역서 · 견적서, AI 분석)</h2>
 
         {isAdmin ? (
           <div
@@ -585,10 +538,10 @@ export default function Assets() {
 
             <Upload className={`mx-auto mb-4 transition-colors ${docDragActive ? "text-blue-500 animate-bounce" : "text-gray-400"}`} size={48} />
             <div className="text-gray-600 mb-2 font-medium">
-              유지보수 내역서(엑셀) 또는 견적서(PDF)들을 이곳에 마우스로 끌어다 놓으세요.
+              신규 자산 등록용 엑셀, 또는 기존 자산의 유지보수 내역서(엑셀)·견적서(PDF)를 이곳에 끌어다 놓으세요.
             </div>
             <div className="text-sm text-gray-400 mb-4">
-              동시 업로드 및 백그라운드 비동기 대량 배치 분석을 완벽하게 지원합니다.
+              파일 내용을 보고 자산 등록/유지보수 내역을 자동으로 구분합니다. 동시 업로드 및 백그라운드 비동기 대량 배치 분석을 지원합니다.
             </div>
             <button
               onClick={() => docFileInputRef.current?.click()}
@@ -708,7 +661,7 @@ export default function Assets() {
                           <CheckCircle size={14} /> 적용
                         </button>
                       )}
-                      {file.applied && (
+                      {file.applied && file.extractedSummary?.kind !== 'asset_registration' && (
                         <button
                           onClick={() => handleDocUnapply(file.id)}
                           disabled={docPendingIds.has(file.id)}
@@ -730,6 +683,71 @@ export default function Assets() {
                   {file.status === 'FAILED' && file.errorMessage && (
                     <div className="mt-2 text-sm text-red-600">
                       오류: {file.errorMessage}
+                    </div>
+                  )}
+
+                  {file.extractedSummary?.kind === 'asset_registration' && (
+                    <div className="mt-3 bg-gray-50 rounded p-3 text-sm space-y-1">
+                      <div>총 {file.extractedSummary.totalRows}행 중 유효 {file.extractedSummary.validRows}행, 오류 {file.extractedSummary.errorRowCount}행</div>
+                      {file.extractedSummary.duplicateAssetCodes?.length > 0 && (
+                        <div className="text-yellow-700">
+                          이미 존재하는 자산번호: {file.extractedSummary.duplicateAssetCodes.join(', ')}
+                        </div>
+                      )}
+                      {file.applied && (
+                        <div className="text-green-700 font-medium">
+                          등록된 자산: {file.extractedSummary.appliedAssetCount ?? 0}건
+                        </div>
+                      )}
+
+                      {file.extractedSummary.rows?.length > 0 && (
+                        <details className="mt-2">
+                          <summary className="text-gray-500 cursor-pointer">
+                            행별 미리보기 ({file.extractedSummary.rows.length}행)
+                          </summary>
+                          <div className="mt-2 overflow-x-auto">
+                            <table className="table text-xs">
+                              <thead className="table-header">
+                                <tr>
+                                  <th className="table-cell">행</th>
+                                  <th className="table-cell">자산번호</th>
+                                  <th className="table-cell">자산명</th>
+                                  <th className="table-cell">카테고리</th>
+                                  <th className="table-cell">중복여부</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {file.extractedSummary.rows.map((r) => (
+                                  <tr key={r.row} className={r.assetExists ? 'bg-yellow-50' : ''}>
+                                    <td className="table-cell">{r.row}</td>
+                                    <td className="table-cell">{r.assetCode}</td>
+                                    <td className="table-cell">{r.assetName}</td>
+                                    <td className="table-cell">{r.category}</td>
+                                    <td className="table-cell">
+                                      {r.assetExists
+                                        ? <span className="text-yellow-700">중복</span>
+                                        : <span className="text-green-700">신규</span>}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </details>
+                      )}
+
+                      {file.extractedSummary.errorRows?.length > 0 && (
+                        <details className="mt-2">
+                          <summary className="text-red-600 cursor-pointer">
+                            오류 행 ({file.extractedSummary.errorRows.length}행)
+                          </summary>
+                          <ul className="mt-1 list-disc list-inside text-red-600">
+                            {file.extractedSummary.errorRows.map((e, i) => (
+                              <li key={i}>{e.row}행: {e.error}</li>
+                            ))}
+                          </ul>
+                        </details>
+                      )}
                     </div>
                   )}
 
