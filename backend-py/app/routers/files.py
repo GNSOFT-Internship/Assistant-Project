@@ -47,7 +47,9 @@ MAINTENANCE_TYPE_MAP = {
 }
 
 COLUMN_ALIASES = {
-    "asset_code": ["자산코드", "asset_code", "assetCode"],
+    # "자산번호"가 자산 등록용 엑셀(/export, /import)과 같은 컬럼명이라 이제 표준이다.
+    # "자산코드"는 예전 유지보수 내역서 양식과의 호환을 위해 계속 인식만 해준다.
+    "asset_code": ["자산번호", "자산코드", "asset_code", "assetCode"],
     "maintenance_date": ["정비일", "정비일자", "maintenance_date"],
     "maintenance_type": ["정비유형", "유형", "maintenance_type"],
     "cost": ["비용", "정비비용", "cost"],
@@ -141,8 +143,9 @@ def _find_column(columns, aliases):
 
 def _detect_spreadsheet_kind(columns) -> Optional[str]:
     """업로드된 엑셀/CSV가 '자산 등록'용인지 '유지보수 내역'용인지 컬럼 구성만 보고 판별한다.
-    자산 등록은 자산관리 페이지 상단의 엑셀 내보내기(/export)와 같은 형식(자산번호/자산명/...)을,
-    유지보수 내역은 자산코드+정비일 컬럼을 쓰기 때문에 컬럼명이 겹치지 않아 자동 판별이 가능하다."""
+    두 형식 모두 자산을 가리키는 컬럼명은 "자산번호"로 통일돼 있어서, 자산 등록에만 있는
+    나머지 필수 컬럼(자산명/카테고리/구매일/구매가/내용연수(년))이 전부 있는지로 구분한다.
+    이 6개가 다 있으면 자산 등록, 아니고 자산번호+정비일만 있으면 유지보수 내역이다."""
     cols = {str(c).strip() for c in columns}
     if _IMPORT_REQUIRED_COLUMNS <= cols:
         return "asset_registration"
@@ -165,7 +168,7 @@ def _parse_maintenance_rows(df):
             col_map[field] = found
 
     if "asset_code" not in col_map or "maintenance_date" not in col_map:
-        raise ValueError("필수 컬럼(자산코드, 정비일)을 찾을 수 없습니다.")
+        raise ValueError("필수 컬럼(자산번호, 정비일)을 찾을 수 없습니다.")
 
     rows = []
     errors = []
@@ -174,7 +177,7 @@ def _parse_maintenance_rows(df):
         asset_code = str(row.get(col_map["asset_code"], "")).strip()
         maint_date_raw = str(row.get(col_map["maintenance_date"], "")).strip()
         if not asset_code or not maint_date_raw:
-            errors.append({"row": line_no, "reason": "자산코드 또는 정비일 누락"})
+            errors.append({"row": line_no, "reason": "자산번호 또는 정비일 누락"})
             continue
 
         try:
@@ -302,7 +305,8 @@ def _process_file_task_logic(file_upload: models.FileUpload, db: Session):
     try:
         if file_upload.file_type in (models.FileType.EXCEL, models.FileType.CSV):
             # 헤더만 먼저 훑어서 '자산 등록'용 엑셀인지 '유지보수 내역'용인지 판별한다.
-            # 두 형식은 컬럼 구성이 겹치지 않아(자산번호 vs 자산코드) 자동 판별이 가능하다.
+            # 두 형식 모두 "자산번호" 컬럼을 쓰지만, 자산 등록에만 있는 나머지 필수 컬럼
+            # (자산명/카테고리/구매일/구매가/내용연수(년)) 유무로 자동 판별이 가능하다.
             header_df = _read_spreadsheet_df(file_upload.file_path, file_upload.file_type, as_str=True)
             kind = _detect_spreadsheet_kind(header_df.columns)
 
@@ -360,7 +364,7 @@ def _process_file_task_logic(file_upload: models.FileUpload, db: Session):
             else:
                 raise ValueError(
                     "지원하지 않는 파일 형식입니다. 자산 등록용 엑셀(자산번호/자산명/카테고리/구매일/구매가/내용연수(년)) "
-                    "또는 유지보수 내역용 파일(자산코드/정비일)의 컬럼 구성을 확인해주세요."
+                    "또는 유지보수 내역용 파일(자산번호/정비일)의 컬럼 구성을 확인해주세요."
                 )
         else:
             text = _parse_pdf(file_upload.file_path)

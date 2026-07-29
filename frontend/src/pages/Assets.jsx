@@ -35,11 +35,13 @@ export default function Assets() {
   const [exporting, setExporting] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editingAsset, setEditingAsset] = useState(null);
+  const [showTemplateMenu, setShowTemplateMenu] = useState(false);
+  const templateMenuRef = useRef(null);
 
   // 신규 자산 등록용 엑셀과 기존 자산의 유지보수 내역서(엑셀)/견적서(PDF)는 원래
   // 서로 다른 업로드 입구(상단 "엑셀 일괄 등록" 버튼 vs 이 드롭존)를 썼지만, 두 기능이
   // 헷갈린다는 피드백에 따라 이 드롭존 하나로 합쳤다. 어떤 파일인지는 서버가 컬럼
-  // 구성을 보고 자동으로 판별한다(자산번호/자산명/... vs 자산코드/정비일).
+  // 구성을 보고 자동으로 판별한다(자산번호+자산명/카테고리/... vs 자산번호+정비일).
   const [docFiles, setDocFiles] = useState([]);
   const [uploadingDocs, setUploadingDocs] = useState(false);
   const [applyingAllDocs, setApplyingAllDocs] = useState(false);
@@ -111,6 +113,17 @@ export default function Assets() {
       .then((response) => setCategories(response.data.data || []))
       .catch((error) => console.error('카테고리 목록 로드 실패:', error));
   }, []);
+
+  useEffect(() => {
+    if (!showTemplateMenu) return;
+    const handleClickOutside = (e) => {
+      if (templateMenuRef.current && !templateMenuRef.current.contains(e.target)) {
+        setShowTemplateMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showTemplateMenu]);
 
   const withDocPending = async (id, fn) => {
     if (docPendingIds.has(id)) return;
@@ -409,6 +422,36 @@ export default function Assets() {
           >
             <Download size={16} /> {exporting ? '내보내는 중...' : '엑셀 내보내기'}
           </button>
+          {isAdmin && (
+            <div className="relative" ref={templateMenuRef}>
+              <button
+                onClick={() => setShowTemplateMenu((v) => !v)}
+                className="btn btn-secondary flex items-center gap-2"
+              >
+                <Download size={16} /> 예시 파일
+              </button>
+              {showTemplateMenu && (
+                <div className="absolute top-full mt-2 left-0 z-40 w-56 bg-white border border-gray-200 rounded-lg shadow-lg py-1">
+                  <a
+                    href="/templates/자산등록_예시.xlsx"
+                    download
+                    onClick={() => setShowTemplateMenu(false)}
+                    className="block px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                  >
+                    자산 등록 예시 엑셀
+                  </a>
+                  <a
+                    href="/templates/유지보수내역서_예시.xlsx"
+                    download
+                    onClick={() => setShowTemplateMenu(false)}
+                    className="block px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                  >
+                    유지보수 내역서 예시 엑셀
+                  </a>
+                </div>
+              )}
+            </div>
+          )}
           {isAdmin && (
             <button
               onClick={() => { resetForm(); setShowModal(true); }}
@@ -793,7 +836,7 @@ export default function Assets() {
                               <thead className="table-header">
                                 <tr>
                                   <th className="table-cell">행</th>
-                                  <th className="table-cell">자산코드</th>
+                                  <th className="table-cell">자산번호</th>
                                   <th className="table-cell">일치여부</th>
                                   <th className="table-cell">정비일</th>
                                   <th className="table-cell">유형</th>

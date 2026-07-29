@@ -270,3 +270,24 @@ def test_asset_registration_unapply_is_rejected(client, admin_headers):
 
     unapply_resp = client.post(f"/api/files/{file_id}/unapply", headers=admin_headers)
     assert unapply_resp.status_code == 400
+
+
+def test_maintenance_csv_recognizes_unified_asset_number_column(client, admin_headers):
+    """유지보수 내역서도 자산 등록용 엑셀과 같은 "자산번호" 컬럼명을 쓸 수 있어야 한다
+    (예전 "자산코드" 컬럼명도 하위 호환으로 계속 인식된다 — 위 CSV_CONTENT 테스트가 그걸 검증)."""
+    client.post("/api/assets", json=ASSET_PAYLOAD, headers=admin_headers)
+    csv_content = (
+        "자산번호,정비일,정비유형,비용,설명\n"
+        "TEST-FILE-001,2026-05-01,수리,30000,통일된 컬럼명 테스트\n"
+    )
+    files = {"file": ("unified_column.csv", io.BytesIO(csv_content.encode("utf-8")), "text/csv")}
+    upload_resp = client.post("/api/files/upload", files=files, headers=admin_headers)
+    assert upload_resp.status_code == 200, upload_resp.text
+    file_id = upload_resp.json()["data"]["id"]
+
+    process_resp = client.post(f"/api/files/{file_id}/process", headers=admin_headers)
+    assert process_resp.status_code == 200
+    summary = process_resp.json()["data"]["extractedSummary"]
+    assert summary["kind"] == "maintenance_records"
+    assert summary["validRows"] == 1
+    assert summary["records"][0]["assetExists"] is True

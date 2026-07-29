@@ -97,6 +97,7 @@ describe('Assets', () => {
     renderPage();
     await waitFor(() => expect(screen.getByText('노트북 Dell Latitude 5520')).toBeInTheDocument());
     expect(screen.queryByText('자산 등록')).not.toBeInTheDocument();
+    expect(screen.queryByText('예시 파일')).not.toBeInTheDocument();
     expect(screen.getByText('파일 업로드는 관리자만 가능합니다. 아래에서 업로드된 파일을 조회할 수 있습니다.')).toBeInTheDocument();
     expect(screen.queryByText('컴퓨터에서 파일 선택')).not.toBeInTheDocument();
   });
@@ -112,6 +113,19 @@ describe('Assets', () => {
 
     await user.click(screen.getByText('취소'));
     await waitFor(() => expect(screen.queryByRole('heading', { name: '자산 등록' })).not.toBeInTheDocument());
+  });
+
+  it('shows example-file download links for admins', async () => {
+    const user = userEvent.setup();
+    seedAdmin();
+    renderPage();
+    await waitFor(() => expect(screen.getByText('노트북 Dell Latitude 5520')).toBeInTheDocument());
+
+    await user.click(screen.getByText('예시 파일'));
+    const assetLink = screen.getByText('자산 등록 예시 엑셀').closest('a');
+    const maintLink = screen.getByText('유지보수 내역서 예시 엑셀').closest('a');
+    expect(assetLink).toHaveAttribute('href', '/templates/자산등록_예시.xlsx');
+    expect(maintLink).toHaveAttribute('href', '/templates/유지보수내역서_예시.xlsx');
   });
 
   it('opens the edit modal pre-filled with the asset being edited', async () => {
