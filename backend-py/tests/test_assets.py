@@ -312,6 +312,31 @@ def test_import_assets_excel_reports_errors_without_blocking_valid_rows(client, 
     assert "IMPORT-OK" in codes
 
 
+def test_import_assets_excel_validation_errors_are_korean(client, admin_headers):
+    """pydantic 원본 오류(영문 기술 메시지)를 그대로 노출하면 엑셀만 보는 사용자가
+    이해하기 어려우므로, 필드명과 사유를 한국어 문구로 바꿔서 반환해야 한다."""
+    buffer = _make_import_excel([
+        {
+            "자산번호": "IMPORT-BADPRICE", "자산명": "구매가 오류", "카테고리": "IT 장비",
+            "위치": "1층", "담당자": "홍길동", "구매일": "2022-01-15",
+            "구매가": 0, "내용연수(년)": 5, "상태": "ACTIVE", "설명": None,
+        },
+    ])
+
+    resp = client.post(
+        "/api/assets/import",
+        files={"file": ("assets.xlsx", buffer, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+        headers=admin_headers,
+    )
+    assert resp.status_code == 200, resp.text
+    data = resp.json()["data"]
+    assert data["created"] == 0
+    assert len(data["failed"]) == 1
+    error = data["failed"][0]["error"]
+    assert "validation error" not in error.lower()
+    assert "구매가" in error
+
+
 def test_import_assets_excel_requires_admin(client, user_headers):
     buffer = _make_import_excel([{
         "자산번호": "IMPORT-FORBIDDEN", "자산명": "권한 테스트", "카테고리": "IT 장비",

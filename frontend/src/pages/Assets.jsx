@@ -724,10 +724,10 @@ export default function Assets() {
                         </div>
                       )}
 
-                      {file.extractedSummary.rows?.length > 0 && (
+                      {(file.extractedSummary.rows?.length > 0 || file.extractedSummary.errorRows?.length > 0) && (
                         <details className="mt-2">
                           <summary className="text-gray-500 cursor-pointer">
-                            행별 미리보기 ({file.extractedSummary.rows.length}행)
+                            행별 미리보기 ({(file.extractedSummary.rows?.length || 0) + (file.extractedSummary.errorRows?.length || 0)}행, 오류 {file.extractedSummary.errorRows?.length || 0}행 포함)
                           </summary>
                           <div className="mt-2 overflow-x-auto">
                             <table className="table text-xs">
@@ -737,39 +737,33 @@ export default function Assets() {
                                   <th className="table-cell">자산번호</th>
                                   <th className="table-cell">자산명</th>
                                   <th className="table-cell">카테고리</th>
-                                  <th className="table-cell">중복여부</th>
+                                  <th className="table-cell">상태</th>
+                                  <th className="table-cell">비고</th>
                                 </tr>
                               </thead>
                               <tbody>
-                                {file.extractedSummary.rows.map((r) => (
-                                  <tr key={r.row} className={r.assetExists ? 'bg-yellow-50' : ''}>
+                                {[
+                                  ...(file.extractedSummary.rows || []).map((r) => ({ ...r, isError: false })),
+                                  ...(file.extractedSummary.errorRows || []).map((e) => ({ ...e, isError: true })),
+                                ].sort((a, b) => a.row - b.row).map((r) => (
+                                  <tr key={r.row} className={r.isError ? 'bg-red-50' : (r.assetExists ? 'bg-yellow-50' : '')}>
                                     <td className="table-cell">{r.row}</td>
-                                    <td className="table-cell">{r.assetCode}</td>
-                                    <td className="table-cell">{r.assetName}</td>
-                                    <td className="table-cell">{r.category}</td>
+                                    <td className="table-cell">{r.isError ? '-' : r.assetCode}</td>
+                                    <td className="table-cell">{r.isError ? '-' : r.assetName}</td>
+                                    <td className="table-cell">{r.isError ? '-' : r.category}</td>
                                     <td className="table-cell">
-                                      {r.assetExists
-                                        ? <span className="text-yellow-700">중복</span>
-                                        : <span className="text-green-700">신규</span>}
+                                      {r.isError
+                                        ? <span className="text-red-700">오류</span>
+                                        : r.assetExists
+                                          ? <span className="text-yellow-700">중복</span>
+                                          : <span className="text-green-700">신규</span>}
                                     </td>
+                                    <td className="table-cell text-red-700">{r.isError ? r.error : ''}</td>
                                   </tr>
                                 ))}
                               </tbody>
                             </table>
                           </div>
-                        </details>
-                      )}
-
-                      {file.extractedSummary.errorRows?.length > 0 && (
-                        <details className="mt-2">
-                          <summary className="text-red-600 cursor-pointer">
-                            오류 행 ({file.extractedSummary.errorRows.length}행)
-                          </summary>
-                          <ul className="mt-1 list-disc list-inside text-red-600">
-                            {file.extractedSummary.errorRows.map((e, i) => (
-                              <li key={i}>{e.row}행: {e.error}</li>
-                            ))}
-                          </ul>
                         </details>
                       )}
                     </div>
@@ -789,10 +783,10 @@ export default function Assets() {
                         </div>
                       )}
 
-                      {file.extractedSummary.records?.length > 0 && (
+                      {(file.extractedSummary.records?.length > 0 || file.extractedSummary.errorRows?.length > 0) && (
                         <details className="mt-2">
                           <summary className="text-gray-500 cursor-pointer">
-                            행별 미리보기 ({file.extractedSummary.records.length}행)
+                            행별 미리보기 ({(file.extractedSummary.records?.length || 0) + (file.extractedSummary.errorRows?.length || 0)}행, 오류 {file.extractedSummary.errorRows?.length || 0}행 포함)
                           </summary>
                           <div className="mt-2 overflow-x-auto">
                             <table className="table text-xs">
@@ -805,40 +799,34 @@ export default function Assets() {
                                   <th className="table-cell">유형</th>
                                   <th className="table-cell">비용</th>
                                   <th className="table-cell">설명</th>
+                                  <th className="table-cell">비고</th>
                                 </tr>
                               </thead>
                               <tbody>
-                                {file.extractedSummary.records.map((r) => (
-                                  <tr key={r.row} className={r.assetExists ? '' : 'bg-yellow-50'}>
+                                {[
+                                  ...(file.extractedSummary.records || []).map((r) => ({ ...r, isError: false })),
+                                  ...(file.extractedSummary.errorRows || []).map((e) => ({ ...e, isError: true })),
+                                ].sort((a, b) => a.row - b.row).map((r) => (
+                                  <tr key={r.row} className={r.isError ? 'bg-red-50' : (r.assetExists ? '' : 'bg-yellow-50')}>
                                     <td className="table-cell">{r.row}</td>
-                                    <td className="table-cell">{r.assetCode}</td>
+                                    <td className="table-cell">{r.isError ? '-' : r.assetCode}</td>
                                     <td className="table-cell">
-                                      {r.assetExists
-                                        ? <span className="text-green-700">일치</span>
-                                        : <span className="text-yellow-700">불일치</span>}
+                                      {r.isError
+                                        ? <span className="text-red-700">오류</span>
+                                        : r.assetExists
+                                          ? <span className="text-green-700">일치</span>
+                                          : <span className="text-yellow-700">불일치</span>}
                                     </td>
-                                    <td className="table-cell">{r.maintenanceDate}</td>
-                                    <td className="table-cell">{r.maintenanceType}</td>
-                                    <td className="table-cell">{r.cost != null ? r.cost.toLocaleString() : '-'}</td>
-                                    <td className="table-cell">{r.description || '-'}</td>
+                                    <td className="table-cell">{r.isError ? '-' : r.maintenanceDate}</td>
+                                    <td className="table-cell">{r.isError ? '-' : r.maintenanceType}</td>
+                                    <td className="table-cell">{r.isError ? '-' : (r.cost != null ? r.cost.toLocaleString() : '-')}</td>
+                                    <td className="table-cell">{r.isError ? '-' : (r.description || '-')}</td>
+                                    <td className="table-cell text-red-700">{r.isError ? r.reason : ''}</td>
                                   </tr>
                                 ))}
                               </tbody>
                             </table>
                           </div>
-                        </details>
-                      )}
-
-                      {file.extractedSummary.errorRows?.length > 0 && (
-                        <details className="mt-2">
-                          <summary className="text-red-600 cursor-pointer">
-                            오류 행 ({file.extractedSummary.errorRows.length}행)
-                          </summary>
-                          <ul className="mt-1 list-disc list-inside text-red-600">
-                            {file.extractedSummary.errorRows.map((e, i) => (
-                              <li key={i}>{e.row}행: {e.reason}</li>
-                            ))}
-                          </ul>
                         </details>
                       )}
                     </div>

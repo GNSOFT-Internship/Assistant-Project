@@ -294,5 +294,71 @@ describe('Assets', () => {
       expect(screen.getByText('적용 가능한 항목 없음')).toBeInTheDocument();
       expect(screen.queryByText('적용')).not.toBeInTheDocument();
     });
+
+    it('shows asset-registration error rows highlighted in red inside the row preview', async () => {
+      const user = userEvent.setup();
+      seedAdmin();
+      fileApi.getAll.mockResolvedValue({
+        data: {
+          data: [{
+            id: 5,
+            originalFilename: 'has_errors.xlsx',
+            fileType: 'EXCEL',
+            status: 'COMPLETED',
+            applied: false,
+            extractedSummary: {
+              kind: 'asset_registration',
+              totalRows: 2,
+              validRows: 1,
+              errorRowCount: 1,
+              errorRows: [{ row: 3, error: '자산명: 값이 비어있습니다.' }],
+              duplicateAssetCodes: [],
+              rows: [{ row: 2, assetCode: 'IT-950', assetName: '정상 자산', category: 'IT 장비', assetExists: false }],
+              appliedAssetCount: null,
+            },
+          }],
+        },
+      });
+      renderPage();
+      await waitFor(() => expect(screen.getByText('has_errors.xlsx')).toBeInTheDocument());
+
+      await user.click(screen.getByText(/행별 미리보기/));
+      expect(screen.getByText('자산명: 값이 비어있습니다.')).toBeInTheDocument();
+      const errorRow = screen.getByText('자산명: 값이 비어있습니다.').closest('tr');
+      expect(errorRow.className).toContain('bg-red-50');
+    });
+
+    it('shows maintenance error rows highlighted in red inside the row preview', async () => {
+      const user = userEvent.setup();
+      seedAdmin();
+      fileApi.getAll.mockResolvedValue({
+        data: {
+          data: [{
+            id: 6,
+            originalFilename: 'maint_has_errors.xlsx',
+            fileType: 'EXCEL',
+            status: 'COMPLETED',
+            applied: false,
+            extractedSummary: {
+              kind: 'maintenance_records',
+              totalRows: 2,
+              validRows: 1,
+              errorRowCount: 1,
+              errorRows: [{ row: 3, reason: '정비일 형식 오류: 미정' }],
+              unmatchedAssetCodes: [],
+              records: [{ row: 2, assetCode: 'IT-001', assetExists: true, maintenanceDate: '2026-06-10', maintenanceType: 'REPAIR', cost: 45000, description: '정상' }],
+              appliedRecordCount: null,
+            },
+          }],
+        },
+      });
+      renderPage();
+      await waitFor(() => expect(screen.getByText('maint_has_errors.xlsx')).toBeInTheDocument());
+
+      await user.click(screen.getByText(/행별 미리보기/));
+      expect(screen.getByText('정비일 형식 오류: 미정')).toBeInTheDocument();
+      const errorRow = screen.getByText('정비일 형식 오류: 미정').closest('tr');
+      expect(errorRow.className).toContain('bg-red-50');
+    });
   });
 });

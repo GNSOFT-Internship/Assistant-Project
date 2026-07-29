@@ -307,6 +307,35 @@ _IMPORT_COLUMN_MAP = {
     "설명": "description",
 }
 _IMPORT_REQUIRED_COLUMNS = {"자산번호", "자산명", "카테고리", "구매일", "구매가", "내용연수(년)"}
+_IMPORT_FIELD_KOR = {eng: kor for kor, eng in _IMPORT_COLUMN_MAP.items()}
+
+
+def _friendly_pydantic_error_message(err: dict) -> str:
+    """pydantic ValidationError의 필드별 오류를 유지보수 내역서 오류 메시지와 톤을 맞춘
+    한국어 문구로 바꾼다 (원본은 'Input should be greater than 0 [type=greater_than, ...]'
+    같은 영문 기술 메시지라 엑셀만 보는 사용자에게는 그대로 보여주기 어렵다)."""
+    err_type = err.get("type")
+    if err_type == "value_error":
+        # 커스텀 validator가 던진 메시지는 이미 한국어이므로 "Value error, " 접두사만 제거한다.
+        return str(err.get("msg", "")).split("Value error, ", 1)[-1]
+    if err_type == "greater_than":
+        return "0보다 큰 값을 입력해주세요."
+    if err_type in ("missing", "string_type"):
+        return "값이 비어있습니다."
+    if err_type in ("int_type", "int_parsing"):
+        return "정수 형식이 아닙니다."
+    if err_type in ("float_type", "float_parsing"):
+        return "숫자 형식이 아닙니다."
+    return str(err.get("msg", "값이 올바르지 않습니다."))
+
+
+def _format_asset_validation_error(exc: ValidationError) -> str:
+    parts = []
+    for err in exc.errors():
+        field = err["loc"][0] if err.get("loc") else ""
+        field_kor = _IMPORT_FIELD_KOR.get(field, field)
+        parts.append(f"{field_kor}: {_friendly_pydantic_error_message(err)}")
+    return "; ".join(parts) if parts else "값이 올바르지 않습니다."
 
 
 def parse_asset_import_rows(df) -> tuple[list[dict], list[dict]]:
@@ -342,8 +371,11 @@ def parse_asset_import_rows(df) -> tuple[list[dict], list[dict]]:
             if not payload.get("status"):
                 payload["status"] = "ACTIVE"
             asset_req = schemas.AssetRequest(**payload)
-        except (ValidationError, TypeError, ValueError) as e:
-            errors.append({"row": excel_row_no, "error": str(e)})
+        except ValidationError as e:
+            errors.append({"row": excel_row_no, "error": _format_asset_validation_error(e)})
+            continue
+        except (TypeError, ValueError):
+            errors.append({"row": excel_row_no, "error": "구매가 또는 내용연수(년) 값이 숫자 형식이 아닙니다."})
             continue
 
         valid_rows.append({"row": excel_row_no, "assetRequest": asset_req.model_dump()})
