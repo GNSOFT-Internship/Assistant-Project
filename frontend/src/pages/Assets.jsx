@@ -198,6 +198,24 @@ export default function Assets() {
     }
   };
 
+  // 분석은 끝났지만(COMPLETED) 실제로 적용했을 때 아무것도 생성되지 않는 파일(자산 등록은
+  // 전부 이미 존재하는 자산번호, 유지보수/견적서는 일치하는 자산이 하나도 없는 경우)은
+  // 적용 버튼을 눌러도 0건으로 끝나 헷갈리므로, 애초에 적용 버튼을 숨긴다.
+  const fileHasApplicableRows = (file) => {
+    const summary = file.extractedSummary;
+    if (!summary) return true;
+    if (summary.kind === 'asset_registration') {
+      return (summary.rows || []).some((r) => !r.assetExists);
+    }
+    if (summary.kind === 'maintenance_records') {
+      return (summary.records || []).some((r) => r.assetExists);
+    }
+    if (summary.kind === 'pdf_quote') {
+      return Boolean(summary.assetCode && summary.assetExists && summary.totalAmount != null);
+    }
+    return true;
+  };
+
   const handleDocProcess = (id) => withDocPending(id, async () => {
     try {
       await fileApi.process(id);
@@ -224,7 +242,7 @@ export default function Assets() {
 
   const handleDocBatchApply = async () => {
     const applicableIds = docFiles
-      .filter((f) => f.status === 'COMPLETED' && !f.applied)
+      .filter((f) => f.status === 'COMPLETED' && !f.applied && fileHasApplicableRows(f))
       .map((f) => f.id);
 
     if (applicableIds.length === 0) {
@@ -601,7 +619,7 @@ export default function Assets() {
               <div className="flex gap-2">
                 <button
                   onClick={handleDocBatchApply}
-                  disabled={applyingAllDocs || docFiles.filter(f => f.status === 'COMPLETED' && !f.applied).length === 0}
+                  disabled={applyingAllDocs || docFiles.filter(f => f.status === 'COMPLETED' && !f.applied && fileHasApplicableRows(f)).length === 0}
                   className="btn btn-primary text-xs py-1.5 px-3 flex items-center gap-1"
                 >
                   <CheckCircle size={14} />
@@ -653,13 +671,19 @@ export default function Assets() {
                         </button>
                       )}
                       {file.status === 'COMPLETED' && !file.applied && (
-                        <button
-                          onClick={() => handleDocApply(file.id)}
-                          disabled={docPendingIds.has(file.id)}
-                          className="btn btn-primary flex items-center gap-2"
-                        >
-                          <CheckCircle size={14} /> 적용
-                        </button>
+                        fileHasApplicableRows(file) ? (
+                          <button
+                            onClick={() => handleDocApply(file.id)}
+                            disabled={docPendingIds.has(file.id)}
+                            className="btn btn-primary flex items-center gap-2"
+                          >
+                            <CheckCircle size={14} /> 적용
+                          </button>
+                        ) : (
+                          <span className="text-sm text-gray-500 flex items-center gap-1 px-1">
+                            <XCircle size={14} /> 적용 가능한 항목 없음
+                          </span>
+                        )
                       )}
                       {file.applied && file.extractedSummary?.kind !== 'asset_registration' && (
                         <button

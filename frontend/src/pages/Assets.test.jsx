@@ -236,5 +236,63 @@ describe('Assets', () => {
       expect(screen.getByText('등록된 자산: 1건')).toBeInTheDocument();
       expect(screen.queryByText('적용 취소')).not.toBeInTheDocument();
     });
+
+    it('hides the apply button when every asset-registration row is a duplicate', async () => {
+      seedAdmin();
+      fileApi.getAll.mockResolvedValue({
+        data: {
+          data: [{
+            id: 3,
+            originalFilename: 'all_duplicates.xlsx',
+            fileType: 'EXCEL',
+            status: 'COMPLETED',
+            applied: false,
+            extractedSummary: {
+              kind: 'asset_registration',
+              totalRows: 1,
+              validRows: 1,
+              errorRowCount: 0,
+              errorRows: [],
+              duplicateAssetCodes: ['IT-001'],
+              rows: [{ row: 2, assetCode: 'IT-001', assetName: '중복 자산', category: 'IT 장비', assetExists: true }],
+              appliedAssetCount: null,
+            },
+          }],
+        },
+      });
+      renderPage();
+      await waitFor(() => expect(screen.getByText('all_duplicates.xlsx')).toBeInTheDocument());
+      expect(screen.getByText('적용 가능한 항목 없음')).toBeInTheDocument();
+      expect(screen.queryByText('적용')).not.toBeInTheDocument();
+    });
+
+    it('hides the apply button when every maintenance row has an unmatched asset code', async () => {
+      seedAdmin();
+      fileApi.getAll.mockResolvedValue({
+        data: {
+          data: [{
+            id: 4,
+            originalFilename: 'all_unmatched.xlsx',
+            fileType: 'EXCEL',
+            status: 'COMPLETED',
+            applied: false,
+            extractedSummary: {
+              kind: 'maintenance_records',
+              totalRows: 1,
+              validRows: 1,
+              errorRowCount: 0,
+              errorRows: [],
+              unmatchedAssetCodes: ['ZZZ-999'],
+              records: [{ row: 2, assetCode: 'ZZZ-999', assetExists: false, maintenanceDate: '2026-06-22', maintenanceType: 'REPAIR', cost: 30000, description: null }],
+              appliedRecordCount: null,
+            },
+          }],
+        },
+      });
+      renderPage();
+      await waitFor(() => expect(screen.getByText('all_unmatched.xlsx')).toBeInTheDocument());
+      expect(screen.getByText('적용 가능한 항목 없음')).toBeInTheDocument();
+      expect(screen.queryByText('적용')).not.toBeInTheDocument();
+    });
   });
 });
