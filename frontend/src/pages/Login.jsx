@@ -34,9 +34,13 @@ export default function Login() {
 
       <div className="relative max-w-md w-full z-10">
         <div className="flex flex-col items-center mb-8">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white flex items-center justify-center font-extrabold text-2xl shadow-md shadow-blue-500/20 mb-4">
-            자
-          </div>
+
+         <img
+            src="/model.png"
+            alt="자산관리 로고"
+            className="w-[200px] h-[200px] object-contain"
+/>
+
           <h2 className="text-center text-3xl font-extrabold text-slate-900 tracking-tight">
             자산관리 의사결정 시스템
           </h2>
