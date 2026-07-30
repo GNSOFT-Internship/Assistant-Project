@@ -57,10 +57,13 @@ jobs:
     steps:
       - name: Deploy via SSH (git pull + 변경분 재시작/재빌드 + 배포 후 검증)
         env:
-          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          # GitHub Secrets 입력창에 PEM 키를 그대로 붙여넣으면 줄바꿈이 깨져서
+          # ssh가 키 형식을 못 읽는 경우가 있었다. base64로 한 줄 문자열로 인코딩해
+          # 저장하고 여기서 다시 디코딩하면 줄바꿈 손상 문제가 원천적으로 없다.
+          SSH_KEY_B64: ${{ secrets.DEPLOY_SSH_KEY }}
         run: |
           mkdir -p ~/.ssh
-          echo "$SSH_KEY" > ~/.ssh/deploy_key
+          echo "$SSH_KEY_B64" | base64 -d > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key rocky@217.142.238.104 \
             "sudo bash /root/Assistant-Project/deploy.sh"
