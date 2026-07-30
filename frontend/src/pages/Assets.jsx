@@ -431,7 +431,7 @@ export default function Assets() {
                 <Download size={16} /> 예시 파일
               </button>
               {showTemplateMenu && (
-                <div className="absolute top-full mt-2 left-0 z-40 w-72 bg-white border border-gray-200 rounded-lg shadow-lg py-1">
+                <div className="absolute top-full mt-2 right-0 z-40 w-72 max-w-[calc(100vw-2rem)] bg-white border border-gray-200 rounded-lg shadow-lg py-1">
                   <a
                     href="/templates/자산등록_예시.xlsx"
                     download
