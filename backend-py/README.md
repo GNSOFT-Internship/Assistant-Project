@@ -55,4 +55,6 @@
   `backend-py` 변경 시마다 자동 실행됩니다.
 - 프로덕션 배포는 저장소 루트의 `deploy.sh`를 서버에서 실행합니다 (`sudo bash /root/Assistant-Project/deploy.sh`).
   git pull 이후 바뀐 부분(`backend-py/`, `frontend/`)만 골라 재시작/재빌드하고, 배포 후 사이트·API 응답과
-  백엔드 트레이스백 여부까지 자동으로 확인합니다.
+  백엔드 트레이스백 여부까지 자동으로 확인합니다. `main`에 push되면 `.github/workflows/deploy.yml`이
+  pytest/vitest를 한 번 더 통과시킨 뒤 서버에 SSH로 접속해 이 스크립트를 자동으로 실행하므로, 수동으로
+  서버에 접속해 배포할 필요가 없습니다 (SSH 개인키는 `DEPLOY_SSH_KEY` GitHub Secret으로 등록되어 있음).
