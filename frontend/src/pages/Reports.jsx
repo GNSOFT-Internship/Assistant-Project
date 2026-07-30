@@ -78,7 +78,8 @@ export default function Reports() {
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error('보고서 생성 실패:', error);
-      toast.error('보고서 생성 실패');
+      const errorMessage = error?.response?.data?.detail || error?.message || '보고서 생성 실패';
+      toast.error(`보고서 생성 실패: ${errorMessage}`);
     } finally {
       setGenerating(false);
     }
@@ -92,7 +93,10 @@ export default function Reports() {
       <div className="card">
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-2xl font-bold">AI 보고서 자동 생성</h1>
-          <div className="flex items-center gap-2">
+          <div
+            className="flex items-center gap-2"
+            title={generating ? `${CURRENT_MONTH}월 PDF 를 다운중입니다 !` : undefined}
+          >
             <label htmlFor="report-year" className="text-sm text-gray-600">
               보고 대상
             </label>
@@ -100,7 +104,7 @@ export default function Reports() {
               id="report-year"
               value={year}
               onChange={(e) => handleYearChange(Number(e.target.value))}
-              disabled={loadingAiSummary}
+              disabled={loadingAiSummary || generating}
               className="border rounded px-2 py-1 text-sm"
             >
               {YEAR_OPTIONS.map((y) => (
@@ -111,7 +115,7 @@ export default function Reports() {
               id="report-month"
               value={month}
               onChange={(e) => setMonth(Number(e.target.value))}
-              disabled={loadingAiSummary}
+              disabled={loadingAiSummary || generating}
               className="border rounded px-2 py-1 text-sm"
             >
               {MONTH_OPTIONS.map((m) => (
@@ -120,7 +124,7 @@ export default function Reports() {
                 </option>
               ))}
             </select>
-            <button onClick={loadPreview} className="btn btn-secondary flex items-center gap-2" disabled={loading || loadingAiSummary}>
+            <button onClick={loadPreview} className="btn btn-secondary flex items-center gap-2" disabled={loading || loadingAiSummary || generating}>
               <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
               새로고침
             </button>
