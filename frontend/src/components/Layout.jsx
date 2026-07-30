@@ -148,10 +148,11 @@ export default function Layout() {
           <div className="flex justify-between h-16">
             <div className="flex items-center min-w-0 flex-1">
               <div className="flex-shrink-0 flex items-center gap-2">
+                
                 <img
-  src="/model.png"
-  alt="자산관리 시스템 로고"
-  className="w-8 h-8 rounded-lg object-cover shadow-sm shadow-blue-500/30"
+                  src="/model.png"
+                  alt="자산관리 로고"
+                  className="w-[90px] h-[90px] object-contain"
 />
                 <h1 className="text-lg font-bold text-gray-900 hidden sm:block whitespace-nowrap">
                   자산관리 시스템
