@@ -7,8 +7,8 @@
 
 | 구분 | 위치 | 실행 명령 | 최근 결과 |
 |---|---|---|---|
-| 백엔드 (pytest) | `backend-py/tests/` | `cd backend-py && python -m pytest tests/ -q` | **129개 전체 통과** |
-| 프론트엔드 (vitest) | `frontend/src/**/*.test.jsx` | `cd frontend && npx vitest run` | **90개 전체 통과** |
+| 백엔드 (pytest) | `backend-py/tests/` | `cd backend-py && python -m pytest tests/ -q` | **134개 전체 통과** |
+| 프론트엔드 (vitest) | `frontend/src/**/*.test.jsx` | `cd frontend && npx vitest run` | **96개 전체 통과** |
 
 ### 백엔드 테스트 파일 (17개)
 `test_ai_gating.py`, `test_ai_search_and_recommendation.py`, `test_assets.py`, `test_auth.py`,
@@ -22,7 +22,9 @@
 `format`, `shortcut` 공용 컴포넌트/유틸
 
 `Assets` 페이지에는 원래 별도 페이지였던 "파일 업로드"(유지보수 내역서 엑셀/견적서 PDF
-AI 분석) 기능이 통합되어 있어, 관련 테스트도 `Assets.test.jsx` 안에 함께 있다.
+AI 분석) 기능이 통합되어 있고, 자산 등록용 엑셀 업로드까지 같은 드롭존에서 컬럼 구성만
+보고 자동 판별하도록 더 확장되어 있어, 관련 테스트도 `Assets.test.jsx`/`test_files.py` 안에
+함께 있다.
 
 ## 2. 자동 실행 체계 (과정)
 
