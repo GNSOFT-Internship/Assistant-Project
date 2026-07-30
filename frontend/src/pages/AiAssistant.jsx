@@ -19,17 +19,29 @@ export default function AiAssistant() {
   const [viewingMaintenance, setViewingMaintenance] = useState([]);
   const [loadingAssetDetail, setLoadingAssetDetail] = useState(false);
   const messagesContainerRef = useRef(null);
+  const hasScrolledToInitialBottomRef = useRef(false);
 
   // 사용자가 위로 스크롤해서 이전 대화를 보는 중이면 방해하지 않도록,
   // 메시지창 자체 스크롤만 조정하고 이미 하단 근처일 때만 내린다
   useEffect(() => {
     const container = messagesContainerRef.current;
     if (!container) return;
+
+    if (!hasScrolledToInitialBottomRef.current) {
+      // 새 탭/새로고침 직후 대화 기록을 불러왔을 때는 항상 맨 아래(가장 최근 메시지)로
+      // 이동한다. 스크롤이 기본값(맨 위)에 있어 "이미 하단 근처"일 때만 내리는 아래 로직만
+      // 쓰면 첫 로드 시에는 절대 조건을 만족하지 못해 맨 위에 그대로 머무르는 문제가 있었다.
+      if (loadingHistory) return;
+      container.scrollTop = container.scrollHeight;
+      hasScrolledToInitialBottomRef.current = true;
+      return;
+    }
+
     const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
     if (distanceFromBottom < 100) {
       container.scrollTop = container.scrollHeight;
     }
-  }, [messages]);
+  }, [messages, loadingHistory]);
 
   useEffect(() => {
     const loadHistory = async () => {

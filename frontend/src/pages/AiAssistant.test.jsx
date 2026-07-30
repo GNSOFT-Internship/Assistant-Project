@@ -29,6 +29,35 @@ describe('AiAssistant', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     chatApi.getHistory.mockResolvedValue({ data: { data: [] } });
+    // jsdom은 실제 레이아웃을 계산하지 않아 scrollHeight/clientHeight가 항상 0이라, 스크롤 위치를
+    // 검증하려면 메시지 개수에 비례해 늘어나는 가짜 scrollHeight를 흉내내야 한다.
+    Object.defineProperty(HTMLElement.prototype, 'scrollHeight', {
+      configurable: true,
+      get() { return this.children.length * 100; },
+    });
+    Object.defineProperty(HTMLElement.prototype, 'clientHeight', {
+      configurable: true,
+      get() { return 400; },
+    });
+  });
+
+  it('scrolls to the most recent message after loading chat history on mount', async () => {
+    // 회귀 테스트: 새 탭/새로고침 직후 대화 기록을 불러오면 스크롤이 기본값(맨 위)에
+    // 있는 상태라, "이미 하단 근처일 때만 내린다"는 조건만으로는 절대 만족되지 않아
+    // 맨 위에 그대로 머무르는 버그가 있었다.
+    const history = Array.from({ length: 10 }, (_, i) => ({
+      role: i % 2 === 0 ? 'USER' : 'AI',
+      content: `메시지 ${i}`,
+      assets: [],
+    }));
+    chatApi.getHistory.mockResolvedValue({ data: { data: history } });
+
+    renderPage();
+    await waitFor(() => expect(screen.getByText('메시지 9')).toBeInTheDocument());
+
+    const container = document.querySelector('.overflow-y-auto');
+    await waitFor(() => expect(container.scrollTop).toBe(container.scrollHeight));
+    expect(container.scrollTop).toBeGreaterThan(0);
   });
 
   it('renders without crashing while no asset is being viewed', async () => {
