@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from .. import models
 from ..config import settings
 from ..database import get_db
+from ..scoring import compute_replacement_metrics
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
@@ -41,6 +42,36 @@ def get_dashboard_data(db: Session = Depends(get_db)):
     ).count()
 
     operation_rate = (active_assets * 100.0 / total_assets) if total_assets > 0 else 100.0
+
+    # "교체 필요" 상태인 자산 중 교체 우선순위 점수(추천 페이지와 동일한 공식)가 높은
+    # 상위 3건만 추려 대시보드에서 바로 보여준다. 전체 자산이 아니라 이미 REPLACEMENT_NEEDED로
+    # 표시된 자산 안에서만 우선순위를 매겨, 위 카드의 "교체 필요" 건수와 일관된 목록이 되게 한다.
+    replacement_needed_list = (
+        db.query(models.Asset).filter(models.Asset.status == models.AssetStatus.REPLACEMENT_NEEDED).all()
+    )
+    top_replacement_needed = []
+    if replacement_needed_list:
+        asset_ids = [a.id for a in replacement_needed_list]
+        records = (
+            db.query(models.MaintenanceRecord)
+            .filter(models.MaintenanceRecord.asset_id.in_(asset_ids))
+            .all()
+        )
+        records_by_asset: dict = {}
+        for r in records:
+            records_by_asset.setdefault(r.asset_id, []).append(r)
+
+        scored = []
+        for asset in replacement_needed_list:
+            metrics = compute_replacement_metrics(asset, records_by_asset.get(asset.id, []))
+            scored.append({
+                "assetId": asset.id,
+                "assetName": asset.asset_name,
+                "assetCode": asset.asset_code,
+                "score": metrics["score"],
+            })
+        scored.sort(key=lambda r: r["score"], reverse=True)
+        top_replacement_needed = scored[:3]
 
     current_budget = (
         db.query(models.Budget)
@@ -78,6 +109,7 @@ def get_dashboard_data(db: Session = Depends(get_db)):
         "totalAssets": total_assets,
         "activeAssets": active_assets,
         "replacementNeededAssets": replacement_needed_assets,
+        "topReplacementNeeded": top_replacement_needed,
         "isSimulated": is_simulated,
     }
     return {"success": True, "message": None, "data": data}

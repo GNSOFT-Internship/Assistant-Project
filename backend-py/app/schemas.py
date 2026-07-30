@@ -75,6 +75,7 @@ class DashboardData(BaseModel):
     totalAssets: int
     activeAssets: int
     replacementNeededAssets: int
+    topReplacementNeeded: list[dict] = Field(default_factory=list)
     isSimulated: bool
 
 

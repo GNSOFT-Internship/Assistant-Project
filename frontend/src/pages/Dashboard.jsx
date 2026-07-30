@@ -129,6 +129,27 @@ export default function Dashboard() {
               <span className="text-gray-600">교체 필요</span>
               <span className="font-semibold text-red-600">{data.replacementNeededAssets}</span>
             </div>
+
+            {data.topReplacementNeeded?.length > 0 && (
+              <div className="pt-2 border-t">
+                <p className="text-xs text-gray-500 mb-2">교체 우선순위 상위 {data.topReplacementNeeded.length}건</p>
+                <div className="space-y-1.5">
+                  {data.topReplacementNeeded.map((asset, i) => (
+                    <button
+                      key={asset.assetId}
+                      onClick={() => navigate(`/assets/${asset.assetId}`)}
+                      className="w-full flex items-center justify-between text-sm p-2 bg-red-50 rounded hover:bg-red-100 text-left"
+                    >
+                      <span className="flex items-center gap-2 min-w-0">
+                        <span className="text-red-600 font-semibold flex-shrink-0">{i + 1}</span>
+                        <span className="truncate">{asset.assetName}</span>
+                      </span>
+                      <span className="text-red-600 font-medium flex-shrink-0 ml-2">{asset.score}점</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

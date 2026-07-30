@@ -43,3 +43,35 @@ def test_dashboard_marks_simulated_when_no_budget_set(client, admin_headers):
     # 예산이 아예 없어 임의 기본값을 쓰는 경우에만 시뮬레이션으로 표시한다.
     assert data["isSimulated"] is True
     assert data["budgetConsumptionRate"] == 45.0
+
+
+def test_dashboard_top_replacement_needed_only_includes_that_status_sorted_by_score(client, admin_headers):
+    # ACTIVE 자산은 "교체 필요" 상태가 아니므로 우선순위 목록에 나타나면 안 된다.
+    client.post("/api/assets", json=ASSET_PAYLOAD, headers=admin_headers)
+
+    low_priority = {
+        **ASSET_PAYLOAD,
+        "assetCode": "TEST-DASH-002",
+        "assetName": "낮은 우선순위 자산",
+        "purchaseDate": "2024-01-01",
+        "usefulLife": 10,
+        "status": "REPLACEMENT_NEEDED",
+    }
+    high_priority = {
+        **ASSET_PAYLOAD,
+        "assetCode": "TEST-DASH-003",
+        "assetName": "높은 우선순위 자산",
+        "purchaseDate": "2010-01-01",
+        "usefulLife": 3,
+        "status": "REPLACEMENT_NEEDED",
+    }
+    client.post("/api/assets", json=low_priority, headers=admin_headers)
+    client.post("/api/assets", json=high_priority, headers=admin_headers)
+
+    resp = client.get("/api/dashboard", headers=admin_headers)
+    assert resp.status_code == 200
+    top = resp.json()["data"]["topReplacementNeeded"]
+
+    assert len(top) == 2
+    assert [t["assetCode"] for t in top] == ["TEST-DASH-003", "TEST-DASH-002"]
+    assert top[0]["score"] >= top[1]["score"]
