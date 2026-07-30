@@ -5,6 +5,8 @@ import Reports from './Reports';
 import { ToastProvider } from '../context/ToastContext';
 import { reportApi } from '../services/api';
 
+const CURRENT_MONTH = new Date().getMonth() + 1;
+
 vi.mock('../services/api', () => ({
   reportApi: {
     getMonthly: vi.fn(),
@@ -114,5 +116,29 @@ describe('Reports', () => {
     await user.click(screen.getByText('PDF 다운로드'));
 
     await waitFor(() => expect(reportApi.downloadPdf).toHaveBeenCalledTimes(1));
+  });
+
+  it('PDF 생성 중에는 보고 대상 select 가 잠기고 안내 문구를 보여준다', async () => {
+    const user = userEvent.setup();
+    let resolveDownload;
+    reportApi.downloadPdf.mockReturnValue(
+      new Promise((resolve) => { resolveDownload = resolve; })
+    );
+    renderPage();
+    await waitFor(() => expect(screen.getByText('AI 요약 보기')).toBeInTheDocument());
+
+    await user.click(screen.getByText('PDF 다운로드'));
+
+    expect(screen.getByLabelText('보고 대상')).toBeDisabled();
+    expect(document.getElementById('report-month')).toBeDisabled();
+    expect(screen.getByText('새로고침')).toBeDisabled();
+    expect(
+      screen.getByTitle(`${CURRENT_MONTH}월 PDF 를 다운중입니다 !`)
+    ).toBeInTheDocument();
+
+    resolveDownload({ data: new Blob(['%PDF'], { type: 'application/pdf' }) });
+    await waitFor(() =>
+      expect(screen.getByLabelText('보고 대상')).not.toBeDisabled()
+    );
   });
 });
