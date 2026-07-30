@@ -123,9 +123,13 @@ describe('Assets', () => {
 
     await user.click(screen.getByText('예시 파일'));
     const assetLink = screen.getByText('자산 등록 예시 엑셀').closest('a');
-    const maintLink = screen.getByText('유지보수 내역서 예시 엑셀').closest('a');
+    const maintLink = screen.getByText('유지보수 내역서 예시 엑셀 (정상+불일치 혼합)').closest('a');
+    const maintUnmatchedLink = screen.getByText('유지보수 내역서 예시 엑셀 (전체 불일치)').closest('a');
+    const maintErrorLink = screen.getByText('유지보수 내역서 예시 엑셀 (오류 행 포함)').closest('a');
     expect(assetLink).toHaveAttribute('href', '/templates/자산등록_예시.xlsx');
     expect(maintLink).toHaveAttribute('href', '/templates/유지보수내역서_예시.xlsx');
+    expect(maintUnmatchedLink).toHaveAttribute('href', '/templates/유지보수내역서_전체불일치_예시.xlsx');
+    expect(maintErrorLink).toHaveAttribute('href', '/templates/유지보수내역서_오류행포함_예시.xlsx');
   });
 
   it('opens the edit modal pre-filled with the asset being edited', async () => {

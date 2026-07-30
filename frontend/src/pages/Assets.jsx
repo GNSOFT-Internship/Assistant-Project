@@ -431,7 +431,7 @@ export default function Assets() {
                 <Download size={16} /> 예시 파일
               </button>
               {showTemplateMenu && (
-                <div className="absolute top-full mt-2 left-0 z-40 w-56 bg-white border border-gray-200 rounded-lg shadow-lg py-1">
+                <div className="absolute top-full mt-2 left-0 z-40 w-72 bg-white border border-gray-200 rounded-lg shadow-lg py-1">
                   <a
                     href="/templates/자산등록_예시.xlsx"
                     download
@@ -446,7 +446,23 @@ export default function Assets() {
                     onClick={() => setShowTemplateMenu(false)}
                     className="block px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
                   >
-                    유지보수 내역서 예시 엑셀
+                    유지보수 내역서 예시 엑셀 (정상+불일치 혼합)
+                  </a>
+                  <a
+                    href="/templates/유지보수내역서_전체불일치_예시.xlsx"
+                    download
+                    onClick={() => setShowTemplateMenu(false)}
+                    className="block px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                  >
+                    유지보수 내역서 예시 엑셀 (전체 불일치)
+                  </a>
+                  <a
+                    href="/templates/유지보수내역서_오류행포함_예시.xlsx"
+                    download
+                    onClick={() => setShowTemplateMenu(false)}
+                    className="block px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                  >
+                    유지보수 내역서 예시 엑셀 (오류 행 포함)
                   </a>
                 </div>
               )}
