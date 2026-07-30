@@ -296,8 +296,10 @@ def _generate_narrative(report_data: dict) -> dict:
         result["keyIssues"] = _ensure_min_items(result.get("keyIssues"), 3, fallback["keyIssues"])
         result["recommendations"] = _ensure_min_items(result.get("recommendations"), 3, fallback["recommendations"])
         return result
-    except Exception:
-        logger.warning("월간 보고서 AI 서술 생성 실패, 규칙 기반 문구 유지", exc_info=True)
+    except Exception as e:
+        error_type = type(e).__name__
+        error_detail = str(e)
+        logger.error(f"월간 보고서 AI 서술 생성 실패 ({error_type}): {error_detail}", exc_info=True)
         return fallback
 
 
