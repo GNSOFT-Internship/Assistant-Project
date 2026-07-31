@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { assetApi, aiApi } from '../services/api';
-import { Calendar, DollarSign, Clock, Package, History, Edit, Trash2, FileText, Send, MessageSquare, Loader, Download } from 'lucide-react';
+import { Calendar, DollarSign, Clock, Package, History, Edit, Trash2, FileText, Send, MessageSquare, Loader, Download, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react';
 import { AssetStatusBadge, MaintenanceTypeBadge } from '../components/StatusBadge';
 import LoadingState from '../components/LoadingState';
 import Modal from '../components/Modal';
@@ -40,6 +40,8 @@ const FIELD_LABELS = {
   source: '출처',
 };
 
+const HISTORY_PAGE_SIZE = 20;
+
 const ACTION_LABELS = {
   CREATE: { label: '등록', className: 'badge-green' },
   UPDATE: { label: '수정', className: 'badge-blue' },
@@ -66,7 +68,12 @@ export default function AssetDetail() {
   // 유지보수 기록이 페이지 크기를 넘어도 합계가 조용히 줄어들지 않는다.
   const [maintenanceTotal, setMaintenanceTotal] = useState(0);
   const [maintenanceTotalCost, setMaintenanceTotalCost] = useState(0);
+  const [maintenanceOpen, setMaintenanceOpen] = useState(false);
+  const [maintenancePage, setMaintenancePage] = useState(1);
   const [history, setHistory] = useState([]);
+  const [historyTotal, setHistoryTotal] = useState(0);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyPage, setHistoryPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [editingRecord, setEditingRecord] = useState(null);
   const [recordForm, setRecordForm] = useState(EMPTY_RECORD_FORM);
@@ -197,13 +204,14 @@ export default function AssetDetail() {
     }
   };
 
-  const loadMaintenance = async () => {
+  const loadMaintenance = async (page = 1) => {
     try {
-      const response = await assetApi.getMaintenanceHistory(id);
+      const response = await assetApi.getMaintenanceHistory(id, { page, pageSize: HISTORY_PAGE_SIZE });
       const data = response.data.data || {};
       setMaintenance(data.items || []);
       setMaintenanceTotal(data.total || 0);
       setMaintenanceTotalCost(data.totalCost || 0);
+      setMaintenancePage(data.page || page);
     } catch (error) {
       console.error('유지보수 이력 로드 실패:', error);
     } finally {
@@ -211,10 +219,13 @@ export default function AssetDetail() {
     }
   };
 
-  const loadHistory = async () => {
+  const loadHistory = async (page = 1) => {
     try {
-      const response = await assetApi.getHistory(id);
-      setHistory(response.data.data?.items || []);
+      const response = await assetApi.getHistory(id, { page, pageSize: HISTORY_PAGE_SIZE });
+      const data = response.data.data || {};
+      setHistory(data.items || []);
+      setHistoryTotal(data.total || 0);
+      setHistoryPage(data.page || page);
     } catch (error) {
       console.error('변경 이력 로드 실패:', error);
     }
@@ -249,7 +260,7 @@ export default function AssetDetail() {
         failureType: recordForm.failureType || null,
       });
       closeRecordModal();
-      loadMaintenance();
+      loadMaintenance(maintenancePage);
     } catch (error) {
       console.error('유지보수 기록 수정 실패:', error);
       toast.error('수정 중 오류가 발생했습니다.');
@@ -260,7 +271,7 @@ export default function AssetDetail() {
     if (!(await confirmDialog('이 유지보수 기록을 삭제하시겠습니까?', { danger: true, confirmLabel: '삭제' }))) return;
     try {
       await assetApi.deleteMaintenanceRecord(id, recordId);
-      loadMaintenance();
+      loadMaintenance(maintenancePage);
     } catch (error) {
       console.error('유지보수 기록 삭제 실패:', error);
       toast.error('삭제 중 오류가 발생했습니다.');
@@ -429,9 +440,18 @@ export default function AssetDetail() {
       </div>
 
       <div className="card">
-        <h3 className="text-lg font-semibold mb-4">유지보수 이력</h3>
-        
-        {maintenance.length === 0 ? (
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold">유지보수 이력 ({maintenanceTotal}건)</h3>
+          <button
+            onClick={() => setMaintenanceOpen((v) => !v)}
+            className="btn btn-secondary py-1.5 px-3 text-sm flex items-center gap-1"
+          >
+            {maintenanceOpen ? '숨기기' : '이력 보기'}
+            {maintenanceOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          </button>
+        </div>
+
+        {maintenanceOpen && (maintenance.length === 0 ? (
           <div className="text-center text-gray-500 py-8">유지보수 이력이 없습니다.</div>
         ) : (
           <div className="space-y-4">
@@ -483,15 +503,50 @@ export default function AssetDetail() {
               </div>
             ))}
           </div>
+        ))}
+
+        {maintenanceOpen && maintenanceTotal > HISTORY_PAGE_SIZE && (
+          <div className="flex items-center justify-between mt-4 text-sm text-gray-600">
+            <div>
+              전체 {maintenanceTotal}건 중 {(maintenancePage - 1) * HISTORY_PAGE_SIZE + 1}-
+              {Math.min(maintenancePage * HISTORY_PAGE_SIZE, maintenanceTotal)}건
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => loadMaintenance(maintenancePage - 1)}
+                disabled={maintenancePage <= 1}
+                className="btn btn-secondary px-2 py-1 disabled:opacity-40"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <span>{maintenancePage} / {Math.max(1, Math.ceil(maintenanceTotal / HISTORY_PAGE_SIZE))}</span>
+              <button
+                onClick={() => loadMaintenance(maintenancePage + 1)}
+                disabled={maintenancePage >= Math.ceil(maintenanceTotal / HISTORY_PAGE_SIZE)}
+                className="btn btn-secondary px-2 py-1 disabled:opacity-40"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
         )}
       </div>
 
       <div className="card">
-        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-          <History size={18} /> 변경 이력
-        </h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            <History size={18} /> 변경 이력 ({historyTotal}건)
+          </h3>
+          <button
+            onClick={() => setHistoryOpen((v) => !v)}
+            className="btn btn-secondary py-1.5 px-3 text-sm flex items-center gap-1"
+          >
+            {historyOpen ? '숨기기' : '이력 보기'}
+            {historyOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          </button>
+        </div>
 
-        {history.length === 0 ? (
+        {historyOpen && (history.length === 0 ? (
           <div className="text-center text-gray-500 py-8">변경 이력이 없습니다.</div>
         ) : (
           <div className="space-y-3">
@@ -534,6 +589,32 @@ export default function AssetDetail() {
                 </div>
               );
             })}
+          </div>
+        ))}
+
+        {historyOpen && historyTotal > HISTORY_PAGE_SIZE && (
+          <div className="flex items-center justify-between mt-4 text-sm text-gray-600">
+            <div>
+              전체 {historyTotal}건 중 {(historyPage - 1) * HISTORY_PAGE_SIZE + 1}-
+              {Math.min(historyPage * HISTORY_PAGE_SIZE, historyTotal)}건
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => loadHistory(historyPage - 1)}
+                disabled={historyPage <= 1}
+                className="btn btn-secondary px-2 py-1 disabled:opacity-40"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <span>{historyPage} / {Math.max(1, Math.ceil(historyTotal / HISTORY_PAGE_SIZE))}</span>
+              <button
+                onClick={() => loadHistory(historyPage + 1)}
+                disabled={historyPage >= Math.ceil(historyTotal / HISTORY_PAGE_SIZE)}
+                className="btn btn-secondary px-2 py-1 disabled:opacity-40"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
           </div>
         )}
       </div>
