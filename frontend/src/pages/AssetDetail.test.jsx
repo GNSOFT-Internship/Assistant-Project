@@ -68,6 +68,12 @@ function renderPage() {
   );
 }
 
+// 유지보수 이력 카드는 기본적으로 접혀 있으므로, 목록 내용을 확인하기 전에
+// 항상 첫 번째("유지보수 이력") 토글 버튼을 먼저 펼쳐야 한다.
+async function openMaintenanceHistory(user) {
+  await user.click(screen.getAllByText('이력 보기')[0]);
+}
+
 describe('AssetDetail', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -81,8 +87,10 @@ describe('AssetDetail', () => {
   });
 
   it('renders asset details and maintenance history after loading', async () => {
+    const user = userEvent.setup();
     renderPage();
     await waitFor(() => expect(screen.getByRole('heading', { name: '노트북 Dell Latitude 5520' })).toBeInTheDocument());
+    await openMaintenanceHistory(user);
     expect(screen.getByText('하드디스크 교체')).toBeInTheDocument();
   });
 
@@ -100,6 +108,8 @@ describe('AssetDetail', () => {
   it('opens the maintenance record edit modal pre-filled and closes it without crashing', async () => {
     const user = userEvent.setup();
     renderPage();
+    await waitFor(() => expect(screen.getByRole('heading', { name: '노트북 Dell Latitude 5520' })).toBeInTheDocument());
+    await openMaintenanceHistory(user);
     await waitFor(() => expect(screen.getByText('하드디스크 교체')).toBeInTheDocument());
 
     await user.click(screen.getByTitle('수정'));
@@ -113,6 +123,8 @@ describe('AssetDetail', () => {
   it('asks for confirmation before deleting a maintenance record', async () => {
     const user = userEvent.setup();
     renderPage();
+    await waitFor(() => expect(screen.getByRole('heading', { name: '노트북 Dell Latitude 5520' })).toBeInTheDocument());
+    await openMaintenanceHistory(user);
     await waitFor(() => expect(screen.getByText('하드디스크 교체')).toBeInTheDocument());
 
     await user.click(screen.getByTitle('삭제'));
@@ -135,6 +147,8 @@ describe('AssetDetail', () => {
       },
     });
     renderPage();
+    await waitFor(() => expect(screen.getByRole('heading', { name: '노트북 Dell Latitude 5520' })).toBeInTheDocument());
+    await openMaintenanceHistory(user);
     await waitFor(() => expect(screen.getByText('하드디스크 교체')).toBeInTheDocument());
 
     await user.click(screen.getByText('AI 작업 지시서'));
@@ -151,7 +165,7 @@ describe('AssetDetail', () => {
     });
     aiApi.downloadProcurementSpecPdf.mockResolvedValue({ data: new Blob(['%PDF-1.4'], { type: 'application/pdf' }) });
     renderPage();
-    await waitFor(() => expect(screen.getByText('하드디스크 교체')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('heading', { name: '노트북 Dell Latitude 5520' })).toBeInTheDocument());
 
     await user.click(screen.getByText('AI 조달 규격서/RFP 생성'));
     await waitFor(() => expect(screen.getByText('노트북 교체 규격서')).toBeInTheDocument());
