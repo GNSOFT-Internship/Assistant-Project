@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import Dashboard from './Dashboard';
+import { AuthProvider } from '../context/AuthContext';
 import { aiApi } from '../services/api';
 
 vi.mock('../services/api', () => ({
@@ -12,7 +13,9 @@ vi.mock('../services/api', () => ({
 function renderPage() {
   return render(
     <MemoryRouter>
-      <Dashboard />
+      <AuthProvider>
+        <Dashboard />
+      </AuthProvider>
     </MemoryRouter>
   );
 }
