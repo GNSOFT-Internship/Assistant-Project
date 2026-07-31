@@ -33,6 +33,8 @@ const FIELD_LABEL = {
   useful_life: '내용연수',
   status: '상태',
   description: '설명',
+  source: '출처',
+  maintenance_record: '정비 이력',
 };
 
 // 필드별로 값 자체도 한글/보기 좋은 형태로 바꿔야 하는 경우 처리
