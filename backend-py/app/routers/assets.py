@@ -31,11 +31,23 @@ _TRACKED_FIELDS = [
 ]
 
 
+# 감사 로그(changes["maintenance_record"])에 들어가는 요약 문자열이라 프론트에서
+# 필드 단위로 다시 쪼개 번역할 수 없다. 여기서 한글로 만들어 내려보낸다.
+# frontend/src/components/StatusBadge.jsx의 MAINTENANCE_TYPE 라벨과 동일하게 맞춘다.
+_MAINTENANCE_TYPE_LABEL = {
+    "ROUTINE": "정기점검",
+    "REPAIR": "수리",
+    "REPLACEMENT": "교체",
+    "INSPECTION": "점검",
+}
+
+
 def _maintenance_summary(record: models.MaintenanceRecord) -> str:
     cost = f"{float(record.cost):,.0f}원" if record.cost is not None else "비용 미기재"
+    type_value = record.maintenance_type.value if record.maintenance_type else None
     parts = [
         record.maintenance_date.isoformat() if record.maintenance_date else "-",
-        record.maintenance_type.value if record.maintenance_type else "-",
+        _MAINTENANCE_TYPE_LABEL.get(type_value, type_value or "-"),
         cost,
     ]
     if record.description:
