@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { assetApi, aiApi } from '../services/api';
-import { Calendar, DollarSign, Clock, Package, History, Edit, Trash2, FileText, Send, MessageSquare, Loader, Download, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react';
+import { Calendar, DollarSign, Clock, Package, History, Edit, Trash2, FileText, Send, MessageSquare, Loader, Download, ChevronLeft, ChevronRight } from 'lucide-react';
 import { AssetStatusBadge, MaintenanceTypeBadge } from '../components/StatusBadge';
 import LoadingState from '../components/LoadingState';
 import Modal from '../components/Modal';
@@ -287,6 +287,20 @@ export default function AssetDetail() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <Link to="/assets" className="btn btn-secondary">목록으로</Link>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setMaintenanceOpen(true)}
+            className="btn btn-secondary flex items-center gap-1.5"
+          >
+            <Clock size={16} /> 유지보수 이력
+          </button>
+          <button
+            onClick={() => setHistoryOpen(true)}
+            className="btn btn-secondary flex items-center gap-1.5"
+          >
+            <History size={16} /> 변경 이력
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -439,19 +453,17 @@ export default function AssetDetail() {
         </div>
       </div>
 
-      <div className="card">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold">유지보수 이력 ({maintenanceTotal}건)</h3>
-          <button
-            onClick={() => setMaintenanceOpen((v) => !v)}
-            className="btn btn-secondary py-1.5 px-3 text-sm flex items-center gap-1"
-          >
-            {maintenanceOpen ? '숨기기' : '이력 보기'}
-            {maintenanceOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+      <Modal open={maintenanceOpen} onClose={() => setMaintenanceOpen(false)} maxWidth="max-w-3xl">
+        <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            <Clock size={18} /> 유지보수 이력 ({maintenanceTotal}건)
+          </h3>
+          <button onClick={() => setMaintenanceOpen(false)} className="text-slate-400 hover:text-slate-600 font-bold">
+            닫기
           </button>
         </div>
 
-        {maintenanceOpen && (maintenance.length === 0 ? (
+        {(maintenance.length === 0 ? (
           <div className="text-center text-gray-500 py-8">유지보수 이력이 없습니다.</div>
         ) : (
           <div className="space-y-4">
@@ -505,7 +517,7 @@ export default function AssetDetail() {
           </div>
         ))}
 
-        {maintenanceOpen && maintenanceTotal > HISTORY_PAGE_SIZE && (
+        {maintenanceTotal > HISTORY_PAGE_SIZE && (
           <div className="flex items-center justify-between mt-4 text-sm text-gray-600">
             <div>
               전체 {maintenanceTotal}건 중 {(maintenancePage - 1) * HISTORY_PAGE_SIZE + 1}-
@@ -530,23 +542,19 @@ export default function AssetDetail() {
             </div>
           </div>
         )}
-      </div>
+      </Modal>
 
-      <div className="card">
-        <div className="flex items-center justify-between mb-4">
+      <Modal open={historyOpen} onClose={() => setHistoryOpen(false)} maxWidth="max-w-3xl">
+        <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
           <h3 className="text-lg font-semibold flex items-center gap-2">
             <History size={18} /> 변경 이력 ({historyTotal}건)
           </h3>
-          <button
-            onClick={() => setHistoryOpen((v) => !v)}
-            className="btn btn-secondary py-1.5 px-3 text-sm flex items-center gap-1"
-          >
-            {historyOpen ? '숨기기' : '이력 보기'}
-            {historyOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          <button onClick={() => setHistoryOpen(false)} className="text-slate-400 hover:text-slate-600 font-bold">
+            닫기
           </button>
         </div>
 
-        {historyOpen && (history.length === 0 ? (
+        {(history.length === 0 ? (
           <div className="text-center text-gray-500 py-8">변경 이력이 없습니다.</div>
         ) : (
           <div className="space-y-3">
@@ -592,7 +600,7 @@ export default function AssetDetail() {
           </div>
         ))}
 
-        {historyOpen && historyTotal > HISTORY_PAGE_SIZE && (
+        {historyTotal > HISTORY_PAGE_SIZE && (
           <div className="flex items-center justify-between mt-4 text-sm text-gray-600">
             <div>
               전체 {historyTotal}건 중 {(historyPage - 1) * HISTORY_PAGE_SIZE + 1}-
@@ -617,7 +625,7 @@ export default function AssetDetail() {
             </div>
           </div>
         )}
-      </div>
+      </Modal>
 
       <Modal open={!!editingRecord} onClose={closeRecordModal}>
         <h2 className="text-xl font-bold mb-4">유지보수 기록 수정</h2>
