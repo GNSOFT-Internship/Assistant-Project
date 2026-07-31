@@ -4,6 +4,7 @@ import { assetApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import LoadingState from '../components/LoadingState';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ASSET_STATUS } from '../components/StatusBadge';
 
 const PAGE_SIZE = 30;
 
@@ -19,10 +20,45 @@ const ACTION_STYLE = {
   DELETE: 'bg-red-100 text-red-700',
 };
 
+// 백엔드가 스네이크케이스 필드명을 그대로 내려주므로(_TRACKED_FIELDS 참고),
+// 표시용 한글 라벨로 매핑한다.
+const FIELD_LABEL = {
+  asset_name: '자산명',
+  asset_code: '자산번호',
+  category: '카테고리',
+  location: '위치',
+  responsible_person: '담당자',
+  purchase_date: '구매일',
+  purchase_price: '구매가',
+  useful_life: '내용연수',
+  status: '상태',
+  description: '설명',
+};
+
+// 필드별로 값 자체도 한글/보기 좋은 형태로 바꿔야 하는 경우 처리
+// (status는 영문 enum 코드라서 반드시 한글 라벨로 바꿔야 함)
+function formatValue(field, value) {
+  if (value === null || value === undefined || value === '') return '-';
+  if (field === 'status') {
+    return ASSET_STATUS[value]?.label || value;
+  }
+  if (field === 'purchase_price') {
+    const num = Number(value);
+    return Number.isNaN(num) ? value : `${num.toLocaleString('ko-KR')}원`;
+  }
+  if (field === 'useful_life') {
+    return `${value}년`;
+  }
+  return value;
+}
+
 function formatChanges(changes) {
   if (!changes) return '-';
   return Object.entries(changes)
-    .map(([field, { old, new: next }]) => `${field}: ${old ?? '-'} → ${next ?? '-'}`)
+    .map(([field, { old, new: next }]) => {
+      const label = FIELD_LABEL[field] || field;
+      return `${label}: ${formatValue(field, old)} → ${formatValue(field, next)}`;
+    })
     .join(', ');
 }
 
