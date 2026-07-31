@@ -1,15 +1,36 @@
 name: Deploy to Production
 
-# main에 push되면 백엔드/프론트엔드 테스트를 다시 한 번 CI에서 통과시킨 뒤에만
-# 서버에 SSH로 접속해 deploy.sh를 실행한다. 로컬 pre-push 훅이 이미 테스트를
-# 강제하고 있지만, --no-verify로 우회되거나 훅이 설치되지 않은 다른 환경에서
-# push된 경우까지 대비해 배포 직전에 한 번 더 독립적으로 검증한다.
+# main에 push되면 바뀐 쪽(backend-py 또는 frontend)의 테스트만 CI에서 다시
+# 통과시킨 뒤에만 서버에 SSH로 접속해 deploy.sh를 실행한다. 로컬 pre-push
+# 훅이 이미 테스트를 강제하고 있지만, --no-verify로 우회되거나 훅이 설치되지
+# 않은 다른 환경에서 push된 경우까지 대비해 배포 직전에 한 번 더 독립적으로
+# 검증한다. 둘 다 안 바뀌었으면 두 테스트 모두 건너뛰고 바로 배포한다.
 on:
   push:
     branches: [main]
 
 jobs:
+  # 실제로 바뀐 쪽의 테스트만 돌리기 위해, 이번 push에 backend-py/frontend
+  # 디렉터리가 포함됐는지 먼저 판별한다.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'backend-py/**'
+            frontend:
+              - 'frontend/**'
+
   backend-test:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -31,6 +52,8 @@ jobs:
         run: pytest -v
 
   frontend-test:
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -52,7 +75,14 @@ jobs:
         run: npm test
 
   deploy:
-    needs: [backend-test, frontend-test]
+    needs: [changes, backend-test, frontend-test]
+    # backend-test/frontend-test는 변경이 없으면 skipped로 끝나는데, 그 자체는
+    # 문제가 아니다. 둘 다 success거나 skipped일 때만(=failure/cancelled가 없을
+    # 때만) 배포하도록 always()로 needs 실패 시 자동 스킵을 무력화하고 직접 판단한다.
+    if: |
+      always() &&
+      needs.backend-test.result != 'failure' && needs.backend-test.result != 'cancelled' &&
+      needs.frontend-test.result != 'failure' && needs.frontend-test.result != 'cancelled'
     runs-on: ubuntu-latest
     steps:
       - name: Deploy via SSH (git pull + 변경분 재시작/재빌드 + 배포 후 검증)
