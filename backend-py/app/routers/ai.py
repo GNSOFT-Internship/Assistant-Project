@@ -375,7 +375,9 @@ def replacement_recommendation(request: ReplacementRequest, db: Session = Depend
             # 추천된 자산들의 근거 수치가 지난번 생성 시점과 전부 동일하므로 AI를
             # 다시 호출하지 않고 저장된 문구를 그대로 재사용한다.
             for rec in recommendations:
-                rec["reason"] = cached_rows[rec["assetId"]].reason
+                cached = cached_rows[rec["assetId"]]
+                rec["reason"] = cached.reason
+                rec["reasonUpdatedAt"] = cached.updated_at
 
     if recommendations and not all_cached and llm.is_configured():
         try:
@@ -404,18 +406,27 @@ def replacement_recommendation(request: ReplacementRequest, db: Session = Depend
                     cached.metrics_hash = rec["_metricsHash"]
                     cached.reason = rec["reason"]
                 else:
-                    db.add(models.AssetReplacementReason(
+                    cached = models.AssetReplacementReason(
                         asset_id=rec["assetId"],
                         metrics_hash=rec["_metricsHash"],
                         reason=rec["reason"],
-                    ))
+                    )
+                    db.add(cached)
+                    cached_rows[rec["assetId"]] = cached
             db.commit()
+            # commit 후 세션이 만료시킨 updated_at을 다시 읽어와야 서버가 실제로
+            # 채운 시각(onupdate=func.now())이 응답에 반영된다.
+            for rec in recommendations:
+                cached = cached_rows.get(rec["assetId"])
+                if cached is not None:
+                    rec["reasonUpdatedAt"] = cached.updated_at
         except Exception:
             db.rollback()
             logger.warning("교체 추천 AI 서술 생성 실패, 규칙 기반 문구 유지", exc_info=True)
 
     for rec in recommendations:
         rec.pop("_metricsHash", None)
+        rec.setdefault("reasonUpdatedAt", None)
 
     return {
         "success": True,

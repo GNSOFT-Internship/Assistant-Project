@@ -100,6 +100,9 @@ def test_replacement_recommendation_without_budget_returns_top_five(client, admi
     assert len(data["recommendations"]) <= 5
     scores = [r["score"] for r in data["recommendations"]]
     assert scores == sorted(scores, reverse=True)
+    # 테스트 환경은 GN_API_KEY가 비어 AI를 호출하지 않으므로, DB에 저장된 생성
+    # 시각도 없다 — 규칙 기반 문구에는 reasonUpdatedAt이 없어야 한다.
+    assert all(r["reasonUpdatedAt"] is None for r in data["recommendations"])
 
 
 def test_replacement_recommendation_respects_budget_cap(client, admin_headers):
@@ -136,16 +139,20 @@ def test_replacement_recommendation_reason_is_cached_until_metrics_change(client
 
     resp1 = client.post("/api/ai/replacement-recommendation", json={}, headers=admin_headers)
     assert resp1.status_code == 200
-    reason1 = resp1.json()["data"]["recommendations"][0]["reason"]
-    assert reason1 == "AI 생성 이유 #1"
+    rec1 = resp1.json()["data"]["recommendations"][0]
+    assert rec1["reason"] == "AI 생성 이유 #1"
     assert call_count["n"] == 1
+    # 실제로 AI가 문구를 생성했으니, 그 시각이 응답에도 채워져 있어야 한다.
+    assert rec1["reasonUpdatedAt"] is not None
 
     # 두 번째 호출: 근거 수치가 그대로이므로 AI를 다시 부르지 않고 캐시된 문구를 재사용해야 한다.
     resp2 = client.post("/api/ai/replacement-recommendation", json={}, headers=admin_headers)
     assert resp2.status_code == 200
-    reason2 = resp2.json()["data"]["recommendations"][0]["reason"]
-    assert reason2 == "AI 생성 이유 #1"
+    rec2 = resp2.json()["data"]["recommendations"][0]
+    assert rec2["reason"] == "AI 생성 이유 #1"
     assert call_count["n"] == 1
+    # 캐시를 재사용했을 뿐 새로 쓴 게 아니므로 생성 시각도 그대로여야 한다.
+    assert rec2["reasonUpdatedAt"] == rec1["reasonUpdatedAt"]
 
     # 유지보수 기록을 추가해 근거 수치(고장횟수 등)를 바꾸면 캐시가 무효화되어 다시 호출되어야 한다.
     client.post(
@@ -155,9 +162,10 @@ def test_replacement_recommendation_reason_is_cached_until_metrics_change(client
     )
     resp3 = client.post("/api/ai/replacement-recommendation", json={}, headers=admin_headers)
     assert resp3.status_code == 200
-    reason3 = resp3.json()["data"]["recommendations"][0]["reason"]
-    assert reason3 == "AI 생성 이유 #2"
+    rec3 = resp3.json()["data"]["recommendations"][0]
+    assert rec3["reason"] == "AI 생성 이유 #2"
     assert call_count["n"] == 2
+    assert rec3["reasonUpdatedAt"] is not None
 
 
 def test_failure_assets_returns_occurrence_counts_sorted_desc(client, admin_headers):

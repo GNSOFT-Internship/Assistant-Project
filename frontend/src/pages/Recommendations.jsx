@@ -146,7 +146,14 @@ export default function Recommendations() {
 
                 <div className="bg-blue-50/70 border border-blue-100 rounded-xl p-3 flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
                   <div className="flex-1">
-                    <div className="text-sm font-medium text-blue-900 mb-1">AI 추천 이유:</div>
+                    <div className="text-sm font-medium text-blue-900 mb-1 flex items-center gap-2 flex-wrap">
+                      <span>AI 추천 이유:</span>
+                      {rec.reasonUpdatedAt && (
+                        <span className="text-xs font-normal text-blue-500">
+                          ({new Date(rec.reasonUpdatedAt).toLocaleString('ko-KR')} 작성)
+                        </span>
+                      )}
+                    </div>
                     <div className="text-sm text-blue-800">{rec.reason}</div>
                   </div>
                   <button
