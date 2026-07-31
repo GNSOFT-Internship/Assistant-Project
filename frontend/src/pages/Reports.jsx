@@ -62,10 +62,13 @@ export default function Reports() {
     }
   };
 
+  const abortControllerRef = React.useRef(null);
+
   const handleGenerate = async () => {
     setGenerating(true);
+    abortControllerRef.current = new AbortController();
     try {
-      const response = await reportApi.downloadPdf({ year, month });
+      const response = await reportApi.downloadPdf({ year, month }, { signal: abortControllerRef.current.signal });
 
       const blob = new Blob([response.data], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
@@ -77,11 +80,24 @@ export default function Reports() {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
     } catch (error) {
+      if (error.name === 'AbortError') {
+        console.log('보고서 생성 취소됨');
+        return;
+      }
       console.error('보고서 생성 실패:', error);
       const errorMessage = error?.response?.data?.detail || error?.message || '보고서 생성 실패';
       toast.error(`보고서 생성 실패: ${errorMessage}`);
     } finally {
       setGenerating(false);
+      abortControllerRef.current = null;
+    }
+  };
+
+  const handleCancel = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      setGenerating(false);
+      toast.info('PDF 생성이 취소되었습니다.');
     }
   };
 
@@ -143,14 +159,26 @@ export default function Reports() {
               <li>• 교체 권장 자산 목록</li>
               <li>• 주요 문제점 및 향후 관리 권장사항 (AI 생성)</li>
             </ul>
-            <button
-              onClick={handleGenerate}
-              disabled={generating}
-              className="btn btn-primary w-full flex items-center justify-center gap-2"
-            >
-              <Download size={16} />
-              {generating ? '생성 중...' : 'PDF 다운로드'}
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={handleGenerate}
+                disabled={generating}
+                className="btn btn-primary flex-1 flex items-center justify-center gap-2"
+              >
+                <Download size={16} />
+                {generating ? '생성 중...' : 'PDF 다운로드'}
+              </button>
+
+              {generating && (
+                <button
+                  onClick={handleCancel}
+                  className="px-4 bg-red-600 hover:bg-red-700 text-white rounded-lg"
+                  title="PDF 생성 취소"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="border rounded-lg p-6 bg-gray-50">
