@@ -68,10 +68,10 @@ function renderPage() {
   );
 }
 
-// 유지보수 이력 카드는 기본적으로 접혀 있으므로, 목록 내용을 확인하기 전에
-// 항상 첫 번째("유지보수 이력") 토글 버튼을 먼저 펼쳐야 한다.
+// 유지보수 이력은 상단 버튼을 눌러야 모달로 뜨므로, 목록 내용을 확인하기 전에
+// 항상 "유지보수 이력" 버튼을 먼저 클릭해 모달을 열어야 한다.
 async function openMaintenanceHistory(user) {
-  await user.click(screen.getAllByText('이력 보기')[0]);
+  await user.click(screen.getByText('유지보수 이력'));
 }
 
 describe('AssetDetail', () => {
@@ -154,7 +154,10 @@ describe('AssetDetail', () => {
     await user.click(screen.getByText('AI 작업 지시서'));
     await waitFor(() => expect(screen.getByText('[작업 지시서] 하드디스크 교체')).toBeInTheDocument());
 
-    await user.click(screen.getByText('닫기'));
+    // 유지보수 이력 모달이 열려 있는 상태에서 그 위에 작업 지시서 모달이 겹쳐 뜨므로
+    // "닫기" 버튼이 두 개 존재한다 — 나중에 열린(뒤쪽) 작업 지시서 모달의 버튼을 누른다.
+    const closeButtons = screen.getAllByText('닫기');
+    await user.click(closeButtons[closeButtons.length - 1]);
     await waitFor(() => expect(screen.queryByText('[작업 지시서] 하드디스크 교체')).not.toBeInTheDocument());
   });
 
