@@ -190,6 +190,29 @@ describe('Assets', () => {
       expect(screen.getByText('적용')).toBeInTheDocument();
     });
 
+    it('paginates the uploaded file list 5 at a time with prev/next controls', async () => {
+      const user = userEvent.setup();
+      seedAdmin();
+      const sevenFiles = Array.from({ length: 7 }, (_, i) => ({
+        ...COMPLETED_DOC_FILE,
+        id: i + 1,
+        originalFilename: `file_${i + 1}.xlsx`,
+      }));
+      fileApi.getAll.mockResolvedValue({ data: { data: sevenFiles } });
+      renderPage();
+
+      await waitFor(() => expect(screen.getByText('file_1.xlsx')).toBeInTheDocument());
+      expect(screen.getByText('file_5.xlsx')).toBeInTheDocument();
+      expect(screen.queryByText('file_6.xlsx')).not.toBeInTheDocument();
+      expect(screen.getByText('1 / 2')).toBeInTheDocument();
+
+      await user.click(screen.getByLabelText('업로드 파일 다음 페이지'));
+      await waitFor(() => expect(screen.getByText('file_6.xlsx')).toBeInTheDocument());
+      expect(screen.getByText('file_7.xlsx')).toBeInTheDocument();
+      expect(screen.queryByText('file_1.xlsx')).not.toBeInTheDocument();
+      expect(screen.getByText('2 / 2')).toBeInTheDocument();
+    });
+
     it('does not apply the file when the confirmation is cancelled', async () => {
       const user = userEvent.setup();
       seedAdmin();

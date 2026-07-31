@@ -13,6 +13,7 @@ import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
 
 const PAGE_SIZE = 20;
+const DOC_PAGE_SIZE = 5;
 
 export default function Assets() {
   const navigate = useNavigate();
@@ -47,6 +48,7 @@ export default function Assets() {
   const [applyingAllDocs, setApplyingAllDocs] = useState(false);
   const [docDragActive, setDocDragActive] = useState(false);
   const [docPendingIds, setDocPendingIds] = useState(new Set());
+  const [docPage, setDocPage] = useState(1);
   const docFileInputRef = useRef(null);
 
   const [formData, setFormData] = useState({
@@ -324,6 +326,15 @@ export default function Assets() {
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
+  const docTotalPages = Math.max(1, Math.ceil(docFiles.length / DOC_PAGE_SIZE));
+  const pagedDocFiles = docFiles.slice((docPage - 1) * DOC_PAGE_SIZE, docPage * DOC_PAGE_SIZE);
+
+  // 파일이 삭제되는 등으로 목록이 줄어들어 지금 페이지가 더 이상 존재하지 않게 되면
+  // 마지막 페이지로 당겨준다 (빈 페이지가 표시되는 것을 방지).
+  useEffect(() => {
+    setDocPage((p) => Math.min(p, docTotalPages));
+  }, [docTotalPages]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -479,7 +490,7 @@ export default function Assets() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 2xl:grid-cols-[3fr_2fr] gap-6 items-start">
+      <div className="grid grid-cols-1 2xl:grid-cols-[3fr_2fr] gap-6">
       <div className="card">
         <div className="flex flex-col sm:flex-row gap-4 mb-4">
           <input
@@ -574,6 +585,7 @@ export default function Assets() {
               <button
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page <= 1}
+                aria-label="이전 페이지"
                 className="btn btn-secondary px-2 py-1 disabled:opacity-40"
               >
                 <ChevronLeft size={16} />
@@ -582,6 +594,7 @@ export default function Assets() {
               <button
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page >= totalPages}
+                aria-label="다음 페이지"
                 className="btn btn-secondary px-2 py-1 disabled:opacity-40"
               >
                 <ChevronRight size={16} />
@@ -702,7 +715,7 @@ export default function Assets() {
             </div>
           ) : (
             <div className="space-y-4">
-              {docFiles.map((file) => (
+              {pagedDocFiles.map((file) => (
                 <div key={file.id} className="border rounded-lg p-4">
                   <div className="flex justify-between items-start mb-2 flex-wrap gap-2">
                     <div className="flex items-center gap-2 min-w-0">
@@ -917,6 +930,34 @@ export default function Assets() {
                   )}
                 </div>
               ))}
+            </div>
+          )}
+
+          {docFiles.length > DOC_PAGE_SIZE && (
+            <div className="flex items-center justify-between mt-4 text-sm text-gray-600">
+              <div>
+                전체 {docFiles.length}건 중 {(docPage - 1) * DOC_PAGE_SIZE + 1}-
+                {Math.min(docPage * DOC_PAGE_SIZE, docFiles.length)}건
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setDocPage((p) => Math.max(1, p - 1))}
+                  disabled={docPage <= 1}
+                  aria-label="업로드 파일 이전 페이지"
+                  className="btn btn-secondary px-2 py-1 disabled:opacity-40"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <span>{docPage} / {docTotalPages}</span>
+                <button
+                  onClick={() => setDocPage((p) => Math.min(docTotalPages, p + 1))}
+                  disabled={docPage >= docTotalPages}
+                  aria-label="업로드 파일 다음 페이지"
+                  className="btn btn-secondary px-2 py-1 disabled:opacity-40"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
             </div>
           )}
         </div>
