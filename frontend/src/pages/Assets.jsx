@@ -490,7 +490,7 @@ export default function Assets() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 2xl:grid-cols-[3fr_2fr] gap-6">
+      <div className="grid grid-cols-1 2xl:grid-cols-[3fr_2fr] gap-6 items-start">
       <div className="card">
         <div className="flex flex-col sm:flex-row gap-4 mb-4">
           <input
