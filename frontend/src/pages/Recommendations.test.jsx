@@ -44,6 +44,17 @@ describe('Recommendations', () => {
     renderPage();
     await waitFor(() => expect(screen.getByText('데스크톱 Lenovo ThinkCentre')).toBeInTheDocument());
     expect(screen.getByText('111.2점')).toBeInTheDocument();
+    // reasonUpdatedAt이 없는(규칙 기반 문구) 경우엔 작성일을 표시하지 않는다.
+    expect(screen.queryByText(/작성\)/)).not.toBeInTheDocument();
+  });
+
+  it('shows when the AI reason was written, and hides the date when it has none', async () => {
+    aiApi.getReplacementRecommendation.mockResolvedValue({
+      data: { data: { recommendations: [{ ...RECOMMENDATION, reasonUpdatedAt: '2024-06-01T09:00:00' }] } },
+    });
+    renderPage();
+    await waitFor(() => expect(screen.getByText('내용연수를 초과해 사용 중입니다.')).toBeInTheDocument());
+    expect(screen.getByText(/작성\)/)).toBeInTheDocument();
   });
 
   it('shows an empty state when there are no recommendations', async () => {
