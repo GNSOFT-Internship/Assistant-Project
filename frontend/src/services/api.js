@@ -53,10 +53,10 @@ export const assetApi = {
   create: (data) => api.post('/assets', data),
   update: (id, data) => api.put(`/assets/${id}`, data),
   delete: (id) => api.delete(`/assets/${id}`),
-  getMaintenanceHistory: (id) => api.get(`/assets/${id}/maintenance`),
+  getMaintenanceHistory: (id, params) => api.get(`/assets/${id}/maintenance`, { params }),
   updateMaintenanceRecord: (assetId, recordId, data) => api.put(`/assets/${assetId}/maintenance/${recordId}`, data),
   deleteMaintenanceRecord: (assetId, recordId) => api.delete(`/assets/${assetId}/maintenance/${recordId}`),
-  getHistory: (id) => api.get(`/assets/${id}/history`),
+  getHistory: (id, params) => api.get(`/assets/${id}/history`, { params }),
   getAuditLogs: (params) => api.get('/assets/audit-logs', { params }),
 };
 
