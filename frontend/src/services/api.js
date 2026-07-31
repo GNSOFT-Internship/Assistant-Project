@@ -147,7 +147,12 @@ export const chatApi = {
 export const reportApi = {
   getMonthly: (params) => api.get('/reports/monthly', { params }),
   getNarrative: (reportData) => api.post('/reports/monthly/narrative', reportData, { timeout: AI_TIMEOUT }),
-  downloadPdf: (params) => api.get('/reports/monthly/pdf', { params, responseType: 'blob', timeout: AI_TIMEOUT }),
+  downloadPdf: (params, config = {}) => api.get('/reports/monthly/pdf', {
+  ...config,
+  params,
+  responseType: 'blob',
+  timeout: AI_TIMEOUT,
+}),
 };
 
 export const budgetApi = {

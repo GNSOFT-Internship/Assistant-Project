@@ -18,6 +18,12 @@ export default function Reports() {
   const [loadingAiSummary, setLoadingAiSummary] = React.useState(false);
   const [year, setYear] = React.useState(CURRENT_YEAR);
   const [month, setMonth] = React.useState(CURRENT_MONTH);
+  const abortControllerRef = React.useRef(null);
+  // AbortController.abort()는 "요청 취소를 시도"할 뿐, 로컬 서버처럼 응답이 빠른 환경에서는
+  // 사용자가 취소 버튼을 누르는 시점에 이미 응답이 도착해 있어 취소가 씹힐 수 있다.
+  // 그래서 매 다운로드 시도마다 세대 번호를 증가시키고, 응답이 왔을 때 "지금도 최신 요청인지"를
+  // 다시 확인해서, 취소되었거나 그 사이 다른 연/월로 새 요청이 시작된 옛 응답은 그냥 버린다.
+  const generationRef = React.useRef(0);
 
   const handleYearChange = (newYear) => {
     setYear(newYear);
@@ -62,43 +68,63 @@ export default function Reports() {
     }
   };
 
-  const abortControllerRef = React.useRef(null);
-
   const handleGenerate = async () => {
+    // 이 요청만의 고유 세대 번호. 응답이 도착했을 때 이 번호가 여전히 최신인지 확인해서,
+    // 취소되었거나 그 사이 다른 다운로드가 새로 시작된 응답이면 버린다.
+    const requestGeneration = ++generationRef.current;
+    // 연/월 select는 generating 동안 비활성화되지만, 취소 후 재활성화된 뒤 사용자가
+    // 곧바로 다른 연/월을 선택할 수 있으므로, 파일명·내용은 "요청을 보낸 시점의 값"으로
+    // 고정해 둔다 (state를 나중에 다시 읽으면 그 사이 바뀐 값을 잘못 붙일 수 있음).
+    const reqYear = year;
+    const reqMonth = month;
+
     setGenerating(true);
     abortControllerRef.current = new AbortController();
     try {
-      const response = await reportApi.downloadPdf({ year, month }, { signal: abortControllerRef.current.signal });
+      const response = await reportApi.downloadPdf(
+        { year: reqYear, month: reqMonth },
+        { signal: abortControllerRef.current.signal }
+      );
+
+      // abort()가 타이밍상 서버 응답을 막지 못해 정상 응답이 그대로 와버린 경우 대비:
+      // 취소 이후(또는 새 요청 시작 이후)의 낡은 응답이면 파일을 저장하지 않고 조용히 버린다.
+      if (requestGeneration !== generationRef.current) return;
 
       const blob = new Blob([response.data], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `자산관리_보고서_${year}-${String(month).padStart(2, '0')}.pdf`;
+      link.download = `자산관리_보고서_${reqYear}-${String(reqMonth).padStart(2, '0')}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      if (error.name === 'AbortError') {
-        console.log('보고서 생성 취소됨');
+      if (requestGeneration !== generationRef.current) return;
+      if (error?.name === 'CanceledError' || error?.name === 'AbortError') {
+        // 사용자가 취소한 경우이므로 에러 토스트를 띄우지 않는다
         return;
       }
       console.error('보고서 생성 실패:', error);
       const errorMessage = error?.response?.data?.detail || error?.message || '보고서 생성 실패';
       toast.error(`보고서 생성 실패: ${errorMessage}`);
     } finally {
-      setGenerating(false);
-      abortControllerRef.current = null;
+      // 이 요청이 이미 취소/대체되어 무효화된 뒤라면, 그 사이 시작된 "다음" 요청의
+      // generating/abortControllerRef 상태를 잘못 초기화하지 않도록 건너뛴다.
+      if (requestGeneration === generationRef.current) {
+        setGenerating(false);
+        abortControllerRef.current = null;
+      }
     }
   };
 
   const handleCancel = () => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      setGenerating(false);
-      toast.info('PDF 생성이 취소되었습니다.');
-    }
+    abortControllerRef.current?.abort();
+    // 세대 번호를 올려서, 이미 서버 응답이 도착해 있어 abort가 씹히더라도
+    // 위의 generation 검사에서 무조건 무시되도록 한다.
+    generationRef.current++;
+    setGenerating(false);
+    abortControllerRef.current = null;
   };
 
   const activeCount = report?.byStatus?.ACTIVE || 0;
