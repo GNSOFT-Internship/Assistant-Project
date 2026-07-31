@@ -14,3 +14,23 @@ export function formatCurrency(amount) {
   if (amount == null || Number.isNaN(amount)) return '-';
   return `${Math.round(amount).toLocaleString()}원`;
 }
+
+// 대시보드 "최근 활동" 등에서 "5분 전", "3시간 전" 처럼 짧게 보여주기 위한 상대 시간 포맷.
+// 하루가 넘어가면 절대 날짜(YYYY-MM-DD)로 바꿔서, 오래된 항목까지 "며칠 전"으로만 표시되어
+// 언제인지 가늠하기 어려워지는 것을 막는다.
+export function formatRelativeTime(dateInput) {
+  if (!dateInput) return '-';
+  const date = new Date(dateInput);
+  if (Number.isNaN(date.getTime())) return '-';
+
+  const diffSeconds = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (diffSeconds < 60) return '방금 전';
+  const diffMinutes = Math.floor(diffSeconds / 60);
+  if (diffMinutes < 60) return `${diffMinutes}분 전`;
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours}시간 전`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 7) return `${diffDays}일 전`;
+
+  return date.toISOString().slice(0, 10);
+}
