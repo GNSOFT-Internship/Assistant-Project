@@ -102,7 +102,7 @@ export default function Assets() {
   };
 
   const SortIcon = ({ column }) => {
-    if (sortBy !== column) return <ArrowUpDown size={12} className="text-gray-300" />;
+    if (sortBy !== column) return <ArrowUpDown size={12} className="text-gray-300 dark:text-slate-600" />;
     return sortOrder === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />;
   };
 
@@ -442,12 +442,12 @@ export default function Assets() {
                 <Download size={16} /> 예시 파일
               </button>
               {showTemplateMenu && (
-                <div className="absolute top-full mt-2 right-0 z-40 w-72 max-w-[calc(100vw-2rem)] bg-white border border-gray-200 rounded-lg shadow-lg py-1">
+                <div className="absolute top-full mt-2 right-0 z-40 w-72 max-w-[calc(100vw-2rem)] bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg shadow-lg py-1">
                   <a
                     href="/templates/자산등록_예시.xlsx"
                     download
                     onClick={() => setShowTemplateMenu(false)}
-                    className="block px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                    className="block px-3 py-2 text-sm text-gray-700 dark:text-slate-300 hover:bg-gray-50 hover:dark:bg-slate-900"
                   >
                     자산 등록 예시 엑셀
                   </a>
@@ -455,7 +455,7 @@ export default function Assets() {
                     href="/templates/유지보수내역서_예시.xlsx"
                     download
                     onClick={() => setShowTemplateMenu(false)}
-                    className="block px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                    className="block px-3 py-2 text-sm text-gray-700 dark:text-slate-300 hover:bg-gray-50 hover:dark:bg-slate-900"
                   >
                     유지보수 내역서 예시 엑셀 (정상+불일치 혼합)
                   </a>
@@ -463,7 +463,7 @@ export default function Assets() {
                     href="/templates/유지보수내역서_전체불일치_예시.xlsx"
                     download
                     onClick={() => setShowTemplateMenu(false)}
-                    className="block px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                    className="block px-3 py-2 text-sm text-gray-700 dark:text-slate-300 hover:bg-gray-50 hover:dark:bg-slate-900"
                   >
                     유지보수 내역서 예시 엑셀 (전체 불일치)
                   </a>
@@ -471,7 +471,7 @@ export default function Assets() {
                     href="/templates/유지보수내역서_오류행포함_예시.xlsx"
                     download
                     onClick={() => setShowTemplateMenu(false)}
-                    className="block px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                    className="block px-3 py-2 text-sm text-gray-700 dark:text-slate-300 hover:bg-gray-50 hover:dark:bg-slate-900"
                   >
                     유지보수 내역서 예시 엑셀 (오류 행 포함)
                   </a>
@@ -515,7 +515,7 @@ export default function Assets() {
         {loading ? (
           <LoadingState className="py-8" />
         ) : assets.length === 0 ? (
-          <div className="text-center text-gray-500 py-8">일치하는 자산이 없습니다.</div>
+          <div className="text-center text-gray-500 dark:text-slate-400 py-8">일치하는 자산이 없습니다.</div>
         ) : (
         <div className="overflow-x-auto">
           <table className="table">
@@ -542,7 +542,7 @@ export default function Assets() {
               {assets.map((asset) => (
                 <tr
                   key={asset.id}
-                  className="border-t cursor-pointer hover:bg-gray-50"
+                  className="border-t cursor-pointer hover:bg-gray-50 hover:dark:bg-slate-900"
                   onClick={() => navigate(`/assets/${asset.id}`)}
                 >
                   <td className="table-cell font-medium">{asset.assetName}</td>
@@ -558,13 +558,13 @@ export default function Assets() {
                       <>
                         <button
                           onClick={() => handleEdit(asset)}
-                          className="p-2 hover:bg-gray-100 rounded"
+                          className="p-2 hover:bg-gray-100 hover:dark:bg-slate-700 rounded"
                         >
                           <Edit size={16} />
                         </button>
                         <button
                           onClick={() => handleDelete(asset.id)}
-                          className="p-2 hover:bg-red-100 rounded text-red-600"
+                          className="p-2 hover:bg-red-100 hover:dark:bg-red-500/15 rounded text-red-600"
                         >
                           <Trash2 size={16} />
                         </button>
@@ -579,7 +579,7 @@ export default function Assets() {
         )}
 
         {!loading && total > 0 && (
-          <div className="flex items-center justify-between mt-4 text-sm text-gray-600">
+          <div className="flex items-center justify-between mt-4 text-sm text-gray-600 dark:text-slate-400">
             <div>전체 {total}건 중 {(page - 1) * PAGE_SIZE + 1}-{Math.min(page * PAGE_SIZE, total)}건</div>
             <div className="flex items-center gap-2">
               <button
@@ -610,7 +610,7 @@ export default function Assets() {
         {isAdmin ? (
           <div
             className={`border-2 border-dashed rounded-lg p-8 text-center transition-all ${
-              docDragActive ? "border-blue-500 bg-blue-50" : "border-gray-300"
+              docDragActive ? "border-blue-500 bg-blue-50 dark:bg-blue-500/10" : "border-gray-300 dark:border-slate-600"
             }`}
             onDragEnter={handleDocDrag}
             onDragLeave={handleDocDrag}
@@ -626,11 +626,11 @@ export default function Assets() {
               className="hidden"
             />
 
-            <Upload className={`mx-auto mb-4 transition-colors ${docDragActive ? "text-blue-500 animate-bounce" : "text-gray-400"}`} size={48} />
-            <div className="text-gray-600 mb-2 font-medium">
+            <Upload className={`mx-auto mb-4 transition-colors ${docDragActive ? "text-blue-500 animate-bounce" : "text-gray-400 dark:text-slate-500"}`} size={48} />
+            <div className="text-gray-600 dark:text-slate-400 mb-2 font-medium">
               신규 자산 등록용 엑셀, 또는 기존 자산의 유지보수 내역서(엑셀)·견적서(PDF)를 이곳에 끌어다 놓으세요.
             </div>
-            <div className="text-sm text-gray-400 mb-4">
+            <div className="text-sm text-gray-400 dark:text-slate-500 mb-4">
               파일 내용을 보고 자산 등록/유지보수 내역을 자동으로 구분합니다. 동시 업로드 및 백그라운드 비동기 대량 배치 분석을 지원합니다.
             </div>
             <button
@@ -643,18 +643,18 @@ export default function Assets() {
             </button>
           </div>
         ) : (
-          <div className="text-center text-gray-500 py-4">
+          <div className="text-center text-gray-500 dark:text-slate-400 py-4">
             파일 업로드는 관리자만 가능합니다. 아래에서 업로드된 파일을 조회할 수 있습니다.
           </div>
         )}
 
         {docFiles.length > 0 && (
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-6">
-            <div className="card text-center p-4 bg-gray-50 border border-gray-200">
-              <div className="text-2xl font-bold text-gray-800">{docFiles.length}건</div>
-              <div className="text-xs text-gray-500 font-medium mt-1">총 업로드</div>
+            <div className="card text-center p-4 bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-600">
+              <div className="text-2xl font-bold text-gray-800 dark:text-slate-200">{docFiles.length}건</div>
+              <div className="text-xs text-gray-500 dark:text-slate-400 font-medium mt-1">총 업로드</div>
             </div>
-            <div className="card text-center p-4 bg-yellow-50 border border-yellow-100">
+            <div className="card text-center p-4 bg-yellow-50 dark:bg-yellow-500/10 border border-yellow-100">
               <div className="text-2xl font-bold text-yellow-700 flex items-center justify-center gap-1">
                 {docFiles.filter(f => f.status === 'PROCESSING' || f.status === 'PENDING').length > 0 && (
                   <Loader className="animate-spin text-yellow-600" size={20} />
@@ -663,19 +663,19 @@ export default function Assets() {
               </div>
               <div className="text-xs text-yellow-600 font-medium mt-1">분석 중</div>
             </div>
-            <div className="card text-center p-4 bg-green-50 border border-green-100">
+            <div className="card text-center p-4 bg-green-50 dark:bg-green-500/10 border border-green-100">
               <div className="text-2xl font-bold text-green-700">
                 {docFiles.filter(f => f.status === 'COMPLETED' && !f.applied).length}건
               </div>
               <div className="text-xs text-green-600 font-medium mt-1">분석 완료 (미적용)</div>
             </div>
-            <div className="card text-center p-4 bg-blue-50 border border-blue-100">
+            <div className="card text-center p-4 bg-blue-50 dark:bg-blue-500/10 border border-blue-100">
               <div className="text-2xl font-bold text-blue-700">
                 {docFiles.filter(f => f.applied).length}건
               </div>
               <div className="text-xs text-blue-600 font-medium mt-1">DB 적용 완료</div>
             </div>
-            <div className="card text-center p-4 bg-red-50 border border-red-100 col-span-2 md:col-span-1">
+            <div className="card text-center p-4 bg-red-50 dark:bg-red-500/10 border border-red-100 col-span-2 md:col-span-1">
               <div className="text-2xl font-bold text-red-700">
                 {docFiles.filter(f => f.status === 'FAILED').length}건
               </div>
@@ -710,7 +710,7 @@ export default function Assets() {
           </div>
 
           {docFiles.length === 0 ? (
-            <div className="text-center text-gray-500 py-8">
+            <div className="text-center text-gray-500 dark:text-slate-400 py-8">
               업로드된 파일이 없습니다.
             </div>
           ) : (
@@ -722,7 +722,7 @@ export default function Assets() {
                       <FileText className="text-blue-600 flex-shrink-0" size={20} />
                       <div className="min-w-0">
                         <div className="font-medium break-all">{file.originalFilename}</div>
-                        <div className="text-sm text-gray-500">{file.fileType}</div>
+                        <div className="text-sm text-gray-500 dark:text-slate-400">{file.fileType}</div>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
@@ -752,7 +752,7 @@ export default function Assets() {
                             <CheckCircle size={14} /> 적용
                           </button>
                         ) : (
-                          <span className="text-sm text-gray-500 flex items-center gap-1 px-1">
+                          <span className="text-sm text-gray-500 dark:text-slate-400 flex items-center gap-1 px-1">
                             <XCircle size={14} /> 적용 가능한 항목 없음
                           </span>
                         )
@@ -783,7 +783,7 @@ export default function Assets() {
                   )}
 
                   {file.extractedSummary?.kind === 'asset_registration' && (
-                    <div className="mt-3 bg-gray-50 rounded p-3 text-sm space-y-1">
+                    <div className="mt-3 bg-gray-50 dark:bg-slate-900 rounded p-3 text-sm space-y-1">
                       <div>총 {file.extractedSummary.totalRows}행 중 유효 {file.extractedSummary.validRows}행, 오류 {file.extractedSummary.errorRowCount}행</div>
                       {file.extractedSummary.duplicateAssetCodes?.length > 0 && (
                         <div className="text-yellow-700">
@@ -798,7 +798,7 @@ export default function Assets() {
 
                       {(file.extractedSummary.rows?.length > 0 || file.extractedSummary.errorRows?.length > 0) && (
                         <details className="mt-2">
-                          <summary className="text-gray-500 cursor-pointer">
+                          <summary className="text-gray-500 dark:text-slate-400 cursor-pointer">
                             행별 미리보기 ({(file.extractedSummary.rows?.length || 0) + (file.extractedSummary.errorRows?.length || 0)}행, 오류 {file.extractedSummary.errorRows?.length || 0}행 포함)
                           </summary>
                           <div className="mt-2 overflow-x-auto">
@@ -818,7 +818,7 @@ export default function Assets() {
                                   ...(file.extractedSummary.rows || []).map((r) => ({ ...r, isError: false })),
                                   ...(file.extractedSummary.errorRows || []).map((e) => ({ ...e, isError: true })),
                                 ].sort((a, b) => a.row - b.row).map((r) => (
-                                  <tr key={r.row} className={r.isError ? 'bg-red-50' : (r.assetExists ? 'bg-yellow-50' : '')}>
+                                  <tr key={r.row} className={r.isError ? 'bg-red-50 dark:bg-red-500/10' : (r.assetExists ? 'bg-yellow-50 dark:bg-yellow-500/10' : '')}>
                                     <td className="table-cell">{r.row}</td>
                                     <td className="table-cell">{r.isError ? '-' : r.assetCode}</td>
                                     <td className="table-cell">{r.isError ? '-' : r.assetName}</td>
@@ -842,7 +842,7 @@ export default function Assets() {
                   )}
 
                   {file.extractedSummary?.kind === 'maintenance_records' && (
-                    <div className="mt-3 bg-gray-50 rounded p-3 text-sm space-y-1">
+                    <div className="mt-3 bg-gray-50 dark:bg-slate-900 rounded p-3 text-sm space-y-1">
                       <div>총 {file.extractedSummary.totalRows}행 중 유효 {file.extractedSummary.validRows}행, 오류 {file.extractedSummary.errorRowCount}행</div>
                       {file.extractedSummary.unmatchedAssetCodes?.length > 0 && (
                         <div className="text-yellow-700">
@@ -857,7 +857,7 @@ export default function Assets() {
 
                       {(file.extractedSummary.records?.length > 0 || file.extractedSummary.errorRows?.length > 0) && (
                         <details className="mt-2">
-                          <summary className="text-gray-500 cursor-pointer">
+                          <summary className="text-gray-500 dark:text-slate-400 cursor-pointer">
                             행별 미리보기 ({(file.extractedSummary.records?.length || 0) + (file.extractedSummary.errorRows?.length || 0)}행, 오류 {file.extractedSummary.errorRows?.length || 0}행 포함)
                           </summary>
                           <div className="mt-2 overflow-x-auto">
@@ -879,7 +879,7 @@ export default function Assets() {
                                   ...(file.extractedSummary.records || []).map((r) => ({ ...r, isError: false })),
                                   ...(file.extractedSummary.errorRows || []).map((e) => ({ ...e, isError: true })),
                                 ].sort((a, b) => a.row - b.row).map((r) => (
-                                  <tr key={r.row} className={r.isError ? 'bg-red-50' : (r.assetExists ? '' : 'bg-yellow-50')}>
+                                  <tr key={r.row} className={r.isError ? 'bg-red-50 dark:bg-red-500/10' : (r.assetExists ? '' : 'bg-yellow-50 dark:bg-yellow-500/10')}>
                                     <td className="table-cell">{r.row}</td>
                                     <td className="table-cell">{r.isError ? '-' : r.assetCode}</td>
                                     <td className="table-cell">
@@ -905,7 +905,7 @@ export default function Assets() {
                   )}
 
                   {file.extractedSummary?.kind === 'pdf_quote' && (
-                    <div className="mt-3 bg-gray-50 rounded p-3 text-sm space-y-1">
+                    <div className="mt-3 bg-gray-50 dark:bg-slate-900 rounded p-3 text-sm space-y-1">
                       <div>
                         자산코드: {file.extractedSummary.assetCode || '인식 안 됨'}
                         {file.extractedSummary.assetCode && (
@@ -923,8 +923,8 @@ export default function Assets() {
                         </div>
                       )}
                       <details className="mt-1">
-                        <summary className="text-gray-500 cursor-pointer">추출된 텍스트 전체 보기</summary>
-                        <pre className="whitespace-pre-wrap text-xs text-gray-700 mt-1">{file.extractedSummary.preview}</pre>
+                        <summary className="text-gray-500 dark:text-slate-400 cursor-pointer">추출된 텍스트 전체 보기</summary>
+                        <pre className="whitespace-pre-wrap text-xs text-gray-700 dark:text-slate-300 mt-1">{file.extractedSummary.preview}</pre>
                       </details>
                     </div>
                   )}
@@ -934,7 +934,7 @@ export default function Assets() {
           )}
 
           {docFiles.length > DOC_PAGE_SIZE && (
-            <div className="flex items-center justify-between mt-4 text-sm text-gray-600">
+            <div className="flex items-center justify-between mt-4 text-sm text-gray-600 dark:text-slate-400">
               <div>
                 전체 {docFiles.length}건 중 {(docPage - 1) * DOC_PAGE_SIZE + 1}-
                 {Math.min(docPage * DOC_PAGE_SIZE, docFiles.length)}건

@@ -21,14 +21,14 @@ class ErrorBoundary extends Component {
       }
       
       return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-100">
-          <div className="bg-white p-8 rounded-lg shadow-lg max-w-md w-full">
+        <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-slate-700">
+          <div className="bg-white dark:bg-slate-800 p-8 rounded-lg shadow-lg max-w-md w-full">
             <h2 className="text-2xl font-bold text-red-600 mb-4">오류 발생</h2>
-            <p className="text-gray-600 mb-4">
+            <p className="text-gray-600 dark:text-slate-400 mb-4">
               애플리케이션에서 오류가 발생했습니다.
             </p>
             {this.state.error && (
-              <div className="bg-red-50 p-3 rounded mb-4">
+              <div className="bg-red-50 dark:bg-red-500/10 p-3 rounded mb-4">
                 <p className="text-sm text-red-700">{this.state.error.message}</p>
               </div>
             )}

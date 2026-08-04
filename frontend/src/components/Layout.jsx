@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useSettings } from '../context/SettingsContext';
 import {
   LayoutDashboard, Package, Wrench, Lightbulb, MessageSquare,
-  FileText, LogOut, Wallet, ChevronLeft, ChevronRight, ScrollText, Search, Keyboard
+  FileText, LogOut, Wallet, ChevronLeft, ChevronRight, ScrollText, Search, Keyboard, Sun, Moon
 } from 'lucide-react';
 import CommandPalette from './CommandPalette';
 import ShortcutRecorderModal from './ShortcutRecorderModal';
@@ -56,7 +57,7 @@ function ScrollableNav({ items, activePath, variant }) {
           aria-label="이전 메뉴"
           className="absolute left-0 z-10 h-full px-1 flex items-center bg-gradient-to-r from-white via-white to-transparent"
         >
-          <ChevronLeft size={16} className="text-gray-500" />
+          <ChevronLeft size={16} className="text-gray-500 dark:text-slate-400" />
         </button>
       )}
       <div
@@ -73,7 +74,7 @@ function ScrollableNav({ items, activePath, variant }) {
               className={`${itemClass} ${
                 active
                   ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-sm shadow-blue-500/25 font-semibold'
-                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 hover:dark:bg-slate-700 hover:text-slate-900 hover:dark:text-slate-100'
               }`}
             >
               <Icon size={iconSize} />
@@ -88,7 +89,7 @@ function ScrollableNav({ items, activePath, variant }) {
           aria-label="다음 메뉴"
           className="absolute right-0 z-10 h-full px-1 flex items-center bg-gradient-to-l from-white via-white to-transparent"
         >
-          <ChevronRight size={16} className="text-gray-500" />
+          <ChevronRight size={16} className="text-gray-500 dark:text-slate-400" />
         </button>
       )}
     </div>
@@ -97,6 +98,7 @@ function ScrollableNav({ items, activePath, variant }) {
 
 export default function Layout() {
   const { user, logout } = useAuth();
+  const { theme, toggleTheme } = useSettings();
   const navigate = useNavigate();
   const location = useLocation();
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -142,8 +144,8 @@ export default function Layout() {
   }, [shortcut]);
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <nav className="sticky top-0 z-30 bg-white/70 backdrop-blur-md border-b border-slate-100">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
+      <nav className="sticky top-0 z-30 bg-white/70 dark:bg-slate-800/70 backdrop-blur-md border-b border-slate-100 dark:border-slate-700">
         <div className="max-w-7xl 2xl:max-w-[1680px] mx-auto px-4">
           <div className="flex justify-between h-16">
             <div className="flex items-center min-w-0 flex-1">
@@ -154,7 +156,7 @@ export default function Layout() {
                   alt="자산관리 로고"
                   className="w-[90px] h-[90px] object-contain"
 />
-                <h1 className="text-lg font-bold text-gray-900 hidden sm:block whitespace-nowrap">
+                <h1 className="text-lg font-bold text-gray-900 dark:text-slate-100 hidden sm:block whitespace-nowrap">
                   자산관리 시스템
                 </h1>
               </div>
@@ -170,16 +172,16 @@ export default function Layout() {
                     dismissOnboarding();
                   }}
                   title={`전역 검색 (${shortcutLabel})`}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-gray-500 border border-slate-200 hover:bg-gray-50 hover:text-gray-700 transition-colors"
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-gray-500 dark:text-slate-400 border border-slate-200 dark:border-slate-600 hover:bg-gray-50 hover:dark:bg-slate-900 hover:text-gray-700 hover:dark:text-slate-300 transition-colors"
                 >
                   <Search size={14} />
                   <span>검색</span>
-                  <kbd className="text-xs text-slate-400 border border-slate-200 rounded px-1">{shortcutLabel}</kbd>
+                  <kbd className="text-xs text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-600 rounded px-1">{shortcutLabel}</kbd>
                 </button>
                 <button
                   onClick={() => setRecorderOpen(true)}
                   title="검색 단축키 변경"
-                  className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+                  className="p-1.5 rounded-lg text-gray-400 dark:text-slate-500 hover:bg-gray-100 hover:dark:bg-slate-700 hover:text-gray-600 hover:dark:text-slate-400 transition-colors"
                 >
                   <Keyboard size={16} />
                 </button>
@@ -201,20 +203,27 @@ export default function Layout() {
                   dismissOnboarding();
                 }}
                 title="전역 검색"
-                className="sm:hidden p-2 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+                className="sm:hidden p-2 rounded-lg text-gray-500 dark:text-slate-400 hover:bg-gray-100 hover:dark:bg-slate-700 hover:text-gray-700 hover:dark:text-slate-300 transition-colors"
               >
                 <Search size={18} />
               </button>
-              <div className="hidden sm:flex items-center gap-2 text-sm text-gray-600">
-                <div className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center text-xs font-semibold text-gray-600">
+              <div className="hidden sm:flex items-center gap-2 text-sm text-gray-600 dark:text-slate-400">
+                <div className="w-7 h-7 rounded-full bg-gray-200 dark:bg-slate-700 flex items-center justify-center text-xs font-semibold text-gray-600 dark:text-slate-400">
                   {user?.username?.[0]?.toUpperCase()}
                 </div>
                 <span>{user?.username}</span>
               </div>
               <button
+                onClick={toggleTheme}
+                title={theme === 'dark' ? '라이트 모드로 전환' : '다크 모드로 전환'}
+                className="p-2 rounded-lg text-gray-500 dark:text-slate-400 hover:bg-gray-100 hover:dark:bg-slate-700 hover:text-gray-700 hover:dark:text-slate-300 transition-colors"
+              >
+                {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+              </button>
+              <button
                 onClick={handleLogout}
                 title="로그아웃"
-                className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+                className="p-2 rounded-lg text-gray-500 dark:text-slate-400 hover:bg-gray-100 hover:dark:bg-slate-700 hover:text-gray-700 hover:dark:text-slate-300 transition-colors"
               >
                 <LogOut size={18} />
               </button>

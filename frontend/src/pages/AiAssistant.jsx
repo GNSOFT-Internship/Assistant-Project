@@ -146,34 +146,34 @@ export default function AiAssistant() {
 
         <div className="grid grid-cols-2 gap-4 mb-6 text-sm">
           <div>
-            <div className="text-gray-500">자산번호</div>
+            <div className="text-gray-500 dark:text-slate-400">자산번호</div>
             <div className="font-medium">{viewingAsset.assetCode}</div>
           </div>
           <div>
-            <div className="text-gray-500">카테고리</div>
+            <div className="text-gray-500 dark:text-slate-400">카테고리</div>
             <div className="font-medium">{viewingAsset.category}</div>
           </div>
           <div>
-            <div className="text-gray-500">위치</div>
+            <div className="text-gray-500 dark:text-slate-400">위치</div>
             <div className="font-medium">{viewingAsset.location}</div>
           </div>
           <div>
-            <div className="text-gray-500">담당자</div>
+            <div className="text-gray-500 dark:text-slate-400">담당자</div>
             <div className="font-medium">{viewingAsset.responsiblePerson}</div>
           </div>
           <div>
-            <div className="text-gray-500">구매일</div>
+            <div className="text-gray-500 dark:text-slate-400">구매일</div>
             <div className="font-medium">{viewingAsset.purchaseDate?.split('T')[0]}</div>
           </div>
           <div>
-            <div className="text-gray-500">구매가</div>
+            <div className="text-gray-500 dark:text-slate-400">구매가</div>
             <div className="font-medium">{viewingAsset.purchasePrice?.toLocaleString()}원</div>
           </div>
         </div>
 
         <h3 className="font-semibold mb-2">유지보수 이력</h3>
         {viewingMaintenance.length === 0 ? (
-          <div className="text-center text-gray-500 py-6">유지보수 이력이 없습니다.</div>
+          <div className="text-center text-gray-500 dark:text-slate-400 py-6">유지보수 이력이 없습니다.</div>
         ) : (
           <div className="space-y-3 mb-4">
             {viewingMaintenance.map((record) => (
@@ -181,11 +181,11 @@ export default function AiAssistant() {
                 <div className="flex justify-between items-start">
                   <div>
                     <MaintenanceTypeBadge type={record.maintenanceType} />
-                    <div className="text-sm text-gray-600 mt-1">{record.description}</div>
+                    <div className="text-sm text-gray-600 dark:text-slate-400 mt-1">{record.description}</div>
                   </div>
                   <div className="text-right">
                     <div className="text-sm font-medium">{record.cost?.toLocaleString()}원</div>
-                    <div className="text-xs text-gray-500">{record.maintenanceDate?.split('T')[0]}</div>
+                    <div className="text-xs text-gray-500 dark:text-slate-400">{record.maintenanceDate?.split('T')[0]}</div>
                   </div>
                 </div>
               </div>
@@ -214,19 +214,19 @@ export default function AiAssistant() {
             </button>
           )}
         </div>
-        <p className="text-sm text-gray-500 mb-4">
+        <p className="text-sm text-gray-500 dark:text-slate-400 mb-4">
           자산 현황을 질문하거나, 조건에 맞는 자산을 자연어로 찾아보세요. 필요하면 관련 자산 목록도 함께 보여드립니다.
           대화 내용은 계정에 저장되어 다른 페이지에 다녀와도 이어집니다.
         </p>
 
-        <div className="bg-gray-50 rounded-lg p-4 mb-4">
-          <div className="text-sm text-gray-600 mb-2">추천 질문:</div>
+        <div className="bg-gray-50 dark:bg-slate-900 rounded-lg p-4 mb-4">
+          <div className="text-sm text-gray-600 dark:text-slate-400 mb-2">추천 질문:</div>
           <div className="flex flex-wrap gap-2">
             {suggestedQuestions.map((q, i) => (
               <button
                 key={i}
                 onClick={() => setInput(q)}
-                className="text-sm px-3 py-1 bg-white border rounded hover:bg-gray-100"
+                className="text-sm px-3 py-1 bg-white dark:bg-slate-800 border rounded hover:bg-gray-100 hover:dark:bg-slate-700"
               >
                 {q}
               </button>
@@ -234,13 +234,13 @@ export default function AiAssistant() {
           </div>
         </div>
 
-        <div ref={messagesContainerRef} className="border rounded-lg h-[28rem] overflow-y-auto p-4 bg-white space-y-4">
+        <div ref={messagesContainerRef} className="border rounded-lg h-[28rem] overflow-y-auto p-4 bg-white dark:bg-slate-800 space-y-4">
           {loadingHistory ? (
-            <div className="h-full flex items-center justify-center text-gray-500">
+            <div className="h-full flex items-center justify-center text-gray-500 dark:text-slate-400">
               대화 기록을 불러오는 중...
             </div>
           ) : messages.length === 0 && (
-            <div className="h-full flex items-center justify-center text-gray-500">
+            <div className="h-full flex items-center justify-center text-gray-500 dark:text-slate-400">
               질문을 입력하세요.
             </div>
           )}
@@ -248,13 +248,13 @@ export default function AiAssistant() {
           {messages.map((msg, i) => (
             <div key={i} className={`flex ${msg.type === 'user' ? 'justify-end' : ''}`}>
               {msg.type === 'ai' && (
-                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-2 flex-shrink-0">
+                <div className="w-8 h-8 bg-blue-100 dark:bg-blue-500/15 rounded-full flex items-center justify-center mr-2 flex-shrink-0">
                   <Bot size={16} className="text-blue-600" />
                 </div>
               )}
               <div className={msg.type === 'user' ? 'max-w-[80%]' : 'max-w-[85%] flex-1'}>
                 <div className={`rounded-lg p-3 w-fit ${
-                  msg.type === 'user' ? 'bg-blue-600 text-white ml-auto' : 'bg-gray-100 text-gray-800'
+                  msg.type === 'user' ? 'bg-blue-600 text-white ml-auto' : 'bg-gray-100 dark:bg-slate-700 text-gray-800 dark:text-slate-200'
                 }`}>
                   <div className="whitespace-pre-line">{msg.content}</div>
                 </div>
@@ -274,7 +274,7 @@ export default function AiAssistant() {
                         {msg.assets.map((asset) => (
                           <tr
                             key={asset.id}
-                            className="border-t cursor-pointer hover:bg-gray-50"
+                            className="border-t cursor-pointer hover:bg-gray-50 hover:dark:bg-slate-900"
                             onClick={() => handleAssetClick(asset.id)}
                           >
                             <td className="table-cell font-medium">{asset.assetName}</td>
@@ -289,8 +289,8 @@ export default function AiAssistant() {
                 )}
               </div>
               {msg.type === 'user' && (
-                <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center ml-2 flex-shrink-0">
-                  <User size={16} className="text-gray-600" />
+                <div className="w-8 h-8 bg-gray-200 dark:bg-slate-700 rounded-full flex items-center justify-center ml-2 flex-shrink-0">
+                  <User size={16} className="text-gray-600 dark:text-slate-400" />
                 </div>
               )}
             </div>
@@ -298,10 +298,10 @@ export default function AiAssistant() {
 
           {loading && (
             <div className="flex">
-              <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-2">
+              <div className="w-8 h-8 bg-blue-100 dark:bg-blue-500/15 rounded-full flex items-center justify-center mr-2">
                 <Bot size={16} className="text-blue-600" />
               </div>
-              <div className="bg-gray-100 rounded-lg p-3">
+              <div className="bg-gray-100 dark:bg-slate-700 rounded-lg p-3">
                 답변 중...
               </div>
             </div>

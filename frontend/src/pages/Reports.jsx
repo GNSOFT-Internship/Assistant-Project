@@ -152,7 +152,7 @@ export default function Reports() {
             className="flex items-center gap-2"
             title={generating ? `${CURRENT_MONTH}월 PDF 를 다운중입니다 !` : undefined}
           >
-            <label htmlFor="report-year" className="text-sm text-gray-600">
+            <label htmlFor="report-year" className="text-sm text-gray-600 dark:text-slate-400">
               보고 대상
             </label>
             <Dropdown
@@ -188,7 +188,7 @@ export default function Reports() {
               <FileText className="text-blue-600" size={32} />
               <h2 className="text-lg font-semibold">월간 자산관리 보고서 ({year}년 {month}월)</h2>
             </div>
-            <ul className="space-y-2 text-sm text-gray-600 mb-6">
+            <ul className="space-y-2 text-sm text-gray-600 dark:text-slate-400 mb-6">
               <li>• 자산 현황 요약</li>
               <li>• 유지보수 비용 분석</li>
               <li>• 교체 권장 자산 목록</li>
@@ -216,7 +216,7 @@ export default function Reports() {
                 )}
               </div>
               {generating && (
-                <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-blue-100">
+                <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-blue-100 dark:bg-blue-500/15">
                   <div
                     className="h-full rounded-full bg-blue-600 transition-all duration-200 ease-linear"
                     style={{
@@ -228,30 +228,30 @@ export default function Reports() {
             </div>
           </div>
 
-          <div className="border rounded-lg p-6 bg-gray-50">
+          <div className="border rounded-lg p-6 bg-gray-50 dark:bg-slate-900">
             <h3 className="font-semibold mb-4">보고서 미리보기</h3>
             {loading || !report ? (
-              <p className="text-sm text-gray-500">불러오는 중...</p>
+              <p className="text-sm text-gray-500 dark:text-slate-400">불러오는 중...</p>
             ) : (
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">총 자산 수</span>
+                  <span className="text-gray-600 dark:text-slate-400">총 자산 수</span>
                   <span className="font-medium">{report.totalAssets} 개</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">가동 중 자산</span>
+                  <span className="text-gray-600 dark:text-slate-400">가동 중 자산</span>
                   <span className="font-medium">{activeCount} 개</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">교체 필요 자산</span>
+                  <span className="text-gray-600 dark:text-slate-400">교체 필요 자산</span>
                   <span className="font-medium text-red-600">{replacementCount} 개</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">{month}월 유지보수 비용</span>
+                  <span className="text-gray-600 dark:text-slate-400">{month}월 유지보수 비용</span>
                   <span className="font-medium">{formatCurrency(report.totalMaintenanceCost)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">반복 고장 자산</span>
+                  <span className="text-gray-600 dark:text-slate-400">반복 고장 자산</span>
                   <span className="font-medium">{report.repeatedFailureCount} 개</span>
                 </div>
               </div>
@@ -263,7 +263,7 @@ export default function Reports() {
           <div className="mt-6">
             {report.executiveSummary == null ? (
               <div className="border rounded-lg p-6 text-center">
-                <p className="text-sm text-gray-500 mb-3">
+                <p className="text-sm text-gray-500 dark:text-slate-400 mb-3">
                   AI 요약, 주요 문제점, 향후 관리 권장사항은 버튼을 눌러야 생성됩니다.
                 </p>
                 <button
@@ -278,12 +278,12 @@ export default function Reports() {
               <div className="space-y-4">
                 <div className="border rounded-lg p-4">
                   <h3 className="font-semibold mb-2">AI 요약</h3>
-                  <p className="text-sm text-gray-700">{report.executiveSummary}</p>
+                  <p className="text-sm text-gray-700 dark:text-slate-300">{report.executiveSummary}</p>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="border rounded-lg p-4">
                     <h3 className="font-semibold mb-2">주요 문제점</h3>
-                    <ul className="text-sm text-gray-700 space-y-1 list-disc list-inside">
+                    <ul className="text-sm text-gray-700 dark:text-slate-300 space-y-1 list-disc list-inside">
                       {(report.keyIssues || []).map((issue, i) => (
                         <li key={i}>{issue}</li>
                       ))}
@@ -291,7 +291,7 @@ export default function Reports() {
                   </div>
                   <div className="border rounded-lg p-4">
                     <h3 className="font-semibold mb-2">향후 관리 권장사항</h3>
-                    <ul className="text-sm text-gray-700 space-y-1 list-disc list-inside">
+                    <ul className="text-sm text-gray-700 dark:text-slate-300 space-y-1 list-disc list-inside">
                       {(report.recommendations || []).map((rec, i) => (
                         <li key={i}>{rec}</li>
                       ))}

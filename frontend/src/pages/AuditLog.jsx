@@ -24,9 +24,9 @@ const ACTION_FILTER_OPTIONS = [
 ];
 
 const ACTION_STYLE = {
-  CREATE: 'bg-green-100 text-green-700',
-  UPDATE: 'bg-blue-100 text-blue-700',
-  DELETE: 'bg-red-100 text-red-700',
+  CREATE: 'bg-green-100 dark:bg-green-500/15 text-green-700',
+  UPDATE: 'bg-blue-100 dark:bg-blue-500/15 text-blue-700',
+  DELETE: 'bg-red-100 dark:bg-red-500/15 text-red-700',
 };
 
 // 백엔드가 스네이크케이스 필드명을 그대로 내려주므로(_TRACKED_FIELDS 참고),
@@ -49,20 +49,20 @@ const FIELD_LABEL = {
 // 대시보드 통계 카드와 같은 톤(연한 배경 + 진한 텍스트)으로, 필드마다 다른 색을 부여해
 // 한 줄에 여러 필드가 나열돼도 한눈에 구분되도록 한다.
 const FIELD_COLOR = {
-  asset_name: 'bg-blue-50 text-blue-600',
-  asset_code: 'bg-cyan-50 text-cyan-600',
-  category: 'bg-amber-50 text-amber-600',
-  location: 'bg-purple-50 text-purple-600',
-  responsible_person: 'bg-pink-50 text-pink-600',
-  purchase_date: 'bg-indigo-50 text-indigo-600',
-  purchase_price: 'bg-green-50 text-green-600',
-  useful_life: 'bg-teal-50 text-teal-600',
-  status: 'bg-violet-50 text-violet-600',
-  description: 'bg-gray-100 text-gray-600',
-  source: 'bg-sky-50 text-sky-600',
-  maintenance_record: 'bg-rose-50 text-rose-600',
+  asset_name: 'bg-blue-50 dark:bg-blue-500/10 text-blue-600',
+  asset_code: 'bg-cyan-50 dark:bg-cyan-500/10 text-cyan-600',
+  category: 'bg-amber-50 dark:bg-amber-500/10 text-amber-600',
+  location: 'bg-purple-50 dark:bg-purple-500/10 text-purple-600',
+  responsible_person: 'bg-pink-50 dark:bg-pink-500/10 text-pink-600',
+  purchase_date: 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600',
+  purchase_price: 'bg-green-50 dark:bg-green-500/10 text-green-600',
+  useful_life: 'bg-teal-50 dark:bg-teal-500/10 text-teal-600',
+  status: 'bg-violet-50 dark:bg-violet-500/10 text-violet-600',
+  description: 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-400',
+  source: 'bg-sky-50 dark:bg-sky-500/10 text-sky-600',
+  maintenance_record: 'bg-rose-50 dark:bg-rose-500/10 text-rose-600',
 };
-const DEFAULT_FIELD_COLOR = 'bg-gray-100 text-gray-600';
+const DEFAULT_FIELD_COLOR = 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-400';
 
 // 필드별로 값 자체도 한글/보기 좋은 형태로 바꿔야 하는 경우 처리
 // (status는 영문 enum 코드라서 반드시 한글 라벨로 바꿔야 함)
@@ -106,7 +106,7 @@ function ChangesCell({ changes }) {
   const entries = getChangeEntries(changes);
 
   if (entries.length === 0) {
-    return <span className="text-gray-400">-</span>;
+    return <span className="text-gray-400 dark:text-slate-500">-</span>;
   }
 
   const visibleEntries = expanded ? entries : entries.slice(0, CHANGES_COLLAPSE_THRESHOLD);
@@ -125,18 +125,18 @@ function ChangesCell({ changes }) {
             </span>
             {isCreated && (
               <>
-                <span className="shrink-0 text-gray-300">→</span>
-                <span className="break-all font-medium text-gray-900">{newText}</span>
+                <span className="shrink-0 text-gray-300 dark:text-slate-600">→</span>
+                <span className="break-all font-medium text-gray-900 dark:text-slate-100">{newText}</span>
               </>
             )}
             {isDeleted && (
-              <span className="break-all text-gray-400 line-through decoration-gray-300">{oldText}</span>
+              <span className="break-all text-gray-400 dark:text-slate-500 line-through decoration-gray-300">{oldText}</span>
             )}
             {!isCreated && !isDeleted && (
               <span className="flex flex-wrap items-center gap-x-1 break-all">
-                <span className="text-gray-400 line-through decoration-gray-300">{oldText}</span>
-                <span className="shrink-0 text-gray-300">→</span>
-                <span className="font-medium text-gray-900">{newText}</span>
+                <span className="text-gray-400 dark:text-slate-500 line-through decoration-gray-300">{oldText}</span>
+                <span className="shrink-0 text-gray-300 dark:text-slate-600">→</span>
+                <span className="font-medium text-gray-900 dark:text-slate-100">{newText}</span>
               </span>
             )}
           </div>
@@ -155,7 +155,7 @@ function ChangesCell({ changes }) {
         <button
           type="button"
           onClick={() => setExpanded(false)}
-          className="text-xs font-medium text-gray-500 hover:underline"
+          className="text-xs font-medium text-gray-500 dark:text-slate-400 hover:underline"
         >
           접기
         </button>
@@ -242,7 +242,7 @@ export default function AuditLog() {
         {loading ? (
           <LoadingState className="py-8" />
         ) : logs.length === 0 ? (
-          <div className="text-center text-gray-500 py-8">기록이 없습니다.</div>
+          <div className="text-center text-gray-500 dark:text-slate-400 py-8">기록이 없습니다.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="table">
@@ -264,7 +264,7 @@ export default function AuditLog() {
                     </td>
                     <td className="table-cell">{log.changedBy || '-'}</td>
                     <td className="table-cell">
-                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${ACTION_STYLE[log.action] || 'bg-gray-100 text-gray-700'}`}>
+                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${ACTION_STYLE[log.action] || 'bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-slate-300'}`}>
                         {ACTION_LABEL[log.action] || log.action}
                       </span>
                     </td>
@@ -281,7 +281,7 @@ export default function AuditLog() {
         )}
 
         {!loading && total > 0 && (
-          <div className="flex items-center justify-between mt-4 text-sm text-gray-600">
+          <div className="flex items-center justify-between mt-4 text-sm text-gray-600 dark:text-slate-400">
             <div>전체 {total}건 중 {(page - 1) * PAGE_SIZE + 1}-{Math.min(page * PAGE_SIZE, total)}건</div>
             <div className="flex items-center gap-2">
               <button

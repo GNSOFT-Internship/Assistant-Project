@@ -91,11 +91,11 @@ export default function CommandPalette({ open, onClose, navItems }) {
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden"
+        className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-lg overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center gap-3 px-4 border-b border-slate-100">
-          <Search size={18} className="text-slate-400 flex-shrink-0" />
+        <div className="flex items-center gap-3 px-4 border-b border-slate-100 dark:border-slate-700">
+          <Search size={18} className="text-slate-400 dark:text-slate-500 flex-shrink-0" />
           <input
             ref={inputRef}
             type="text"
@@ -106,9 +106,9 @@ export default function CommandPalette({ open, onClose, navItems }) {
             }}
             onKeyDown={handleKeyDown}
             placeholder="페이지 이동 또는 자산 검색..."
-            className="flex-1 py-3.5 outline-none text-sm placeholder:text-slate-400"
+            className="flex-1 py-3.5 outline-none text-sm placeholder:text-slate-400 placeholder:dark:text-slate-500"
           />
-          <kbd className="hidden sm:inline text-xs text-slate-400 border border-slate-200 rounded px-1.5 py-0.5">
+          <kbd className="hidden sm:inline text-xs text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-600 rounded px-1.5 py-0.5">
             Esc
           </kbd>
         </div>
@@ -116,7 +116,7 @@ export default function CommandPalette({ open, onClose, navItems }) {
         <div className="max-h-96 overflow-y-auto py-2">
           {filteredNavItems.length > 0 && (
             <div>
-              <div className="px-4 py-1 text-xs font-medium text-slate-400">페이지</div>
+              <div className="px-4 py-1 text-xs font-medium text-slate-400 dark:text-slate-500">페이지</div>
               {filteredNavItems.map((item) => {
                 const globalIndex = results.findIndex((r) => r.type === 'nav' && r.path === item.path);
                 const Icon = item.icon;
@@ -126,12 +126,12 @@ export default function CommandPalette({ open, onClose, navItems }) {
                     onClick={() => handleSelect({ type: 'nav', ...item })}
                     onMouseEnter={() => setActiveIndex(globalIndex)}
                     className={`w-full flex items-center gap-3 px-4 py-2 text-sm text-left transition-colors ${
-                      activeIndex === globalIndex ? 'bg-blue-50 text-blue-700' : 'text-slate-700 hover:bg-slate-50'
+                      activeIndex === globalIndex ? 'bg-blue-50 dark:bg-blue-500/10 text-blue-700' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 hover:dark:bg-slate-900'
                     }`}
                   >
                     <Icon size={16} className="flex-shrink-0" />
                     <span className="flex-1">{item.label}</span>
-                    <ArrowRight size={14} className="text-slate-300" />
+                    <ArrowRight size={14} className="text-slate-300 dark:text-slate-600" />
                   </button>
                 );
               })}
@@ -140,11 +140,11 @@ export default function CommandPalette({ open, onClose, navItems }) {
 
           {query.trim() && (
             <div>
-              <div className="px-4 py-1 text-xs font-medium text-slate-400">
+              <div className="px-4 py-1 text-xs font-medium text-slate-400 dark:text-slate-500">
                 자산{loading ? ' 검색 중...' : ''}
               </div>
               {!loading && assets.length === 0 && (
-                <div className="px-4 py-3 text-sm text-slate-400">일치하는 자산이 없습니다.</div>
+                <div className="px-4 py-3 text-sm text-slate-400 dark:text-slate-500">일치하는 자산이 없습니다.</div>
               )}
               {assets.map((asset) => {
                 const globalIndex = results.findIndex((r) => r.type === 'asset' && r.id === asset.id);
@@ -154,12 +154,12 @@ export default function CommandPalette({ open, onClose, navItems }) {
                     onClick={() => handleSelect({ type: 'asset', ...asset })}
                     onMouseEnter={() => setActiveIndex(globalIndex)}
                     className={`w-full flex items-center gap-3 px-4 py-2 text-sm text-left transition-colors ${
-                      activeIndex === globalIndex ? 'bg-blue-50 text-blue-700' : 'text-slate-700 hover:bg-slate-50'
+                      activeIndex === globalIndex ? 'bg-blue-50 dark:bg-blue-500/10 text-blue-700' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 hover:dark:bg-slate-900'
                     }`}
                   >
                     <div className="flex-1 min-w-0">
                       <div className="truncate font-medium">{asset.assetName}</div>
-                      <div className="text-xs text-slate-400">{asset.assetCode}</div>
+                      <div className="text-xs text-slate-400 dark:text-slate-500">{asset.assetCode}</div>
                     </div>
                     <AssetStatusBadge status={asset.status} />
                   </button>
@@ -169,7 +169,7 @@ export default function CommandPalette({ open, onClose, navItems }) {
           )}
 
           {!query.trim() && (
-            <div className="px-4 py-2 text-xs text-slate-400">
+            <div className="px-4 py-2 text-xs text-slate-400 dark:text-slate-500">
               자산명이나 자산번호를 입력하면 바로 찾을 수 있습니다.
             </div>
           )}

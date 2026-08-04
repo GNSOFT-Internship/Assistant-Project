@@ -46,17 +46,17 @@ export default function ShortcutRecorderModal({ open, onClose, onSaved }) {
 
   return (
     <div className="fixed inset-0 bg-black/40 z-[60] flex items-center justify-center px-4" onClick={onClose}>
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-5" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-sm p-5" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
-          <h3 className="font-semibold text-slate-800">전역 검색 단축키 변경</h3>
-          <button onClick={onClose} className="p-1 rounded hover:bg-slate-100 text-slate-400">
+          <h3 className="font-semibold text-slate-800 dark:text-slate-200">전역 검색 단축키 변경</h3>
+          <button onClick={onClose} className="p-1 rounded hover:bg-slate-100 hover:dark:bg-slate-700 text-slate-400 dark:text-slate-500">
             <X size={18} />
           </button>
         </div>
-        <p className="text-sm text-slate-500 mb-4">
+        <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
           원하는 키 조합을 눌러주세요. (예: Alt+/, Ctrl+Shift+F 등)
         </p>
-        <div className="flex items-center justify-center h-16 rounded-lg border-2 border-dashed border-slate-200 bg-slate-50 mb-4">
+        <div className="flex items-center justify-center h-16 rounded-lg border-2 border-dashed border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 mb-4">
           <span className="text-lg font-mono font-semibold text-blue-600">
             {captured ? describeShortcut(captured) : '키를 눌러주세요...'}
           </span>
@@ -64,7 +64,7 @@ export default function ShortcutRecorderModal({ open, onClose, onSaved }) {
         <div className="flex items-center justify-between gap-2">
           <button
             onClick={handleReset}
-            className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700 flex-shrink-0"
+            className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400 hover:text-slate-700 hover:dark:text-slate-300 flex-shrink-0"
           >
             <RotateCcw size={13} /> 기본값({getDefaultShortcutLabel()})으로
           </button>

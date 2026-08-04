@@ -18,9 +18,9 @@ const ACTION_LABEL = {
 };
 
 const ACTION_STYLE = {
-  CREATE: 'bg-green-100 text-green-700',
-  UPDATE: 'bg-blue-100 text-blue-700',
-  DELETE: 'bg-red-100 text-red-700',
+  CREATE: 'bg-green-100 dark:bg-green-500/15 text-green-700',
+  UPDATE: 'bg-blue-100 dark:bg-blue-500/15 text-blue-700',
+  DELETE: 'bg-red-100 dark:bg-red-500/15 text-red-700',
 };
 
 export default function Dashboard() {
@@ -82,7 +82,7 @@ export default function Dashboard() {
   if (error || !data) {
     return (
       <div className="card text-center py-10">
-        <p className="text-gray-600 mb-4">대시보드 데이터를 불러오지 못했습니다.</p>
+        <p className="text-gray-600 dark:text-slate-400 mb-4">대시보드 데이터를 불러오지 못했습니다.</p>
         <button onClick={fetchDashboardData} className="btn btn-primary">다시 시도</button>
       </div>
     );
@@ -109,7 +109,7 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-900">대시보드</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-100">대시보드</h1>
         <button
           onClick={fetchDashboardData}
           className="btn btn-secondary"
@@ -119,17 +119,17 @@ export default function Dashboard() {
       </div>
 
       {data.isSimulated && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-          <p className="text-sm text-yellow-800">
+        <div className="bg-yellow-50 dark:bg-yellow-500/10 border border-yellow-200 rounded-lg p-4">
+          <p className="text-sm text-yellow-800 dark:text-yellow-300">
             <strong>데모 모드:</strong> 현재 표시되는 데이터는 시뮬레이션 값입니다.
           </p>
         </div>
       )}
 
       {budgetWarning && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-2">
+        <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 rounded-lg p-4 flex items-center gap-2">
           <AlertTriangle size={18} className="text-red-600 flex-shrink-0" />
-          <p className="text-sm text-red-800">
+          <p className="text-sm text-red-800 dark:text-red-300">
             <strong>예산 경고:</strong> 이번 달 예산 소진율이 {formatPercent(data.budgetConsumptionRate)}로 {BUDGET_WARNING_THRESHOLD}%를 초과했습니다. 예산 재검토가 필요합니다.
           </p>
         </div>
@@ -141,15 +141,15 @@ export default function Dashboard() {
           return (
             <div
               key={stat.label}
-              className={`card ${stat.warning ? 'border-2 border-red-300 bg-red-50' : ''}`}
+              className={`card ${stat.warning ? 'border-2 border-red-300 bg-red-50 dark:bg-red-500/10' : ''}`}
             >
               <div className="flex items-center">
-                <div className={`p-3 rounded-full ${stat.warning ? 'bg-red-100' : 'bg-gray-100'} ${stat.color}`}>
+                <div className={`p-3 rounded-full ${stat.warning ? 'bg-red-100 dark:bg-red-500/15' : 'bg-gray-100 dark:bg-slate-700'} ${stat.color}`}>
                   <Icon size={24} />
                 </div>
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">{stat.label}</p>
-                  <p className="text-2xl font-semibold text-gray-900">{stat.value}</p>
+                  <p className="text-sm font-medium text-gray-600 dark:text-slate-400">{stat.label}</p>
+                  <p className="text-2xl font-semibold text-gray-900 dark:text-slate-100">{stat.value}</p>
                 </div>
               </div>
             </div>
@@ -162,31 +162,31 @@ export default function Dashboard() {
           <h3 className="text-lg font-semibold mb-4">자산 현황</h3>
           <div className="space-y-3">
             <div className="flex justify-between">
-              <span className="text-gray-600">총 자산 수</span>
+              <span className="text-gray-600 dark:text-slate-400">총 자산 수</span>
               <span className="font-semibold">{data.totalAssets}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-600">가동 중</span>
+              <span className="text-gray-600 dark:text-slate-400">가동 중</span>
               <span className="font-semibold text-green-600">{data.activeAssets}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-600">교체 필요</span>
+              <span className="text-gray-600 dark:text-slate-400">교체 필요</span>
               <span className="font-semibold text-red-600">{data.replacementNeededAssets}</span>
             </div>
 
             {data.topReplacementNeeded?.length > 0 && (
               <div className="pt-2 border-t">
-                <p className="text-xs text-gray-500 mb-2">교체 우선순위 상위 {data.topReplacementNeeded.length}건</p>
+                <p className="text-xs text-gray-500 dark:text-slate-400 mb-2">교체 우선순위 상위 {data.topReplacementNeeded.length}건</p>
                 <div className="space-y-1.5">
                   {data.topReplacementNeeded.map((asset, i) => (
                     <button
                       key={asset.assetId}
                       onClick={() => navigate(`/assets/${asset.assetId}`)}
-                      className="w-full flex items-center justify-between text-sm p-2 bg-red-50 rounded hover:bg-red-100 text-left"
+                      className="w-full flex items-center justify-between text-sm p-2 bg-red-50 dark:bg-red-500/10 rounded hover:bg-red-100 hover:dark:bg-red-500/15 text-left"
                     >
                       <span className="flex items-center gap-2 min-w-0">
                         <span className="text-red-600 font-semibold flex-shrink-0">{i + 1}</span>
-                        <span className="truncate">{asset.assetName}</span>
+                        <span className="truncate text-slate-700 dark:text-slate-300">{asset.assetName}</span>
                       </span>
                       <span className="text-red-600 font-medium flex-shrink-0 ml-2">{asset.score}점</span>
                     </button>
@@ -200,7 +200,7 @@ export default function Dashboard() {
         <div className="card">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold flex items-center gap-2">
-              <History size={18} className="text-gray-500" />
+              <History size={18} className="text-gray-500 dark:text-slate-400" />
               최근 활동
             </h3>
             {isAdmin && (
@@ -214,30 +214,30 @@ export default function Dashboard() {
           </div>
 
           {!isAdmin ? (
-            <p className="text-sm text-gray-500 py-6 text-center">
+            <p className="text-sm text-gray-500 dark:text-slate-400 py-6 text-center">
               최근 활동은 관리자만 확인할 수 있습니다.
             </p>
           ) : loadingLogs ? (
-            <p className="text-sm text-gray-500 py-6 text-center">불러오는 중...</p>
+            <p className="text-sm text-gray-500 dark:text-slate-400 py-6 text-center">불러오는 중...</p>
           ) : recentLogs.length === 0 ? (
-            <p className="text-sm text-gray-500 py-6 text-center">최근 활동 내역이 없습니다.</p>
+            <p className="text-sm text-gray-500 dark:text-slate-400 py-6 text-center">최근 활동 내역이 없습니다.</p>
           ) : (
             <ul className="space-y-3">
               {recentLogs.map((log) => (
                 <li key={log.id} className="flex items-start gap-3 text-sm">
                   <span
-                    className={`shrink-0 px-2 py-0.5 rounded text-xs font-medium ${ACTION_STYLE[log.action] || 'bg-gray-100 text-gray-700'}`}
+                    className={`shrink-0 px-2 py-0.5 rounded text-xs font-medium ${ACTION_STYLE[log.action] || 'bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-slate-300'}`}
                   >
                     {ACTION_LABEL[log.action] || log.action}
                   </span>
                   <div className="flex-1 min-w-0">
-                    <p className="text-gray-800 truncate">
+                    <p className="text-gray-800 dark:text-slate-200 truncate">
                       <span className="font-medium">{log.changedBy || '알 수 없음'}</span>
                       님이{' '}
                       <span className="font-medium">{log.assetName || log.assetCode || `자산 #${log.assetId}`}</span>
                       을(를) {ACTION_LABEL[log.action] || log.action}했습니다
                     </p>
-                    <p className="text-xs text-gray-400">{formatRelativeTime(log.createdAt)}</p>
+                    <p className="text-xs text-gray-400 dark:text-slate-500">{formatRelativeTime(log.createdAt)}</p>
                   </div>
                 </li>
               ))}
