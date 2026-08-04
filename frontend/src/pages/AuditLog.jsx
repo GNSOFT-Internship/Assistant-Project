@@ -54,14 +54,71 @@ function formatValue(field, value) {
   return value;
 }
 
-function formatChanges(changes) {
-  if (!changes) return '-';
-  return Object.entries(changes)
-    .map(([field, { old, new: next }]) => {
-      const label = FIELD_LABEL[field] || field;
-      return `${label}: ${formatValue(field, old)} → ${formatValue(field, next)}`;
-    })
-    .join(', ');
+// 콤마로 이어붙인 한 줄 문자열 대신, 필드별로 줄바꿈해서 보여줄 수 있도록
+// { field, label, oldText, newText } 배열로 반환한다.
+function getChangeEntries(changes) {
+  if (!changes) return [];
+  return Object.entries(changes).map(([field, { old, new: next }]) => {
+    const label = FIELD_LABEL[field] || field;
+    return {
+      field,
+      label,
+      oldText: formatValue(field, old),
+      newText: formatValue(field, next),
+    };
+  });
+}
+
+const CHANGES_COLLAPSE_THRESHOLD = 3;
+
+// 변경 내용 셀: 필드별로 한 줄씩 세로로 나열하고, 필드가 많으면
+// 기본 N개만 보여준 뒤 "+N개 더보기" 토글로 나머지를 펼쳐서 보여준다.
+function ChangesCell({ changes }) {
+  const [expanded, setExpanded] = useState(false);
+  const entries = getChangeEntries(changes);
+
+  if (entries.length === 0) {
+    return <span className="text-gray-400">-</span>;
+  }
+
+  const visibleEntries = expanded ? entries : entries.slice(0, CHANGES_COLLAPSE_THRESHOLD);
+  const hiddenCount = entries.length - visibleEntries.length;
+
+  return (
+    <div className="space-y-1">
+      {visibleEntries.map(({ field, label, oldText, newText }) => (
+        <div key={field} className="flex items-baseline gap-x-1.5 text-sm leading-snug">
+          <span className="w-20 shrink-0 text-right text-xs font-medium text-gray-500">
+            {label}
+          </span>
+          <span className="text-gray-400">:</span>
+          <span className="flex flex-wrap items-baseline gap-x-1 break-all">
+            <span className="text-gray-400 line-through decoration-gray-300">{oldText}</span>
+            <span className="shrink-0 text-gray-400">→</span>
+            <span className="font-medium text-gray-900">{newText}</span>
+          </span>
+        </div>
+      ))}
+      {hiddenCount > 0 && (
+        <button
+          type="button"
+          onClick={() => setExpanded(true)}
+          className="text-xs font-medium text-blue-600 hover:underline"
+        >
+          +{hiddenCount}개 더보기
+        </button>
+      )}
+      {expanded && entries.length > CHANGES_COLLAPSE_THRESHOLD && (
+        <button
+          type="button"
+          onClick={() => setExpanded(false)}
+          className="text-xs font-medium text-gray-500 hover:underline"
+        >
+          접기
+        </button>
+      )}
+    </div>
+  );
 }
 
 export default function AuditLog() {
@@ -173,8 +230,8 @@ export default function AuditLog() {
                     </td>
                     <td className="table-cell">{log.assetName || '-'}</td>
                     <td className="table-cell">{log.assetCode || '-'}</td>
-                    <td className="table-cell max-w-md truncate" title={formatChanges(log.changes)}>
-                      {formatChanges(log.changes)}
+                    <td className="table-cell max-w-md align-top">
+                      <ChangesCell changes={log.changes} />
                     </td>
                   </tr>
                 ))}
