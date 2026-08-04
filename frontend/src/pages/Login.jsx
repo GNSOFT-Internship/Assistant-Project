@@ -27,7 +27,7 @@ export default function Login() {
   };
 
   return (
-    <div className="relative min-h-screen bg-slate-50 flex items-center justify-center px-4 overflow-hidden">
+    <div className="relative min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center px-4 overflow-hidden">
       {/* 백그라운드 그라데이션 블롭 데코레이션 */}
       <div className="absolute top-1/4 left-1/4 w-80 h-80 bg-blue-400/20 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-pulse pointer-events-none"></div>
       <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-indigo-400/20 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-pulse pointer-events-none"></div>
@@ -41,23 +41,23 @@ export default function Login() {
             className="w-[200px] h-[200px] object-contain"
 />
 
-          <h2 className="text-center text-3xl font-extrabold text-slate-900 tracking-tight">
+          <h2 className="text-center text-3xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
             자산관리 의사결정 시스템
           </h2>
-          <p className="mt-2 text-center text-sm text-slate-500 font-medium">
+          <p className="mt-2 text-center text-sm text-slate-500 dark:text-slate-400 font-medium">
             공공기관 시설·자산 정보 관리 및 LLM 분석 포털
           </p>
         </div>
 
-        <div className="card border border-slate-100/80 bg-white/90 backdrop-blur-sm shadow-xl shadow-slate-100">
+        <div className="card border border-slate-100/80 dark:border-slate-700/80 bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm shadow-xl shadow-slate-100">
           <form className="space-y-4" onSubmit={handleSubmit}>
             {error && (
-              <div className="rounded-lg bg-red-50 border border-red-200 p-3">
+              <div className="rounded-lg bg-red-50 dark:bg-red-500/10 border border-red-200 p-3">
                 <p className="text-sm text-red-700">{error}</p>
               </div>
             )}
             <div>
-              <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
                 사용자명
               </label>
               <input
@@ -72,7 +72,7 @@ export default function Login() {
               />
             </div>
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
                 비밀번호
               </label>
               <input
@@ -97,7 +97,7 @@ export default function Login() {
           </form>
         </div>
 
-        <div className="text-center text-sm text-gray-500 mt-6 space-y-1">
+        <div className="text-center text-sm text-gray-500 dark:text-slate-400 mt-6 space-y-1">
           <p>관리자: admin / admin123</p>
           <p>일반 사용자: user / user123</p>
         </div>

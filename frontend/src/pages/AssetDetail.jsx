@@ -305,8 +305,8 @@ export default function AssetDetail() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 card">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 border-b border-slate-100 pb-3">
-            <h1 className="text-2xl font-bold text-slate-800">{asset.assetName}</h1>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 border-b border-slate-100 dark:border-slate-700 pb-3">
+            <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-200">{asset.assetName}</h1>
             <button
               onClick={() => handleGenerateSpec(asset.id)}
               className="btn btn-primary text-xs py-1.5 px-3 flex items-center gap-1.5 shadow-md shadow-blue-500/20"
@@ -318,42 +318,42 @@ export default function AssetDetail() {
           
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
             <div>
-              <div className="text-sm text-gray-500">자산번호</div>
+              <div className="text-sm text-gray-500 dark:text-slate-400">자산번호</div>
               <div className="font-medium">{asset.assetCode}</div>
             </div>
             <div>
-              <div className="text-sm text-gray-500">카테고리</div>
+              <div className="text-sm text-gray-500 dark:text-slate-400">카테고리</div>
               <div className="font-medium">{asset.category}</div>
             </div>
             <div>
-              <div className="text-sm text-gray-500">위치</div>
+              <div className="text-sm text-gray-500 dark:text-slate-400">위치</div>
               <div className="font-medium">{asset.location}</div>
             </div>
             <div>
-              <div className="text-sm text-gray-500">담당자</div>
+              <div className="text-sm text-gray-500 dark:text-slate-400">담당자</div>
               <div className="font-medium">{asset.responsiblePerson}</div>
             </div>
             <div>
-              <div className="text-sm text-gray-500">구매일</div>
+              <div className="text-sm text-gray-500 dark:text-slate-400">구매일</div>
               <div className="font-medium">{asset.purchaseDate?.split('T')[0]}</div>
             </div>
             <div>
-              <div className="text-sm text-gray-500">구매가</div>
+              <div className="text-sm text-gray-500 dark:text-slate-400">구매가</div>
               <div className="font-medium">{asset.purchasePrice?.toLocaleString()}원</div>
             </div>
             <div>
-              <div className="text-sm text-gray-500">내용연수</div>
+              <div className="text-sm text-gray-500 dark:text-slate-400">내용연수</div>
               <div className="font-medium">{asset.usefulLife}년</div>
             </div>
             <div>
-              <div className="text-sm text-gray-500 mb-1">상태</div>
+              <div className="text-sm text-gray-500 dark:text-slate-400 mb-1">상태</div>
               <AssetStatusBadge status={asset.status} />
             </div>
           </div>
 
           {asset.description && (
             <div className="border-t pt-4">
-              <div className="text-sm text-gray-500 mb-1">설명</div>
+              <div className="text-sm text-gray-500 dark:text-slate-400 mb-1">설명</div>
               <div>{asset.description}</div>
             </div>
           )}
@@ -366,28 +366,28 @@ export default function AssetDetail() {
               <div className="flex items-center gap-3">
                 <Calendar className="text-blue-600" size={20} />
                 <div>
-                  <div className="text-sm text-gray-500">사용기간</div>
+                  <div className="text-sm text-gray-500 dark:text-slate-400">사용기간</div>
                   <div className="font-medium">{usageYears}년</div>
                 </div>
               </div>
               <div className="flex items-center gap-3">
                 <DollarSign className="text-green-600" size={20} />
                 <div>
-                  <div className="text-sm text-gray-500">누적 수리비</div>
+                  <div className="text-sm text-gray-500 dark:text-slate-400">누적 수리비</div>
                   <div className="font-medium">{maintenanceTotalCost.toLocaleString()}원</div>
                 </div>
               </div>
               <div className="flex items-center gap-3">
                 <Clock className="text-yellow-600" size={20} />
                 <div>
-                  <div className="text-sm text-gray-500">잔여 내용연수</div>
+                  <div className="text-sm text-gray-500 dark:text-slate-400">잔여 내용연수</div>
                   <div className="font-medium">{Math.max(0, asset.usefulLife - usageYears)}년</div>
                 </div>
               </div>
               <div className="flex items-center gap-3">
                 <Package className="text-purple-600" size={20} />
                 <div>
-                  <div className="text-sm text-gray-500">유지보수 건수</div>
+                  <div className="text-sm text-gray-500 dark:text-slate-400">유지보수 건수</div>
                   <div className="font-medium">{maintenanceTotal}건</div>
                 </div>
               </div>
@@ -396,7 +396,7 @@ export default function AssetDetail() {
 
           {/* AI 고장 자가 진단 챗봇 카드 */}
           <div className="card flex flex-col h-[420px] p-4 space-y-3">
-            <h3 className="font-bold text-slate-800 flex items-center gap-2 border-b border-slate-100 pb-2">
+            <h3 className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2 border-b border-slate-100 dark:border-slate-700 pb-2">
               <MessageSquare className="text-blue-600 animate-pulse" size={18} />
               AI 고장 진단 챗봇
             </h3>
@@ -408,14 +408,14 @@ export default function AssetDetail() {
                   key={index}
                   className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
                 >
-                  <span className="text-[10px] text-slate-400 font-semibold mb-0.5">
+                  <span className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold mb-0.5">
                     {msg.role === 'user' ? '나' : 'AI 엔지니어'}
                   </span>
                   <div
                     className={`p-3 rounded-2xl max-w-[85%] whitespace-pre-wrap leading-relaxed ${
                       msg.role === 'user'
                         ? 'bg-blue-600 text-white rounded-tr-none shadow-sm shadow-blue-500/10'
-                        : 'bg-slate-50 text-slate-700 border border-slate-100 rounded-tl-none'
+                        : 'bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-100 dark:border-slate-700 rounded-tl-none'
                     }`}
                   >
                     {msg.content}
@@ -423,7 +423,7 @@ export default function AssetDetail() {
                 </div>
               ))}
               {loadingChat && !chatHistory[chatHistory.length - 1]?.content && (
-                <div className="flex items-center gap-1 text-slate-400 pl-1">
+                <div className="flex items-center gap-1 text-slate-400 dark:text-slate-500 pl-1">
                   <Loader className="animate-spin" size={12} />
                   <span>진단 답변 생각 중...</span>
                 </div>
@@ -431,7 +431,7 @@ export default function AssetDetail() {
             </div>
 
             {/* Chat Input Field */}
-            <form onSubmit={handleSendChat} className="flex gap-1.5 border-t border-slate-100 pt-2 flex-shrink-0">
+            <form onSubmit={handleSendChat} className="flex gap-1.5 border-t border-slate-100 dark:border-slate-700 pt-2 flex-shrink-0">
               <input
                 type="text"
                 required
@@ -439,7 +439,7 @@ export default function AssetDetail() {
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
                 disabled={loadingChat}
-                className="input py-2 text-xs flex-1 rounded-lg border-slate-200"
+                className="input py-2 text-xs flex-1 rounded-lg border-slate-200 dark:border-slate-600"
               />
               <button
                 type="submit"
@@ -454,17 +454,17 @@ export default function AssetDetail() {
       </div>
 
       <Modal open={maintenanceOpen} onClose={() => setMaintenanceOpen(false)} maxWidth="max-w-3xl">
-        <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
+        <div className="flex items-center justify-between mb-4 border-b border-slate-100 dark:border-slate-700 pb-3">
           <h3 className="text-lg font-semibold flex items-center gap-2">
             <Clock size={18} /> 유지보수 이력 ({maintenanceTotal}건)
           </h3>
-          <button onClick={() => setMaintenanceOpen(false)} className="text-slate-400 hover:text-slate-600 font-bold">
+          <button onClick={() => setMaintenanceOpen(false)} className="text-slate-400 dark:text-slate-500 hover:text-slate-600 hover:dark:text-slate-400 font-bold">
             닫기
           </button>
         </div>
 
         {(maintenance.length === 0 ? (
-          <div className="text-center text-gray-500 py-8">유지보수 이력이 없습니다.</div>
+          <div className="text-center text-gray-500 dark:text-slate-400 py-8">유지보수 이력이 없습니다.</div>
         ) : (
           <div className="space-y-4">
             {maintenance.map((record) => (
@@ -472,25 +472,25 @@ export default function AssetDetail() {
                 <div className="flex justify-between items-start">
                   <div>
                     <MaintenanceTypeBadge type={record.maintenanceType} />
-                    <div className="text-sm text-gray-600 mt-1">{record.description}</div>
+                    <div className="text-sm text-gray-600 dark:text-slate-400 mt-1">{record.description}</div>
                   </div>
                   <div className="text-right flex items-start gap-2">
                     <div>
                       <div className="font-medium">{record.cost?.toLocaleString()}원</div>
-                      <div className="text-sm text-gray-500">{record.maintenanceDate?.split('T')[0]}</div>
+                      <div className="text-sm text-gray-500 dark:text-slate-400">{record.maintenanceDate?.split('T')[0]}</div>
                     </div>
                     {isAdmin && (
                       <div className="flex gap-1">
                         <button
                           onClick={() => handleEditRecord(record)}
-                          className="p-1.5 hover:bg-gray-100 rounded text-gray-500"
+                          className="p-1.5 hover:bg-gray-100 hover:dark:bg-slate-700 rounded text-gray-500 dark:text-slate-400"
                           title="수정"
                         >
                           <Edit size={14} />
                         </button>
                         <button
                           onClick={() => handleDeleteRecord(record.id)}
-                          className="p-1.5 hover:bg-red-100 rounded text-red-600"
+                          className="p-1.5 hover:bg-red-100 hover:dark:bg-red-500/15 rounded text-red-600"
                           title="삭제"
                         >
                           <Trash2 size={14} />
@@ -499,15 +499,15 @@ export default function AssetDetail() {
                     )}
                   </div>
                 </div>
-                <div className="flex justify-between items-center mt-2 pt-2 border-t border-dashed border-gray-100 flex-wrap gap-2">
-                  <div className="flex gap-3 text-sm text-gray-500">
+                <div className="flex justify-between items-center mt-2 pt-2 border-t border-dashed border-gray-100 dark:border-slate-700 flex-wrap gap-2">
+                  <div className="flex gap-3 text-sm text-gray-500 dark:text-slate-400">
                     {record.technician && <span>기술자: {record.technician}</span>}
                     {record.technician && record.failureType && <span>|</span>}
                     {record.failureType && <span className="text-red-600 font-medium">고장유형: {record.failureType}</span>}
                   </div>
                   <button
                     onClick={() => handleViewWorkOrder(record)}
-                    className="btn btn-secondary py-1 px-3 text-xs bg-blue-50 text-blue-700 hover:bg-blue-100 border-none flex items-center gap-1"
+                    className="btn btn-secondary py-1 px-3 text-xs bg-blue-50 dark:bg-blue-500/10 text-blue-700 hover:bg-blue-100 hover:dark:bg-blue-500/15 border-none flex items-center gap-1"
                   >
                     AI 작업 지시서
                   </button>
@@ -518,7 +518,7 @@ export default function AssetDetail() {
         ))}
 
         {maintenanceTotal > HISTORY_PAGE_SIZE && (
-          <div className="flex items-center justify-between mt-4 text-sm text-gray-600">
+          <div className="flex items-center justify-between mt-4 text-sm text-gray-600 dark:text-slate-400">
             <div>
               전체 {maintenanceTotal}건 중 {(maintenancePage - 1) * HISTORY_PAGE_SIZE + 1}-
               {Math.min(maintenancePage * HISTORY_PAGE_SIZE, maintenanceTotal)}건
@@ -545,35 +545,35 @@ export default function AssetDetail() {
       </Modal>
 
       <Modal open={historyOpen} onClose={() => setHistoryOpen(false)} maxWidth="max-w-3xl">
-        <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
+        <div className="flex items-center justify-between mb-4 border-b border-slate-100 dark:border-slate-700 pb-3">
           <h3 className="text-lg font-semibold flex items-center gap-2">
             <History size={18} /> 변경 이력 ({historyTotal}건)
           </h3>
-          <button onClick={() => setHistoryOpen(false)} className="text-slate-400 hover:text-slate-600 font-bold">
+          <button onClick={() => setHistoryOpen(false)} className="text-slate-400 dark:text-slate-500 hover:text-slate-600 hover:dark:text-slate-400 font-bold">
             닫기
           </button>
         </div>
 
         {(history.length === 0 ? (
-          <div className="text-center text-gray-500 py-8">변경 이력이 없습니다.</div>
+          <div className="text-center text-gray-500 dark:text-slate-400 py-8">변경 이력이 없습니다.</div>
         ) : (
           <div className="space-y-3">
             {history.map((entry) => {
               const actionInfo = ACTION_LABELS[entry.action] || { label: entry.action, className: 'badge-gray' };
               const changedFields = entry.changes ? Object.keys(entry.changes) : [];
               return (
-                <div key={entry.id} className="border-l-4 border-gray-300 pl-4 py-2">
+                <div key={entry.id} className="border-l-4 border-gray-300 dark:border-slate-600 pl-4 py-2">
                   <div className="flex items-center justify-between flex-wrap gap-2">
                     <div className="flex items-center gap-2">
                       <span className={actionInfo.className}>{actionInfo.label}</span>
-                      <span className="text-sm text-gray-600">{entry.changedBy || '알 수 없음'}</span>
+                      <span className="text-sm text-gray-600 dark:text-slate-400">{entry.changedBy || '알 수 없음'}</span>
                     </div>
-                    <span className="text-sm text-gray-500">
+                    <span className="text-sm text-gray-500 dark:text-slate-400">
                       {entry.createdAt ? new Date(entry.createdAt).toLocaleString('ko-KR') : ''}
                     </span>
                   </div>
                   {changedFields.length > 0 && (
-                    <ul className="mt-2 text-sm text-gray-700 space-y-1">
+                    <ul className="mt-2 text-sm text-gray-700 dark:text-slate-300 space-y-1">
                       {changedFields.map((field) => {
                         const change = entry.changes[field];
                         const label = FIELD_LABELS[field] || field;
@@ -601,7 +601,7 @@ export default function AssetDetail() {
         ))}
 
         {historyTotal > HISTORY_PAGE_SIZE && (
-          <div className="flex items-center justify-between mt-4 text-sm text-gray-600">
+          <div className="flex items-center justify-between mt-4 text-sm text-gray-600 dark:text-slate-400">
             <div>
               전체 {historyTotal}건 중 {(historyPage - 1) * HISTORY_PAGE_SIZE + 1}-
               {Math.min(historyPage * HISTORY_PAGE_SIZE, historyTotal)}건
@@ -719,46 +719,46 @@ export default function AssetDetail() {
               }
             `}</style>
             <div className="flex justify-between items-center mb-4 border-b pb-3 print:hidden">
-              <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+              <h2 className="text-xl font-bold text-gray-800 dark:text-slate-200 flex items-center gap-2">
                 🔧 AI 유지보수 작업 지시서
               </h2>
               <button
                 onClick={() => setActiveWorkOrder(null)}
-                className="text-gray-500 hover:text-gray-700 text-2xl font-semibold"
+                className="text-gray-500 dark:text-slate-400 hover:text-gray-700 hover:dark:text-slate-300 text-2xl font-semibold"
               >&times;</button>
             </div>
 
             <div id="print-work-order" className="space-y-6">
-              <div className="text-center pb-4 border-b border-double border-gray-300">
-                <h1 className="text-2xl font-bold text-gray-900">{activeWorkOrder.title}</h1>
-                <p className="text-sm text-gray-500 mt-2">일련번호: WO-{activeWorkOrder.id} | 생성일시: {activeWorkOrder.createdAt ? new Date(activeWorkOrder.createdAt).toLocaleString('ko-KR') : '-'}</p>
+              <div className="text-center pb-4 border-b border-double border-gray-300 dark:border-slate-600">
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-100">{activeWorkOrder.title}</h1>
+                <p className="text-sm text-gray-500 dark:text-slate-400 mt-2">일련번호: WO-{activeWorkOrder.id} | 생성일시: {activeWorkOrder.createdAt ? new Date(activeWorkOrder.createdAt).toLocaleString('ko-KR') : '-'}</p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-gray-50 p-3 rounded">
-                  <div className="text-sm text-gray-500 font-medium">대상 자산</div>
-                  <div className="font-semibold text-gray-800">{asset?.assetName} ({asset?.assetCode})</div>
+                <div className="bg-gray-50 dark:bg-slate-900 p-3 rounded">
+                  <div className="text-sm text-gray-500 dark:text-slate-400 font-medium">대상 자산</div>
+                  <div className="font-semibold text-gray-800 dark:text-slate-200">{asset?.assetName} ({asset?.assetCode})</div>
                 </div>
-                <div className="bg-gray-50 p-3 rounded">
-                  <div className="text-sm text-gray-500 font-medium">예상 작업 시간</div>
-                  <div className="font-semibold text-gray-800">{activeWorkOrder.estimatedTime || '미정'}</div>
+                <div className="bg-gray-50 dark:bg-slate-900 p-3 rounded">
+                  <div className="text-sm text-gray-500 dark:text-slate-400 font-medium">예상 작업 시간</div>
+                  <div className="font-semibold text-gray-800 dark:text-slate-200">{activeWorkOrder.estimatedTime || '미정'}</div>
                 </div>
               </div>
 
               {activeWorkOrder.requiredTools && activeWorkOrder.requiredTools.length > 0 && (
                 <div>
-                  <h3 className="font-bold text-gray-700 mb-2 flex items-center gap-1">🛠️ 필요 공구 및 자재</h3>
+                  <h3 className="font-bold text-gray-700 dark:text-slate-300 mb-2 flex items-center gap-1">🛠️ 필요 공구 및 자재</h3>
                   <div className="flex flex-wrap gap-2">
                     {activeWorkOrder.requiredTools.map((tool, idx) => (
-                      <span key={idx} className="bg-gray-100 text-gray-800 text-xs px-2.5 py-1 rounded font-medium">{tool}</span>
+                      <span key={idx} className="bg-gray-100 dark:bg-slate-700 text-gray-800 dark:text-slate-200 text-xs px-2.5 py-1 rounded font-medium">{tool}</span>
                     ))}
                   </div>
                 </div>
               )}
 
               {activeWorkOrder.safetyPrecautions && activeWorkOrder.safetyPrecautions.length > 0 && (
-                <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-r">
-                  <h3 className="font-bold text-red-800 mb-2 flex items-center gap-1">⚠️ 필수 안전 주의사항</h3>
+                <div className="bg-red-50 dark:bg-red-500/10 border-l-4 border-red-500 p-4 rounded-r">
+                  <h3 className="font-bold text-red-800 dark:text-red-300 mb-2 flex items-center gap-1">⚠️ 필수 안전 주의사항</h3>
                   <ul className="list-disc list-inside text-sm text-red-700 space-y-1">
                     {activeWorkOrder.safetyPrecautions.map((prec, idx) => (
                       <li key={idx}>{prec}</li>
@@ -768,11 +768,11 @@ export default function AssetDetail() {
               )}
 
               <div>
-                <h3 className="font-bold text-gray-700 mb-2 flex items-center gap-1">📋 단계별 표준 조치 절차</h3>
+                <h3 className="font-bold text-gray-700 dark:text-slate-300 mb-2 flex items-center gap-1">📋 단계별 표준 조치 절차</h3>
                 <ol className="space-y-3">
                   {activeWorkOrder.steps.map((step, idx) => (
-                    <li key={idx} className="flex gap-3 text-sm text-gray-800 items-start">
-                      <span className="flex items-center justify-center bg-blue-100 text-blue-800 font-bold rounded-full w-5 h-5 text-xs flex-shrink-0 mt-0.5">{idx + 1}</span>
+                    <li key={idx} className="flex gap-3 text-sm text-gray-800 dark:text-slate-200 items-start">
+                      <span className="flex items-center justify-center bg-blue-100 dark:bg-blue-500/15 text-blue-800 dark:text-blue-300 font-bold rounded-full w-5 h-5 text-xs flex-shrink-0 mt-0.5">{idx + 1}</span>
                       <span className="leading-relaxed">{step}</span>
                     </li>
                   ))}
@@ -797,7 +797,7 @@ export default function AssetDetail() {
       {/* 로딩 인디케이터 */}
       {loadingWO && (
         <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-          <div className="bg-white p-4 rounded shadow-lg flex items-center gap-3">
+          <div className="bg-white dark:bg-slate-800 p-4 rounded shadow-lg flex items-center gap-3">
             <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
             <span className="text-sm font-medium">AI 작업 지시서 생성 중...</span>
           </div>
@@ -810,13 +810,13 @@ export default function AssetDetail() {
         onClose={() => { setShowSpecModal(false); setSpecData(null); }}
         maxWidth="max-w-4xl"
       >
-        <div className="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
-          <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+        <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-700 pb-3 mb-4">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
             📋 AI 조달 구매 규격서 & 제안요청서(RFP)
           </h2>
           <button
             onClick={() => { setShowSpecModal(false); setSpecData(null); }}
-            className="text-slate-400 hover:text-slate-600 font-bold"
+            className="text-slate-400 dark:text-slate-500 hover:text-slate-600 hover:dark:text-slate-400 font-bold"
           >
             닫기
           </button>
@@ -825,46 +825,46 @@ export default function AssetDetail() {
         {loadingSpec ? (
           <div className="py-12 text-center flex flex-col items-center justify-center gap-3">
             <div className="w-8 h-8 rounded-full border-4 border-blue-600 border-t-transparent animate-spin"></div>
-            <p className="text-sm text-slate-500 font-medium animate-pulse">Qwen3.5 AI 조달 사양서 및 제안요청서 생성 중...</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400 font-medium animate-pulse">Qwen3.5 AI 조달 사양서 및 제안요청서 생성 중...</p>
           </div>
         ) : specData ? (
           <div className="space-y-4">
-            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col md:flex-row justify-between gap-4">
+            <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-xl border border-slate-100 dark:border-slate-700 flex flex-col md:flex-row justify-between gap-4">
               <div>
-                <div className="text-xs text-slate-400 font-semibold uppercase">공고 규격서명</div>
-                <div className="text-lg font-bold text-slate-800 mt-0.5">{specData.title}</div>
+                <div className="text-xs text-slate-400 dark:text-slate-500 font-semibold uppercase">공고 규격서명</div>
+                <div className="text-lg font-bold text-slate-800 dark:text-slate-200 mt-0.5">{specData.title}</div>
               </div>
               <div className="text-right min-w-[150px]">
-                <div className="text-xs text-slate-400 font-semibold uppercase">예상 도입 사업비</div>
+                <div className="text-xs text-slate-400 dark:text-slate-500 font-semibold uppercase">예상 도입 사업비</div>
                 <div className="text-xl font-extrabold text-blue-600 mt-0.5">{specData.budgetEstimate?.toLocaleString()}원</div>
               </div>
             </div>
 
-            <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100/50 text-sm text-blue-900 leading-relaxed">
+            <div className="bg-blue-50/50 dark:bg-blue-500/10 p-4 rounded-xl border border-blue-100/50 dark:border-blue-500/20 text-sm text-blue-900 dark:text-blue-300 leading-relaxed">
               <span className="font-bold">💡 규격 설계 및 예산 근거:</span> {specData.rationale}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
               <div className="space-y-2">
-                <h3 className="text-sm font-bold text-slate-700 border-l-4 border-blue-600 pl-2">
+                <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 border-l-4 border-blue-600 pl-2">
                   1. 조달 기술 규격 사양서
                 </h3>
-                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs text-slate-700 whitespace-pre-wrap font-mono leading-relaxed max-h-96 overflow-y-auto">
+                <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-600 text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap font-mono leading-relaxed max-h-96 overflow-y-auto">
                   {specData.specifications}
                 </div>
               </div>
 
               <div className="space-y-2">
-                <h3 className="text-sm font-bold text-slate-700 border-l-4 border-indigo-600 pl-2">
+                <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 border-l-4 border-indigo-600 pl-2">
                   2. 조달 제안요청서(RFP)
                 </h3>
-                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs text-slate-700 whitespace-pre-wrap font-mono leading-relaxed max-h-96 overflow-y-auto">
+                <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-600 text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap font-mono leading-relaxed max-h-96 overflow-y-auto">
                   {specData.rfp}
                 </div>
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-4 border-t border-slate-100">
+            <div className="flex justify-end gap-2 pt-4 border-t border-slate-100 dark:border-slate-700">
               <button
                 onClick={handleDownloadSpecPdf}
                 disabled={downloadingSpecPdf}

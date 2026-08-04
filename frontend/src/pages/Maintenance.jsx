@@ -160,24 +160,24 @@ export default function Maintenance() {
         <h1 className="text-2xl font-bold mb-4">AI 유지보수 분석</h1>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-blue-50 rounded-lg p-4">
-            <div className="text-sm text-gray-600">총 유지보수 건수</div>
+          <div className="bg-blue-50 dark:bg-blue-500/10 rounded-lg p-4">
+            <div className="text-sm text-gray-600 dark:text-slate-400">총 유지보수 건수</div>
             <div className="text-2xl font-bold text-blue-600">{analysis.statistics?.totalRecords || 0}</div>
           </div>
-          <div className="bg-green-50 rounded-lg p-4">
-            <div className="text-sm text-gray-600">총 비용</div>
+          <div className="bg-green-50 dark:bg-green-500/10 rounded-lg p-4">
+            <div className="text-sm text-gray-600 dark:text-slate-400">총 비용</div>
             <div className="text-2xl font-bold text-green-600">
               {(analysis.statistics?.totalCost || 0).toLocaleString()}원
             </div>
           </div>
-          <div className="bg-yellow-50 rounded-lg p-4">
-            <div className="text-sm text-gray-600">평균 비용</div>
+          <div className="bg-yellow-50 dark:bg-yellow-500/10 rounded-lg p-4">
+            <div className="text-sm text-gray-600 dark:text-slate-400">평균 비용</div>
             <div className="text-2xl font-bold text-yellow-600">
               {(analysis.statistics?.averageCost || 0).toLocaleString()}원
             </div>
           </div>
-          <div className="bg-purple-50 rounded-lg p-4">
-            <div className="text-sm text-gray-600">이번 달 건수</div>
+          <div className="bg-purple-50 dark:bg-purple-500/10 rounded-lg p-4">
+            <div className="text-sm text-gray-600 dark:text-slate-400">이번 달 건수</div>
             <div className="text-2xl font-bold text-purple-600">{analysis.statistics?.currentMonthCount || 0}</div>
           </div>
         </div>
@@ -205,7 +205,7 @@ export default function Maintenance() {
                   <option value="">월</option>
                   {MONTH_OPTIONS.map((m) => <option key={m} value={m}>{m}월</option>)}
                 </select>
-                <span className="text-gray-400">~</span>
+                <span className="text-gray-400 dark:text-slate-500">~</span>
                 <select
                   value={endYear}
                   onChange={(e) => setEndYear(e.target.value)}
@@ -230,12 +230,12 @@ export default function Maintenance() {
               </div>
             </div>
             {rangeInvalid && (
-              <div className="mb-3 text-sm text-red-600 bg-red-50 rounded px-3 py-2">
+              <div className="mb-3 text-sm text-red-600 bg-red-50 dark:bg-red-500/10 rounded px-3 py-2">
                 종료월이 시작월보다 빠릅니다. 범위를 다시 선택해주세요.
               </div>
             )}
             {rangeInvalid ? null : failureChartData.length === 0 ? (
-              <div className="h-[250px] flex items-center justify-center text-gray-400 text-sm">
+              <div className="h-[250px] flex items-center justify-center text-gray-400 dark:text-slate-500 text-sm">
                 표시할 고장 유형 데이터가 없습니다.
               </div>
             ) : (
@@ -281,7 +281,7 @@ export default function Maintenance() {
           <h3 className="font-semibold mb-4">
             전체 고장 유형 목록
             {(startMonth || endMonth) && (
-              <span className="text-sm text-gray-500 font-normal ml-2">
+              <span className="text-sm text-gray-500 dark:text-slate-400 font-normal ml-2">
                 ({startMonth || '처음'} ~ {endMonth || '지금'})
               </span>
             )}
@@ -291,7 +291,7 @@ export default function Maintenance() {
               종료월이 시작월보다 빠릅니다. 범위를 다시 선택해주세요.
             </div>
           ) : failureEntries.length === 0 ? (
-            <div className="text-center text-gray-400 text-sm py-6">
+            <div className="text-center text-gray-400 dark:text-slate-500 text-sm py-6">
               해당 기간에 표시할 고장 유형 데이터가 없습니다.
             </div>
           ) : (
@@ -311,14 +311,14 @@ export default function Maintenance() {
                     return (
                       <tr
                         key={name}
-                        className="border-t cursor-pointer hover:bg-gray-50"
+                        className="border-t cursor-pointer hover:bg-gray-50 hover:dark:bg-slate-900"
                         onClick={() => handleFailureTypeClick(name)}
                       >
                         <td className="table-cell text-blue-600 hover:underline">{name}</td>
                         <td className="table-cell">{value}건</td>
                         <td className="table-cell">{percent.toFixed(1)}%</td>
                         <td className="table-cell w-40">
-                          <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                          <div className="h-2 bg-gray-100 dark:bg-slate-700 rounded-full overflow-hidden">
                             <div className="h-full bg-blue-500" style={{ width: `${percent}%` }} />
                           </div>
                         </td>
@@ -331,9 +331,9 @@ export default function Maintenance() {
           )}
         </div>
 
-        <div className="bg-blue-50 rounded-lg p-4">
+        <div className="bg-blue-50 dark:bg-blue-500/10 rounded-lg p-4">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="font-semibold text-blue-900">AI 분석 결과</h3>
+            <h3 className="font-semibold text-blue-900 dark:text-blue-300">AI 분석 결과</h3>
             {!aiAnalysis && (
               <button
                 onClick={handleLoadAiAnalysis}
@@ -345,7 +345,7 @@ export default function Maintenance() {
             )}
           </div>
           {aiAnalysis ? (
-            <div className="text-sm text-blue-800 whitespace-pre-line">{aiAnalysis}</div>
+            <div className="text-sm text-blue-800 dark:text-blue-300 whitespace-pre-line">{aiAnalysis}</div>
           ) : (
             <div className="text-sm text-blue-700">
               버튼을 누르면 현재 기간 데이터를 바탕으로 AI가 분석해드립니다.
@@ -374,34 +374,34 @@ export default function Maintenance() {
                     </div>
                     <div className="grid grid-cols-2 gap-4 mb-6 text-sm">
                       <div>
-                        <div className="text-gray-500">자산번호</div>
+                        <div className="text-gray-500 dark:text-slate-400">자산번호</div>
                         <div className="font-medium">{viewingAsset.assetCode}</div>
                       </div>
                       <div>
-                        <div className="text-gray-500">카테고리</div>
+                        <div className="text-gray-500 dark:text-slate-400">카테고리</div>
                         <div className="font-medium">{viewingAsset.category}</div>
                       </div>
                       <div>
-                        <div className="text-gray-500">위치</div>
+                        <div className="text-gray-500 dark:text-slate-400">위치</div>
                         <div className="font-medium">{viewingAsset.location}</div>
                       </div>
                       <div>
-                        <div className="text-gray-500">담당자</div>
+                        <div className="text-gray-500 dark:text-slate-400">담당자</div>
                         <div className="font-medium">{viewingAsset.responsiblePerson}</div>
                       </div>
                       <div>
-                        <div className="text-gray-500">구매일</div>
+                        <div className="text-gray-500 dark:text-slate-400">구매일</div>
                         <div className="font-medium">{viewingAsset.purchaseDate?.split('T')[0]}</div>
                       </div>
                       <div>
-                        <div className="text-gray-500">구매가</div>
+                        <div className="text-gray-500 dark:text-slate-400">구매가</div>
                         <div className="font-medium">{viewingAsset.purchasePrice?.toLocaleString()}원</div>
                       </div>
                     </div>
 
                     <h3 className="font-semibold mb-2">유지보수 이력</h3>
                     {viewingMaintenance.length === 0 ? (
-                      <div className="text-center text-gray-500 py-6">유지보수 이력이 없습니다.</div>
+                      <div className="text-center text-gray-500 dark:text-slate-400 py-6">유지보수 이력이 없습니다.</div>
                     ) : (
                       <div className="space-y-3 mb-4">
                         {viewingMaintenance.map((record) => (
@@ -409,11 +409,11 @@ export default function Maintenance() {
                             <div className="flex justify-between items-start">
                               <div>
                                 <MaintenanceTypeBadge type={record.maintenanceType} />
-                                <div className="text-sm text-gray-600 mt-1">{record.description}</div>
+                                <div className="text-sm text-gray-600 dark:text-slate-400 mt-1">{record.description}</div>
                               </div>
                               <div className="text-right">
                                 <div className="text-sm font-medium">{record.cost?.toLocaleString()}원</div>
-                                <div className="text-xs text-gray-500">{record.maintenanceDate?.split('T')[0]}</div>
+                                <div className="text-xs text-gray-500 dark:text-slate-400">{record.maintenanceDate?.split('T')[0]}</div>
                               </div>
                             </div>
                           </div>
@@ -437,7 +437,7 @@ export default function Maintenance() {
                 {loadingFailureAssets ? (
                   <LoadingState className="py-8" />
                 ) : failureAssets.length === 0 ? (
-                  <div className="text-center text-gray-500 py-8">해당 고장 유형이 발생한 자산이 없습니다.</div>
+                  <div className="text-center text-gray-500 dark:text-slate-400 py-8">해당 고장 유형이 발생한 자산이 없습니다.</div>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="table">
@@ -454,7 +454,7 @@ export default function Maintenance() {
                         {failureAssets.map((asset) => (
                           <tr
                             key={asset.id}
-                            className="border-t cursor-pointer hover:bg-gray-50"
+                            className="border-t cursor-pointer hover:bg-gray-50 hover:dark:bg-slate-900"
                             onClick={() => handleAssetClick(asset.id)}
                           >
                             <td className="table-cell font-medium">{asset.assetName}</td>

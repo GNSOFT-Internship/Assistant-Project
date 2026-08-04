@@ -13,7 +13,7 @@
   }
 
   body {
-    @apply bg-slate-50 text-slate-900 antialiased;
+    @apply bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 antialiased transition-colors;
     letter-spacing: -0.02em;
   }
 }
@@ -36,7 +36,7 @@
   }
 
   .btn-secondary {
-    @apply btn bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 focus:ring-blue-500;
+    @apply btn bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 focus:ring-blue-500;
     box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.02);
   }
 
@@ -50,7 +50,7 @@
   }
 
   .card {
-    @apply bg-white rounded-2xl border border-slate-100 p-6;
+    @apply bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 p-6;
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.03), 0 2px 4px -1px rgba(0, 0, 0, 0.01), 0 0 0 1px rgba(0, 0, 0, 0.01);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
@@ -62,8 +62,8 @@
   }
 
   .input {
-    @apply block w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm
-      text-slate-900 placeholder-slate-400 shadow-sm transition-all duration-150
+    @apply block w-full rounded-xl border border-slate-200 dark:border-slate-600 px-3 py-2.5 text-sm
+      bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 shadow-sm transition-all duration-150
       focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500;
   }
 
@@ -72,15 +72,15 @@
   }
 
   .table-header {
-    @apply bg-slate-50/70 text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-100;
+    @apply bg-slate-50/70 dark:bg-slate-800/70 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-slate-700;
   }
 
   .table-cell {
-    @apply px-4 py-3.5 whitespace-nowrap text-slate-700 border-b border-slate-100;
+    @apply px-4 py-3.5 whitespace-nowrap text-slate-700 dark:text-slate-300 border-b border-slate-100 dark:border-slate-700;
   }
 
   .table tbody tr {
-    @apply transition-colors hover:bg-slate-50/50;
+    @apply transition-colors hover:bg-slate-50/50 dark:hover:bg-slate-700/50;
   }
 
   .badge {
@@ -88,25 +88,25 @@
   }
 
   .badge-green {
-    @apply badge bg-emerald-50 text-emerald-700 border border-emerald-100;
+    @apply badge bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-500/20;
   }
   .badge-red {
-    @apply badge bg-rose-50 text-rose-700 border border-rose-100;
+    @apply badge bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-100 dark:border-rose-500/20;
   }
   .badge-yellow {
-    @apply badge bg-amber-50 text-amber-700 border border-amber-100;
+    @apply badge bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-100 dark:border-amber-500/20;
   }
   .badge-blue {
-    @apply badge bg-sky-50 text-sky-700 border border-sky-100;
+    @apply badge bg-sky-50 dark:bg-sky-500/10 text-sky-700 dark:text-sky-400 border border-sky-100 dark:border-sky-500/20;
   }
   .badge-gray {
-    @apply badge bg-slate-50 text-slate-600 border border-slate-100;
+    @apply badge bg-slate-50 dark:bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-100 dark:border-slate-500/20;
   }
   .badge-purple {
-    @apply badge bg-violet-50 text-violet-700 border border-violet-100;
+    @apply badge bg-violet-50 dark:bg-violet-500/10 text-violet-700 dark:text-violet-400 border border-violet-100 dark:border-violet-500/20;
   }
   .badge-orange {
-    @apply badge bg-orange-50 text-orange-700 border border-orange-100;
+    @apply badge bg-orange-50 dark:bg-orange-500/10 text-orange-700 dark:text-orange-400 border border-orange-100 dark:border-orange-500/20;
   }
 }
 

@@ -27,16 +27,16 @@ export default function Dropdown({ id, value, options, onChange, disabled, width
         id={id}
         disabled={disabled}
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center justify-between gap-1 whitespace-nowrap rounded border px-2 py-1 text-sm transition-colors hover:border-gray-400 disabled:cursor-not-allowed disabled:opacity-50"
+        className="flex w-full items-center justify-between gap-1 whitespace-nowrap rounded border px-2 py-1 text-sm transition-colors hover:border-gray-400 hover:dark:border-slate-500 disabled:cursor-not-allowed disabled:opacity-50"
       >
         <span>{selected?.label}</span>
         <ChevronDown
           size={14}
-          className={`text-gray-400 transition-transform duration-150 ${open ? 'rotate-180' : ''}`}
+          className={`text-gray-400 dark:text-slate-500 transition-transform duration-150 ${open ? 'rotate-180' : ''}`}
         />
       </button>
       <div
-        className={`absolute left-0 top-full z-20 mt-1 max-h-56 w-full origin-top overflow-y-auto rounded-lg border bg-white py-1 shadow-lg transition-all duration-150 ease-out ${
+        className={`absolute left-0 top-full z-20 mt-1 max-h-56 w-full origin-top overflow-y-auto rounded-lg border bg-white dark:bg-slate-800 py-1 shadow-lg transition-all duration-150 ease-out ${
           open
             ? 'pointer-events-auto translate-y-0 scale-100 opacity-100'
             : 'pointer-events-none -translate-y-1 scale-95 opacity-0'
@@ -52,8 +52,8 @@ export default function Dropdown({ id, value, options, onChange, disabled, width
               onChange(opt.value);
               setOpen(false);
             }}
-            className={`block w-full whitespace-nowrap px-3 py-1.5 text-left text-sm transition-colors disabled:cursor-not-allowed disabled:text-gray-300 ${
-              opt.value === value ? 'bg-blue-50 font-medium text-blue-600' : 'text-gray-700 hover:bg-gray-50'
+            className={`block w-full whitespace-nowrap px-3 py-1.5 text-left text-sm transition-colors disabled:cursor-not-allowed disabled:text-gray-300 disabled:dark:text-slate-600 ${
+              opt.value === value ? 'bg-blue-50 dark:bg-blue-500/10 font-medium text-blue-600' : 'text-gray-700 dark:text-slate-300 hover:bg-gray-50 hover:dark:bg-slate-900'
             }`}
           >
             {opt.label}

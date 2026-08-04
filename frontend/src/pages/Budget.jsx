@@ -171,7 +171,7 @@ export default function Budget() {
       </div>
 
       <div className="card">
-        <p className="text-sm text-gray-500 mb-4">
+        <p className="text-sm text-gray-500 dark:text-slate-400 mb-4">
           월별 유지보수 예산을 배정하면 대시보드의 예산 소진율이 실제 데이터를 기준으로 계산됩니다.
         </p>
         <div className="overflow-x-auto">
@@ -228,7 +228,7 @@ export default function Budget() {
                           {formatPercent(rate)}
                         </span>
                       ) : (
-                        <span className="text-gray-400">-</span>
+                        <span className="text-gray-400 dark:text-slate-500">-</span>
                       )}
                     </td>
                     {isAdmin && (
@@ -256,7 +256,7 @@ export default function Budget() {
           <h3 className="text-lg font-semibold flex items-center gap-2">
             🔮 AI 차년도 예산 예측
           </h3>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-gray-500 dark:text-slate-400">
             과거 월별 유지보수 지출 추이 및 현재 장비 노후도를 Qwen3.5 AI가 분석하여 차년도 월별 지출 예상액을 예측합니다.
           </p>
 
@@ -272,13 +272,13 @@ export default function Budget() {
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="bg-blue-50 p-4 rounded text-sm text-blue-800 leading-relaxed border border-blue-100">
+              <div className="bg-blue-50 dark:bg-blue-500/10 p-4 rounded text-sm text-blue-800 dark:text-blue-300 leading-relaxed border border-blue-100 dark:border-blue-500/20">
                 <span className="font-bold">💡 AI 예측 분석 총평:</span> {forecast.rationale}
               </div>
 
               <div className="overflow-y-auto max-h-64 border rounded">
                 <table className="table min-w-full text-xs">
-                  <thead className="table-header bg-gray-50">
+                  <thead className="table-header bg-gray-50 dark:bg-slate-900">
                     <tr>
                       <th className="table-cell">월</th>
                       <th className="table-cell text-right">예측 금액</th>
@@ -290,7 +290,7 @@ export default function Budget() {
                       <tr key={item.month} className="border-t">
                         <td className="table-cell font-bold text-center">{item.month}월</td>
                         <td className="table-cell font-semibold text-right text-blue-700">{item.amount?.toLocaleString()}원</td>
-                        <td className="table-cell text-gray-600">{item.reason}</td>
+                        <td className="table-cell text-gray-600 dark:text-slate-400">{item.reason}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -314,7 +314,7 @@ export default function Budget() {
           <h3 className="text-lg font-semibold flex items-center gap-2">
             📊 AI 예산 최적화 시뮬레이터
           </h3>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-gray-500 dark:text-slate-400">
             가용할 수 있는 전체 예산 상한액을 입력하면, 노후도가 높은 급박한 카테고리에 맞추어 AI가 최적 비율로 예산을 배분합니다.
           </p>
 
@@ -339,27 +339,27 @@ export default function Budget() {
 
           {simulation && (
             <div className="space-y-4">
-              <div className="bg-green-50 p-4 rounded text-sm text-green-800 leading-relaxed border border-green-100">
+              <div className="bg-green-50 dark:bg-green-500/10 p-4 rounded text-sm text-green-800 dark:text-green-300 leading-relaxed border border-green-100 dark:border-green-500/20">
                 <span className="font-bold">📋 시뮬레이션 요약:</span> {simulation.summary}
               </div>
 
               <div className="space-y-3">
-                <div className="text-sm font-semibold text-gray-700">카테고리별 배분 추천</div>
+                <div className="text-sm font-semibold text-gray-700 dark:text-slate-300">카테고리별 배분 추천</div>
                 {simulation.allocations.map((item) => (
                   <div key={item.category} className="space-y-1">
-                    <div className="flex justify-between text-xs font-medium text-gray-600">
+                    <div className="flex justify-between text-xs font-medium text-gray-600 dark:text-slate-400">
                       <span>{item.category}</span>
-                      <span className="font-bold text-gray-900">
+                      <span className="font-bold text-gray-900 dark:text-slate-100">
                         {item.allocatedAmount?.toLocaleString()}원 ({(item.ratio * 100).toFixed(1)}%)
                       </span>
                     </div>
-                    <div className="w-full bg-gray-100 rounded-full h-2">
+                    <div className="w-full bg-gray-100 dark:bg-slate-700 rounded-full h-2">
                       <div
                         className="bg-blue-600 h-2 rounded-full"
                         style={{ width: `${item.ratio * 100}%` }}
                       ></div>
                     </div>
-                    <div className="text-[11px] text-gray-500 italic pl-1 leading-relaxed">
+                    <div className="text-[11px] text-gray-500 dark:text-slate-400 italic pl-1 leading-relaxed">
                       {item.reason}
                     </div>
                   </div>

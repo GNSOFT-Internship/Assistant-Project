@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
 import { ConfirmProvider } from './context/ConfirmContext';
+import { SettingsProvider } from './context/SettingsContext';
 import ErrorBoundary from './components/ErrorBoundary';
 import Login from './pages/Login';
 import Layout from './components/Layout';
@@ -35,6 +36,7 @@ function App() {
   return (
     <BrowserRouter>
       <ErrorBoundary>
+        <SettingsProvider>
         <ToastProvider>
           <ConfirmProvider>
             <AuthProvider>
@@ -128,6 +130,7 @@ function App() {
             </AuthProvider>
           </ConfirmProvider>
         </ToastProvider>
+        </SettingsProvider>
       </ErrorBoundary>
     </BrowserRouter>
   );
