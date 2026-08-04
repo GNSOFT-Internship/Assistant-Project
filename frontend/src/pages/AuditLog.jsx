@@ -3,6 +3,7 @@ import { Navigate } from 'react-router-dom';
 import { assetApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import LoadingState from '../components/LoadingState';
+import Dropdown from '../components/Dropdown';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { ASSET_STATUS } from '../components/StatusBadge';
 
@@ -13,6 +14,14 @@ const ACTION_LABEL = {
   UPDATE: '수정',
   DELETE: '삭제',
 };
+
+// Reports/Budget 페이지의 연/월 Dropdown과 동일한 옵션 형태({value, label})로 맞춘 목록
+const ACTION_FILTER_OPTIONS = [
+  { value: '', label: '전체 작업' },
+  { value: 'CREATE', label: '등록' },
+  { value: 'UPDATE', label: '수정' },
+  { value: 'DELETE', label: '삭제' },
+];
 
 const ACTION_STYLE = {
   CREATE: 'bg-green-100 text-green-700',
@@ -221,16 +230,13 @@ export default function AuditLog() {
             onChange={(e) => setSearchInput(e.target.value)}
             className="input flex-1"
           />
-          <select
+          <Dropdown
+            id="action-filter"
             value={actionFilter}
-            onChange={(e) => setActionFilter(e.target.value)}
-            className="input sm:w-40"
-          >
-            <option value="">전체 작업</option>
-            <option value="CREATE">등록</option>
-            <option value="UPDATE">수정</option>
-            <option value="DELETE">삭제</option>
-          </select>
+            onChange={setActionFilter}
+            widthClass="w-full sm:w-40"
+            options={ACTION_FILTER_OPTIONS}
+          />
         </div>
 
         {loading ? (
