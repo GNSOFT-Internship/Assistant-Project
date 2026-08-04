@@ -1,15 +1,22 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
-import { Sun, Moon } from 'lucide-react';
+import { Sun, Moon, AlertTriangle } from 'lucide-react';
 
 export default function Login() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [capsLockOn, setCapsLockOn] = useState(false);
   const { login } = useAuth();
   const { theme, toggleTheme } = useSettings();
+
+  const checkCapsLock = (e) => {
+    if (typeof e.getModifierState === 'function') {
+      setCapsLockOn(e.getModifierState('CapsLock'));
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -82,9 +89,17 @@ export default function Login() {
               />
             </div>
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
-                비밀번호
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-slate-300">
+                  비밀번호
+                </label>
+                {capsLockOn && (
+                  <span className="flex items-center gap-1 text-xs font-medium text-amber-600 dark:text-amber-400">
+                    <AlertTriangle size={13} />
+                    Caps Lock이 켜져있어요
+                  </span>
+                )}
+              </div>
               <input
                 id="password"
                 name="password"
@@ -94,6 +109,9 @@ export default function Login() {
                 placeholder="비밀번호를 입력하세요"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                onKeyDown={checkCapsLock}
+                onKeyUp={checkCapsLock}
+                onBlur={() => setCapsLockOn(false)}
               />
             </div>
 
