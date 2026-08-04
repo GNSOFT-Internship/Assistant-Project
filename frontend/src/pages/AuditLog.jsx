@@ -54,14 +54,65 @@ function formatValue(field, value) {
   return value;
 }
 
-function formatChanges(changes) {
-  if (!changes) return '-';
-  return Object.entries(changes)
-    .map(([field, { old, new: next }]) => {
-      const label = FIELD_LABEL[field] || field;
-      return `${label}: ${formatValue(field, old)} → ${formatValue(field, next)}`;
-    })
-    .join(', ');
+// 콤마로 이어붙인 한 줄 문자열 대신, 필드별로 줄바꿈해서 보여줄 수 있도록
+// { field, label, text } 배열로 반환한다.
+function getChangeEntries(changes) {
+  if (!changes) return [];
+  return Object.entries(changes).map(([field, { old, new: next }]) => {
+    const label = FIELD_LABEL[field] || field;
+    return {
+      field,
+      label,
+      text: `${formatValue(field, old)} → ${formatValue(field, next)}`,
+    };
+  });
+}
+
+const CHANGES_COLLAPSE_THRESHOLD = 3;
+
+// 변경 내용 셀: 필드별로 한 줄씩 세로로 나열하고, 필드가 많으면
+// 기본 N개만 보여준 뒤 "+N개 더보기" 토글로 나머지를 펼쳐서 보여준다.
+function ChangesCell({ changes }) {
+  const [expanded, setExpanded] = useState(false);
+  const entries = getChangeEntries(changes);
+
+  if (entries.length === 0) {
+    return <span className="text-gray-400">-</span>;
+  }
+
+  const visibleEntries = expanded ? entries : entries.slice(0, CHANGES_COLLAPSE_THRESHOLD);
+  const hiddenCount = entries.length - visibleEntries.length;
+
+  return (
+    <div className="space-y-1">
+      {visibleEntries.map(({ field, label, text }) => (
+        <div key={field} className="flex flex-wrap items-baseline gap-x-1 text-sm leading-snug">
+          <span className="shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-xs font-medium text-gray-600">
+            {label}
+          </span>
+          <span className="break-all text-gray-800">{text}</span>
+        </div>
+      ))}
+      {hiddenCount > 0 && (
+        <button
+          type="button"
+          onClick={() => setExpanded(true)}
+          className="text-xs font-medium text-blue-600 hover:underline"
+        >
+          +{hiddenCount}개 더보기
+        </button>
+      )}
+      {expanded && entries.length > CHANGES_COLLAPSE_THRESHOLD && (
+        <button
+          type="button"
+          onClick={() => setExpanded(false)}
+          className="text-xs font-medium text-gray-500 hover:underline"
+        >
+          접기
+        </button>
+      )}
+    </div>
+  );
 }
 
 export default function AuditLog() {
@@ -173,8 +224,8 @@ export default function AuditLog() {
                     </td>
                     <td className="table-cell">{log.assetName || '-'}</td>
                     <td className="table-cell">{log.assetCode || '-'}</td>
-                    <td className="table-cell max-w-md truncate" title={formatChanges(log.changes)}>
-                      {formatChanges(log.changes)}
+                    <td className="table-cell max-w-md align-top">
+                      <ChangesCell changes={log.changes} />
                     </td>
                   </tr>
                 ))}
