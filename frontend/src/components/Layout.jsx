@@ -152,7 +152,7 @@ export default function Layout() {
               <div className="flex-shrink-0 flex items-center gap-2">
                 
                 <img
-                  src="/model.png"
+                  src={theme === 'dark' ? '/model-dark.png' : '/model.png'}
                   alt="자산관리 로고"
                   className="w-[90px] h-[90px] object-contain"
 />

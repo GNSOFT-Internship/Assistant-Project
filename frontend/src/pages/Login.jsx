@@ -53,7 +53,7 @@ export default function Login() {
         <div className="flex flex-col items-center mb-8">
 
          <img
-            src="/model.png"
+            src={theme === 'dark' ? '/model-dark.png' : '/model.png'}
             alt="자산관리 로고"
             className="w-[200px] h-[200px] object-contain"
 />
