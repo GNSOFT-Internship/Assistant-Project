@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { formatPercent } from '../utils/format';
 import LoadingState from '../components/LoadingState';
+import Dropdown from '../components/Dropdown';
 
 const CURRENT_YEAR = new Date().getFullYear();
 // 선택된 연도 기준 앞뒤 1년씩(3개)만 보이던 걸, 지금 연도 기준 과거 10년~이후 1년까지
@@ -150,15 +151,13 @@ export default function Budget() {
       <div className="flex justify-between items-center flex-wrap gap-2">
         <h1 className="text-2xl font-bold">예산 관리</h1>
         <div className="flex items-center gap-2">
-          <select
+          <Dropdown
+            id="budget-year"
             value={year}
-            onChange={(e) => setYear(parseInt(e.target.value, 10))}
-            className="input w-32"
-          >
-            {YEAR_OPTIONS.map((y) => (
-              <option key={y} value={y}>{y}년</option>
-            ))}
-          </select>
+            onChange={(v) => setYear(Number(v))}
+            widthClass="w-24"
+            options={YEAR_OPTIONS.map((y) => ({ value: y, label: `${y}년` }))}
+          />
           {isAdmin && (
             <button
               onClick={handleSaveAll}
