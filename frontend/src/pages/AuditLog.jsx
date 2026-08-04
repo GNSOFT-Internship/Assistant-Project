@@ -55,7 +55,7 @@ function formatValue(field, value) {
 }
 
 // 콤마로 이어붙인 한 줄 문자열 대신, 필드별로 줄바꿈해서 보여줄 수 있도록
-// { field, label, text } 배열로 반환한다.
+// { field, label, oldText, newText } 배열로 반환한다.
 function getChangeEntries(changes) {
   if (!changes) return [];
   return Object.entries(changes).map(([field, { old, new: next }]) => {
@@ -63,7 +63,8 @@ function getChangeEntries(changes) {
     return {
       field,
       label,
-      text: `${formatValue(field, old)} → ${formatValue(field, next)}`,
+      oldText: formatValue(field, old),
+      newText: formatValue(field, next),
     };
   });
 }
@@ -85,12 +86,17 @@ function ChangesCell({ changes }) {
 
   return (
     <div className="space-y-1">
-      {visibleEntries.map(({ field, label, text }) => (
-        <div key={field} className="flex flex-wrap items-baseline gap-x-1 text-sm leading-snug">
-          <span className="shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-xs font-medium text-gray-600">
+      {visibleEntries.map(({ field, label, oldText, newText }) => (
+        <div key={field} className="flex items-baseline gap-x-1.5 text-sm leading-snug">
+          <span className="w-20 shrink-0 text-right text-xs font-medium text-gray-500">
             {label}
           </span>
-          <span className="break-all text-gray-800">{text}</span>
+          <span className="text-gray-400">:</span>
+          <span className="flex flex-wrap items-baseline gap-x-1 break-all">
+            <span className="text-gray-400 line-through decoration-gray-300">{oldText}</span>
+            <span className="shrink-0 text-gray-400">→</span>
+            <span className="font-medium text-gray-900">{newText}</span>
+          </span>
         </div>
       ))}
       {hiddenCount > 0 && (
