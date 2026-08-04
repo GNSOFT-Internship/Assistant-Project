@@ -37,6 +37,24 @@ const FIELD_LABEL = {
   maintenance_record: '정비 이력',
 };
 
+// 대시보드 통계 카드와 같은 톤(연한 배경 + 진한 텍스트)으로, 필드마다 다른 색을 부여해
+// 한 줄에 여러 필드가 나열돼도 한눈에 구분되도록 한다.
+const FIELD_COLOR = {
+  asset_name: 'bg-blue-50 text-blue-600',
+  asset_code: 'bg-cyan-50 text-cyan-600',
+  category: 'bg-amber-50 text-amber-600',
+  location: 'bg-purple-50 text-purple-600',
+  responsible_person: 'bg-pink-50 text-pink-600',
+  purchase_date: 'bg-indigo-50 text-indigo-600',
+  purchase_price: 'bg-green-50 text-green-600',
+  useful_life: 'bg-teal-50 text-teal-600',
+  status: 'bg-violet-50 text-violet-600',
+  description: 'bg-gray-100 text-gray-600',
+  source: 'bg-sky-50 text-sky-600',
+  maintenance_record: 'bg-rose-50 text-rose-600',
+};
+const DEFAULT_FIELD_COLOR = 'bg-gray-100 text-gray-600';
+
 // 필드별로 값 자체도 한글/보기 좋은 형태로 바꿔야 하는 경우 처리
 // (status는 영문 enum 코드라서 반드시 한글 라벨로 바꿔야 함)
 function formatValue(field, value) {
@@ -63,6 +81,7 @@ function getChangeEntries(changes) {
     return {
       field,
       label,
+      color: FIELD_COLOR[field] || DEFAULT_FIELD_COLOR,
       oldText: formatValue(field, old),
       newText: formatValue(field, next),
     };
@@ -86,19 +105,34 @@ function ChangesCell({ changes }) {
 
   return (
     <div className="space-y-1">
-      {visibleEntries.map(({ field, label, oldText, newText }) => (
-        <div key={field} className="flex items-baseline gap-x-1.5 text-sm leading-snug">
-          <span className="w-20 shrink-0 text-right text-xs font-medium text-gray-500">
-            {label}
-          </span>
-          <span className="text-gray-400">:</span>
-          <span className="flex flex-wrap items-baseline gap-x-1 break-all">
-            <span className="text-gray-400 line-through decoration-gray-300">{oldText}</span>
-            <span className="shrink-0 text-gray-400">→</span>
-            <span className="font-medium text-gray-900">{newText}</span>
-          </span>
-        </div>
-      ))}
+      {visibleEntries.map(({ field, label, color, oldText, newText }) => {
+        const isCreated = oldText === '-' && newText !== '-';
+        const isDeleted = newText === '-' && oldText !== '-';
+
+        return (
+          <div key={field} className="flex flex-wrap items-center gap-x-1.5 text-sm leading-snug">
+            <span className={`shrink-0 rounded-md px-1.5 py-0.5 text-xs font-medium ${color}`}>
+              {label}
+            </span>
+            {isCreated && (
+              <>
+                <span className="shrink-0 text-gray-300">→</span>
+                <span className="break-all font-medium text-gray-900">{newText}</span>
+              </>
+            )}
+            {isDeleted && (
+              <span className="break-all text-gray-400 line-through decoration-gray-300">{oldText}</span>
+            )}
+            {!isCreated && !isDeleted && (
+              <span className="flex flex-wrap items-center gap-x-1 break-all">
+                <span className="text-gray-400 line-through decoration-gray-300">{oldText}</span>
+                <span className="shrink-0 text-gray-300">→</span>
+                <span className="font-medium text-gray-900">{newText}</span>
+              </span>
+            )}
+          </div>
+        );
+      })}
       {hiddenCount > 0 && (
         <button
           type="button"
