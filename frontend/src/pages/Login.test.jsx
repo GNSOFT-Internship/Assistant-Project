@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import Login from './Login';
 import { AuthProvider } from '../context/AuthContext';
+import { SettingsProvider } from '../context/SettingsContext';
 import { authApi } from '../services/api';
 
 vi.mock('../services/api', () => ({
@@ -11,9 +12,11 @@ vi.mock('../services/api', () => ({
 
 function renderPage() {
   return render(
-    <AuthProvider>
-      <Login />
-    </AuthProvider>
+    <SettingsProvider>
+      <AuthProvider>
+        <Login />
+      </AuthProvider>
+    </SettingsProvider>
   );
 }
 
