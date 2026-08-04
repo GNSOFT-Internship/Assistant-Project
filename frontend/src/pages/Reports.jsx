@@ -1,6 +1,6 @@
 import React from 'react';
 import { reportApi } from '../services/api';
-import { FileText, Download, RefreshCw } from 'lucide-react';
+import { FileText, Download, RefreshCw, ChevronDown } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { formatCurrency } from '../utils/format';
 
@@ -9,10 +9,78 @@ const CURRENT_YEAR = now.getFullYear();
 const CURRENT_MONTH = now.getMonth() + 1;
 const YEAR_OPTIONS = Array.from({ length: 6 }, (_, i) => CURRENT_YEAR - i);
 const MONTH_OPTIONS = Array.from({ length: 12 }, (_, i) => i + 1);
+// PDF는 AI 서술까지 포함해 서버가 통째로 만든 뒤 한 번에 내려주는 방식이라 실제
+// "다운로드 진행률"은 의미가 없다(전송 자체는 완성 즉시 순식간에 끝남). 그래서 평소
+// 소요 시간(경험적 추정치) 대비 경과 비율로 "예상 진행률"을 보여주고, 실제 완료 시 100%로 스냅한다.
+const ESTIMATED_PDF_SECONDS = 12;
+
+// 네이티브 <select>는 열림/닫힘을 OS가 그려서 트랜지션을 줄 수 없다.
+// 버튼 + 절대 위치 패널로 직접 그려서 부드럽게 열고 닫히게 한다.
+function Dropdown({ id, value, options, onChange, disabled, widthClass = 'w-20' }) {
+  const [open, setOpen] = React.useState(false);
+  const containerRef = React.useRef(null);
+
+  React.useEffect(() => {
+    function handleClickOutside(e) {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const selected = options.find((o) => o.value === value);
+
+  return (
+    <div ref={containerRef} className={`relative ${widthClass}`}>
+      <button
+        type="button"
+        id={id}
+        disabled={disabled}
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center justify-between gap-1 whitespace-nowrap rounded border px-2 py-1 text-sm transition-colors hover:border-gray-400 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        <span>{selected?.label}</span>
+        <ChevronDown
+          size={14}
+          className={`text-gray-400 transition-transform duration-150 ${open ? 'rotate-180' : ''}`}
+        />
+      </button>
+      <div
+        className={`absolute left-0 top-full z-20 mt-1 max-h-56 w-full origin-top overflow-y-auto rounded-lg border bg-white py-1 shadow-lg transition-all duration-150 ease-out ${
+          open
+            ? 'pointer-events-auto translate-y-0 scale-100 opacity-100'
+            : 'pointer-events-none -translate-y-1 scale-95 opacity-0'
+        }`}
+      >
+        {options.map((opt) => (
+          <button
+            key={opt.value}
+            type="button"
+            disabled={opt.disabled}
+            onClick={() => {
+              if (opt.disabled) return;
+              onChange(opt.value);
+              setOpen(false);
+            }}
+            className={`block w-full whitespace-nowrap px-3 py-1.5 text-left text-sm transition-colors disabled:cursor-not-allowed disabled:text-gray-300 ${
+              opt.value === value ? 'bg-blue-50 font-medium text-blue-600' : 'text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function Reports() {
   const toast = useToast();
   const [generating, setGenerating] = React.useState(false);
+  const [elapsedMs, setElapsedMs] = React.useState(0);
+
   const [loading, setLoading] = React.useState(true);
   const [report, setReport] = React.useState(null);
   const [loadingAiSummary, setLoadingAiSummary] = React.useState(false);
@@ -79,6 +147,11 @@ export default function Reports() {
     const reqMonth = month;
 
     setGenerating(true);
+    setElapsedMs(0);
+    const startedAt = Date.now();
+    const timerId = setInterval(() => {
+      setElapsedMs(Date.now() - startedAt);
+    }, 200);
     abortControllerRef.current = new AbortController();
     try {
       const response = await reportApi.downloadPdf(
@@ -109,6 +182,7 @@ export default function Reports() {
       const errorMessage = error?.response?.data?.detail || error?.message || '보고서 생성 실패';
       toast.error(`보고서 생성 실패: ${errorMessage}`);
     } finally {
+      clearInterval(timerId);
       // 이 요청이 이미 취소/대체되어 무효화된 뒤라면, 그 사이 시작된 "다음" 요청의
       // generating/abortControllerRef 상태를 잘못 초기화하지 않도록 건너뛴다.
       if (requestGeneration === generationRef.current) {
@@ -142,30 +216,26 @@ export default function Reports() {
             <label htmlFor="report-year" className="text-sm text-gray-600">
               보고 대상
             </label>
-            <select
+            <Dropdown
               id="report-year"
               value={year}
-              onChange={(e) => handleYearChange(Number(e.target.value))}
+              onChange={(v) => handleYearChange(Number(v))}
               disabled={loadingAiSummary || generating}
-              className="border rounded px-2 py-1 text-sm"
-            >
-              {YEAR_OPTIONS.map((y) => (
-                <option key={y} value={y}>{y}년</option>
-              ))}
-            </select>
-            <select
+              widthClass="w-24"
+              options={YEAR_OPTIONS.map((y) => ({ value: y, label: `${y}년` }))}
+            />
+            <Dropdown
               id="report-month"
               value={month}
-              onChange={(e) => setMonth(Number(e.target.value))}
+              onChange={(v) => setMonth(Number(v))}
               disabled={loadingAiSummary || generating}
-              className="border rounded px-2 py-1 text-sm"
-            >
-              {MONTH_OPTIONS.map((m) => (
-                <option key={m} value={m} disabled={year === CURRENT_YEAR && m > CURRENT_MONTH}>
-                  {m}월
-                </option>
-              ))}
-            </select>
+              widthClass="w-20"
+              options={MONTH_OPTIONS.map((m) => ({
+                value: m,
+                label: `${m}월`,
+                disabled: year === CURRENT_YEAR && m > CURRENT_MONTH,
+              }))}
+            />
             <button onClick={loadPreview} className="btn btn-secondary flex items-center gap-2" disabled={loading || loadingAiSummary || generating}>
               <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
               새로고침
@@ -185,24 +255,36 @@ export default function Reports() {
               <li>• 교체 권장 자산 목록</li>
               <li>• 주요 문제점 및 향후 관리 권장사항 (AI 생성)</li>
             </ul>
-            <div className="flex gap-2">
-              <button
-                onClick={handleGenerate}
-                disabled={generating}
-                className="btn btn-primary flex-1 flex items-center justify-center gap-2"
-              >
-                <Download size={16} />
-                {generating ? '생성 중...' : 'PDF 다운로드'}
-              </button>
-
-              {generating && (
+            <div>
+              <div className="flex gap-2">
                 <button
-                  onClick={handleCancel}
-                  className="px-4 bg-red-600 hover:bg-red-700 text-white rounded-lg"
-                  title="PDF 생성 취소"
+                  onClick={handleGenerate}
+                  disabled={generating}
+                  className="btn btn-primary flex-1 flex items-center justify-center gap-2"
                 >
-                  ✕
+                  <Download size={16} />
+                  {generating ? `생성 중... (${Math.floor(elapsedMs / 1000)}초)` : 'PDF 다운로드'}
                 </button>
+
+                {generating && (
+                  <button
+                    onClick={handleCancel}
+                    className="px-4 bg-red-600 hover:bg-red-700 text-white rounded-lg"
+                    title="PDF 생성 취소"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+              {generating && (
+                <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-blue-100">
+                  <div
+                    className="h-full rounded-full bg-blue-600 transition-all duration-200 ease-linear"
+                    style={{
+                      width: `${Math.min(96, Math.round((elapsedMs / (ESTIMATED_PDF_SECONDS * 1000)) * 100))}%`,
+                    }}
+                  />
+                </div>
               )}
             </div>
           </div>
