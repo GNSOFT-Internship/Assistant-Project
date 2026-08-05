@@ -106,7 +106,7 @@ export default function CommandPalette({ open, onClose, navItems }) {
             }}
             onKeyDown={handleKeyDown}
             placeholder="페이지 이동 또는 자산 검색..."
-            className="flex-1 py-3.5 outline-none text-sm placeholder:text-slate-400 placeholder:dark:text-slate-500"
+            className="flex-1 py-3.5 outline-none text-sm bg-transparent text-slate-900 dark:text-slate-100 placeholder:text-slate-400 placeholder:dark:text-slate-500"
           />
           <kbd className="hidden sm:inline text-xs text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-600 rounded px-1.5 py-0.5">
             Esc
