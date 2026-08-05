@@ -55,7 +55,7 @@ export default function Login() {
          <img
             src="/model.png"
             alt="자산관리 로고"
-            className="w-[200px] h-[200px] object-contain"
+            className="w-[200px] h-[200px] object-contain dark:invert"
 />
 
           <h2 className="text-center text-3xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
