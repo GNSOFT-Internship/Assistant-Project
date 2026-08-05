@@ -55,7 +55,7 @@ function ScrollableNav({ items, activePath, variant }) {
         <button
           onClick={() => scrollByAmount(-1)}
           aria-label="이전 메뉴"
-          className="absolute left-0 z-10 h-full px-1 flex items-center bg-gradient-to-r from-white via-white to-transparent"
+          className="absolute left-0 z-10 h-full px-1 flex items-center bg-gradient-to-r from-white via-white to-transparent dark:from-slate-800 dark:via-slate-800 dark:to-transparent"
         >
           <ChevronLeft size={16} className="text-gray-500 dark:text-slate-400" />
         </button>
@@ -87,7 +87,7 @@ function ScrollableNav({ items, activePath, variant }) {
         <button
           onClick={() => scrollByAmount(1)}
           aria-label="다음 메뉴"
-          className="absolute right-0 z-10 h-full px-1 flex items-center bg-gradient-to-l from-white via-white to-transparent"
+          className="absolute right-0 z-10 h-full px-1 flex items-center bg-gradient-to-l from-white via-white to-transparent dark:from-slate-800 dark:via-slate-800 dark:to-transparent"
         >
           <ChevronRight size={16} className="text-gray-500 dark:text-slate-400" />
         </button>
