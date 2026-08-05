@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import Maintenance from './Maintenance';
+import { SettingsProvider } from '../context/SettingsContext';
 import { aiApi, assetApi } from '../services/api';
 
 vi.mock('../services/api', () => ({
@@ -24,9 +25,11 @@ const ANALYSIS = {
 
 function renderPage() {
   return render(
-    <MemoryRouter>
-      <Maintenance />
-    </MemoryRouter>
+    <SettingsProvider>
+      <MemoryRouter>
+        <Maintenance />
+      </MemoryRouter>
+    </SettingsProvider>
   );
 }
 
