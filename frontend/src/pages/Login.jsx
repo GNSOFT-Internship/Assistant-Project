@@ -99,20 +99,21 @@ export default function Login() {
                     Caps Lock이 켜져있어요
                   </span>
                 )}
-              </div>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                required
-                className="input"
-                placeholder="비밀번호를 입력하세요"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                onKeyDown={checkCapsLock}
-                onKeyUp={checkCapsLock}
-                onBlur={() => setCapsLockOn(false)}
-              />
+                </div>
+                  <input
+                 id="password"
+                 name="password"
+                 type="password"
+                 required
+                 className="input"
+                 placeholder="비밀번호를 입력하세요"
+                 value={password}
+                 onChange={(e) => setPassword(e.target.value)}
+                 onKeyDown={checkCapsLock}
+                 onKeyUp={checkCapsLock}
+                onMouseDown={checkCapsLock}
+                 onBlur={() => setCapsLockOn(false)}
+               />
             </div>
 
             <button
