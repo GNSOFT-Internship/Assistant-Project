@@ -6,6 +6,7 @@ import { AssetStatusBadge, MaintenanceTypeBadge } from '../components/StatusBadg
 import LoadingState from '../components/LoadingState';
 import Modal from '../components/Modal';
 import { ArrowLeft } from 'lucide-react';
+import { useSettings } from '../context/SettingsContext';
 
 const TOP_FAILURE_COUNT = 5;
 const CURRENT_YEAR = new Date().getFullYear();
@@ -18,6 +19,19 @@ function buildYearMonth(year, month) {
 }
 
 export default function Maintenance() {
+  const { theme } = useSettings();
+  const isDark = theme === 'dark';
+  const chartAxisColor = isDark ? '#cbd5e1' : '#6b7280'; // dark: slate-300, light: gray-500
+  const chartGridColor = isDark ? '#334155' : '#e5e7eb'; // dark: slate-700, light: gray-200
+  const chartTooltipStyle = {
+    contentStyle: {
+      backgroundColor: isDark ? '#1e293b' : '#ffffff', // dark: slate-800, light: white
+      border: `1px solid ${isDark ? '#334155' : '#e5e7eb'}`, // dark: slate-700, light: gray-200
+      borderRadius: '8px',
+    },
+    labelStyle: { color: isDark ? '#f1f5f9' : '#111827' }, // dark: slate-100, light: gray-900
+    itemStyle: { color: isDark ? '#f1f5f9' : '#111827' },
+  };
   const [analysis, setAnalysis] = useState(null);
   const [loading, setLoading] = useState(true);
   const [startYear, setStartYear] = useState('');
@@ -242,8 +256,9 @@ export default function Maintenance() {
               <ResponsiveContainer width="100%" height={250}>
                 <BarChart data={failureChartData} layout="vertical" margin={{ left: 10, right: 30 }}>
                   <XAxis type="number" hide />
-                  <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 12 }} />
+                  <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 12, fill: chartAxisColor }} />
                   <Tooltip
+                    {...chartTooltipStyle}
                     formatter={(value) => [`${value}대`, '발생 건수']}
                   />
                   <Bar
@@ -265,10 +280,11 @@ export default function Maintenance() {
             <h3 className="font-semibold mb-4">월별 비용 추이</h3>
             <ResponsiveContainer width="100%" height={250}>
               <BarChart data={costData} margin={{ left: 10 }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis width={80} tick={{ fontSize: 12 }} tickFormatter={(value) => value.toLocaleString()} />
+                <CartesianGrid strokeDasharray="3 3" stroke={chartGridColor} />
+                <XAxis dataKey="name" tick={{ fontSize: 12, fill: chartAxisColor }} />
+                <YAxis width={80} tick={{ fontSize: 12, fill: chartAxisColor }} tickFormatter={(value) => value.toLocaleString()} />
                 <Tooltip
+                  {...chartTooltipStyle}
                   formatter={(value) => [`${value.toLocaleString()}원`, '유지보수 비용']}
                 />
                 <Bar dataKey="value" fill="#3B82F6" />
