@@ -5,10 +5,11 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { AssetStatusBadge, MaintenanceTypeBadge } from '../components/StatusBadge';
 import LoadingState from '../components/LoadingState';
 import Modal from '../components/Modal';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useSettings } from '../context/SettingsContext';
 
 const TOP_FAILURE_COUNT = 5;
+const FAILURE_TYPE_PAGE_SIZE = 10;
 const CURRENT_YEAR = new Date().getFullYear();
 const YEAR_OPTIONS = Array.from({ length: 20 }, (_, i) => CURRENT_YEAR + 1 - i);
 const MONTH_OPTIONS = Array.from({ length: 12 }, (_, i) => i + 1);
@@ -39,6 +40,7 @@ export default function Maintenance() {
   const [endYear, setEndYear] = useState('');
   const [endMonthNum, setEndMonthNum] = useState('');
   const [selectedFailureType, setSelectedFailureType] = useState(null);
+  const [failureTypePage, setFailureTypePage] = useState(1);
   const [failureAssets, setFailureAssets] = useState([]);
   const [loadingFailureAssets, setLoadingFailureAssets] = useState(false);
   const [viewingAsset, setViewingAsset] = useState(null);
@@ -164,6 +166,18 @@ export default function Maintenance() {
     const cost = Object.entries(analysis?.costTrend?.monthlyCosts || {}).map(([name, value]) => ({ name, value }));
     return { failureEntries: entries, totalFailures: total, failureChartData: chartData, costData: cost };
   }, [analysis]);
+
+  const failureTypeTotalPages = Math.max(1, Math.ceil(failureEntries.length / FAILURE_TYPE_PAGE_SIZE));
+  const pagedFailureEntries = failureEntries.slice(
+    (failureTypePage - 1) * FAILURE_TYPE_PAGE_SIZE,
+    failureTypePage * FAILURE_TYPE_PAGE_SIZE
+  );
+
+  // 조회 기간이 바뀌는 등으로 목록이 바뀌면 이전 페이지 번호가 더 이상 유효하지
+  // 않을 수 있으므로(빈 페이지 노출 방지) 항상 유효 범위로 당겨준다.
+  useEffect(() => {
+    setFailureTypePage((p) => Math.min(p, failureTypeTotalPages));
+  }, [failureTypeTotalPages]);
 
   if (loading) return <div className="card"><LoadingState /></div>;
   if (!analysis) return <div className="card">분석 데이터를 불러올 수 없습니다.</div>;
@@ -322,7 +336,7 @@ export default function Maintenance() {
                   </tr>
                 </thead>
                 <tbody>
-                  {failureEntries.map(([name, value]) => {
+                  {pagedFailureEntries.map(([name, value]) => {
                     const percent = totalFailures ? (value / totalFailures) * 100 : 0;
                     return (
                       <tr
@@ -343,6 +357,34 @@ export default function Maintenance() {
                   })}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {failureEntries.length > FAILURE_TYPE_PAGE_SIZE && (
+            <div className="flex items-center justify-between mt-4 text-sm text-gray-600 dark:text-slate-400">
+              <div>
+                전체 {failureEntries.length}건 중 {(failureTypePage - 1) * FAILURE_TYPE_PAGE_SIZE + 1}-
+                {Math.min(failureTypePage * FAILURE_TYPE_PAGE_SIZE, failureEntries.length)}건
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setFailureTypePage((p) => Math.max(1, p - 1))}
+                  disabled={failureTypePage <= 1}
+                  aria-label="고장 유형 이전 페이지"
+                  className="btn btn-secondary px-2 py-1 disabled:opacity-40"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <span>{failureTypePage} / {failureTypeTotalPages}</span>
+                <button
+                  onClick={() => setFailureTypePage((p) => Math.min(failureTypeTotalPages, p + 1))}
+                  disabled={failureTypePage >= failureTypeTotalPages}
+                  aria-label="고장 유형 다음 페이지"
+                  className="btn btn-secondary px-2 py-1 disabled:opacity-40"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
             </div>
           )}
         </div>
