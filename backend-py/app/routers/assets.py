@@ -12,7 +12,7 @@ from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from .. import auth, models, schemas
+from .. import auth, category_importance, models, schemas
 from ..database import get_db
 
 router = APIRouter(prefix="/api/assets", tags=["assets"])
@@ -254,6 +254,55 @@ def get_asset_categories(db: Session = Depends(get_db)):
     return {"success": True, "message": None, "data": categories}
 
 
+@router.get("/category-importance")
+def list_category_importance(db: Session = Depends(get_db)):
+    """카테고리별 교체 우선순위 중요도(0~100점) 목록. 새 카테고리가 자산 등록 시
+    자동으로 채워지므로, 여기 없는 카테고리는 아직 자산이 하나도 없다는 뜻이다."""
+    rows = (
+        db.query(models.CategoryImportance)
+        .order_by(models.CategoryImportance.category)
+        .all()
+    )
+    return {
+        "success": True,
+        "message": None,
+        "data": [
+            {
+                "category": row.category,
+                "score": float(row.importance_score),
+                "reason": row.reason,
+                "source": row.source.value if row.source else None,
+                "updatedAt": row.updated_at,
+            }
+            for row in rows
+        ],
+    }
+
+
+@router.put("/category-importance")
+def update_category_importance(
+    request: schemas.CategoryImportanceUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(auth.require_admin),
+):
+    """관리자가 AI가 매긴(또는 기본값) 카테고리 중요도를 직접 덮어쓴다.
+    이후에는 source가 MANUAL로 표시되고, AI가 자동으로 재계산하지 않는다."""
+    record = category_importance.set_manual_importance(
+        db, request.category, request.score, changed_by=current_user.get("username"),
+    )
+    return {
+        "success": True,
+        "message": "카테고리 중요도가 저장되었습니다.",
+        "data": {
+            "category": record.category,
+            "score": float(record.importance_score),
+            "reason": record.reason,
+            "source": record.source.value if record.source else None,
+            "updatedAt": record.updated_at,
+        },
+    }
+
+
 @router.get("/audit-logs")
 def get_all_audit_logs(
     db: Session = Depends(get_db),
@@ -399,9 +448,14 @@ def create_assets_from_rows(db: Session, rows: list[dict], changed_by: Optional[
     """parse_asset_import_rows가 검증해둔 행들을 실제로 DB에 등록한다."""
     created = 0
     errors: list[dict] = []
+    # 같은 배치 안에서 같은 카테고리가 여러 번 나와도 중요도는 한 번만 산정한다.
+    seen_categories: set = set()
 
     for item in rows:
         asset_req = schemas.AssetRequest(**item["assetRequest"])
+        if asset_req.category not in seen_categories:
+            category_importance.ensure_category_importance(db, asset_req.category)
+            seen_categories.add(asset_req.category)
         asset = models.Asset(
             asset_name=asset_req.assetName,
             asset_code=asset_req.assetCode,
@@ -494,6 +548,7 @@ def create_asset(
     )
     db.add(asset)
     db.flush()
+    category_importance.ensure_category_importance(db, asset.category)
 
     _log_change(
         db,
@@ -533,6 +588,7 @@ def update_asset(
     asset.description = request.description
 
     db.flush()
+    category_importance.ensure_category_importance(db, asset.category)
     after = {field: _field_value(asset, field) for field, _ in _TRACKED_FIELDS}
     changed = {
         field: {"old": before[field], "new": after[field]}

@@ -19,7 +19,7 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from .. import llm, models, schemas
+from .. import category_importance, llm, models, schemas
 from ..database import get_db
 from ..scoring import calc_used_years, compute_replacement_metrics
 from .assets import asset_to_dto
@@ -298,7 +298,7 @@ def _replacement_metrics_hash(metrics: dict, useful_life: int) -> str:
     점수 중 하나라도 바뀌면 값이 달라져, 캐시된 AI 문구를 재사용해도 되는지 판단하는 키로 쓴다."""
     key = (
         f"{metrics['usedYears']}|{useful_life}|{metrics['maintenanceCount']}|"
-        f"{round(metrics['repairRatio'], 2)}|{metrics['score']}"
+        f"{round(metrics['repairRatio'], 2)}|{metrics.get('categoryImportance')}|{metrics['score']}"
     )
     return hashlib.sha256(key.encode()).hexdigest()
 
@@ -313,10 +313,16 @@ def replacement_recommendation(request: ReplacementRequest, db: Session = Depend
         records_by_asset.setdefault(r.asset_id, []).append(r)
 
     recommendations = []
+    # 카테고리별 중요도는 요청당 한 번만 조회/산정하면 되므로 캐싱한다
+    # (자산이 몇백 개여도 서로 다른 카테고리 수만큼만 조회/AI 호출).
+    importance_cache: dict = {}
 
     for asset in all_assets:
         records = records_by_asset.get(asset.id, [])
-        metrics = compute_replacement_metrics(asset, records)
+        if asset.category not in importance_cache:
+            importance_cache[asset.category] = category_importance.get_importance_score(db, asset.category)
+        category_importance_score = importance_cache[asset.category]
+        metrics = compute_replacement_metrics(asset, records, category_importance_score=category_importance_score)
 
         recommendations.append({
             "assetId": asset.id,
@@ -327,12 +333,14 @@ def replacement_recommendation(request: ReplacementRequest, db: Session = Depend
             "maintenanceCount": metrics["maintenanceCount"],
             "totalRepairCost": metrics["repairCost"],
             "purchasePrice": metrics["price"],
+            "categoryImportance": metrics["categoryImportance"],
             "score": metrics["score"],
             "_metricsHash": _replacement_metrics_hash(metrics, asset.useful_life),
             "reason": (
                 f"사용기간 {metrics['usedYears']}년(내용연수 {asset.useful_life}년), "
                 f"수리비가 구매가의 {metrics['repairRatio'] * 100:.0f}% 수준이며 "
-                f"최근 유지보수 {metrics['maintenanceCount']}회가 발생했습니다."
+                f"최근 유지보수 {metrics['maintenanceCount']}회가 발생했습니다. "
+                f"카테고리 중요도 {metrics['categoryImportance']:.0f}/100점이 반영되었습니다."
             ),
         })
 

@@ -3,7 +3,8 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import Recommendations from './Recommendations';
 import { ToastProvider } from '../context/ToastContext';
-import { aiApi } from '../services/api';
+import { AuthProvider } from '../context/AuthContext';
+import { aiApi, assetApi } from '../services/api';
 
 vi.mock('../services/api', () => ({
   aiApi: {
@@ -11,7 +12,15 @@ vi.mock('../services/api', () => ({
     getProcurementSpec: vi.fn(),
     downloadProcurementSpecPdf: vi.fn(),
   },
+  assetApi: {
+    getCategoryImportance: vi.fn(),
+    updateCategoryImportance: vi.fn(),
+  },
 }));
+
+function seedAdmin() {
+  localStorage.setItem('auth_user', JSON.stringify({ token: 't', username: 'admin', role: 'ADMIN' }));
+}
 
 const RECOMMENDATION = {
   assetId: 1,
@@ -29,7 +38,9 @@ const RECOMMENDATION = {
 function renderPage() {
   return render(
     <ToastProvider>
-      <Recommendations />
+      <AuthProvider>
+        <Recommendations />
+      </AuthProvider>
     </ToastProvider>
   );
 }
@@ -37,6 +48,7 @@ function renderPage() {
 describe('Recommendations', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
   });
 
   it('renders a recommendation card after loading', async () => {
@@ -109,5 +121,45 @@ describe('Recommendations', () => {
     await user.type(screen.getByPlaceholderText('입력 후 Enter'), '1000000{Enter}');
 
     await waitFor(() => expect(aiApi.getReplacementRecommendation).toHaveBeenCalledWith(1000000));
+  });
+
+  it('shows the category importance breakdown on a recommendation card', async () => {
+    aiApi.getReplacementRecommendation.mockResolvedValue({
+      data: { data: { recommendations: [{ ...RECOMMENDATION, categoryImportance: 90 }] } },
+    });
+    renderPage();
+    await waitFor(() => expect(screen.getByText('데스크톱 Lenovo ThinkCentre')).toBeInTheDocument());
+    expect(screen.getByText('90/100')).toBeInTheDocument();
+  });
+
+  it('hides the category importance management button for non-admin users', async () => {
+    aiApi.getReplacementRecommendation.mockResolvedValue({ data: { data: { recommendations: [] } } });
+    renderPage();
+    await waitFor(() => expect(screen.getByText('교체 권장 자산이 없습니다.')).toBeInTheDocument());
+    expect(screen.queryByText('카테고리 중요도 관리')).not.toBeInTheDocument();
+  });
+
+  it('lets an admin open the category importance panel and override a score', async () => {
+    const user = userEvent.setup();
+    seedAdmin();
+    aiApi.getReplacementRecommendation.mockResolvedValue({ data: { data: { recommendations: [] } } });
+    assetApi.getCategoryImportance.mockResolvedValue({
+      data: { data: [{ category: 'NAS', score: 50, reason: 'AI 미설정으로 기본값 적용', source: 'DEFAULT' }] },
+    });
+    assetApi.updateCategoryImportance.mockResolvedValue({
+      data: { data: { category: 'NAS', score: 95, reason: '관리자가 직접 설정', source: 'MANUAL' } },
+    });
+    renderPage();
+    await waitFor(() => expect(screen.getByText('교체 권장 자산이 없습니다.')).toBeInTheDocument());
+
+    await user.click(screen.getByText('카테고리 중요도 관리'));
+    await waitFor(() => expect(screen.getByText('NAS')).toBeInTheDocument());
+
+    const scoreInput = screen.getByDisplayValue('50');
+    await user.clear(scoreInput);
+    await user.type(scoreInput, '95');
+    await user.click(screen.getByText('저장'));
+
+    await waitFor(() => expect(assetApi.updateCategoryImportance).toHaveBeenCalledWith('NAS', 95));
   });
 });

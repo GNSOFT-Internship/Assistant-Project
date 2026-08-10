@@ -16,7 +16,7 @@ from reportlab.pdfbase.cidfonts import UnicodeCIDFont
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from sqlalchemy.orm import Session
 
-from .. import llm, models
+from .. import category_importance, llm, models
 from ..database import get_db
 from ..scoring import compute_replacement_metrics
 
@@ -146,9 +146,14 @@ def _build_report_data(db: Session, year: int, month: int) -> dict:
             cost_by_category[asset.category] = cost_by_category.get(asset.category, 0.0) + cost
 
     replacement_candidates = []
+    importance_cache: dict = {}
     for a in all_assets:
         records = records_by_asset.get(a.id, [])
-        metrics = compute_replacement_metrics(a, records, today=month_end)
+        if a.category not in importance_cache:
+            importance_cache[a.category] = category_importance.get_importance_score(db, a.category)
+        metrics = compute_replacement_metrics(
+            a, records, today=month_end, category_importance_score=importance_cache[a.category],
+        )
         replacement_candidates.append({
             "assetName": a.asset_name,
             "assetCode": a.asset_code,

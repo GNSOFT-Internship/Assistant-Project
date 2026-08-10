@@ -17,12 +17,22 @@ def calc_used_years(purchase_date: date, today: date = None) -> int:
     return max(years, 0)
 
 
-def compute_replacement_metrics(asset: "models.Asset", records: list, today: date = None) -> dict:
+def compute_replacement_metrics(
+    asset: "models.Asset",
+    records: list,
+    today: date = None,
+    category_importance_score: float = 50.0,
+) -> dict:
     """자산의 교체 우선순위 점수(0~100점 만점)와 관련 지표를 계산한다.
 
     ai.py의 교체추천과 reports.py의 월간 보고서가 동일한 공식을 공유한다.
-    구성: 사용기간 비율 35점 + 수리비 비율 35점 + 유지보수 횟수 15점 + 교체필요 상태 15점.
+    구성: 사용기간 비율 30점 + 수리비 비율 25점 + 유지보수 횟수 10점
+         + 카테고리 중요도 20점 + 교체필요 상태 15점.
     각 비율 항목은 100%(1.0)를 넘겨도 만점(해당 배점)으로 고정해 총점이 100점을 넘지 않는다.
+
+    category_importance_score(0~100)는 카테고리별 업무 중요도로, 같은 사용기간·수리비라도
+    NAS처럼 중요한 장비가 정수기 같은 장비보다 우선순위가 높게 나오도록 반영한다
+    (category_importance.get_importance_score로 조회/산정한 값을 호출자가 넘긴다).
     """
     today = today or date.today()
     used_years = calc_used_years(asset.purchase_date, today)
@@ -34,8 +44,14 @@ def compute_replacement_metrics(asset: "models.Asset", records: list, today: dat
     age_ratio = min(used_years / max(asset.useful_life, 1), 1.0)
     capped_repair_ratio = min(repair_ratio, 1.0)
     maintenance_ratio = min(maintenance_count, 10) / 10
+    importance_ratio = min(max(category_importance_score, 0.0), 100.0) / 100.0
 
-    score = age_ratio * 35 + capped_repair_ratio * 35 + maintenance_ratio * 15
+    score = (
+        age_ratio * 30
+        + capped_repair_ratio * 25
+        + maintenance_ratio * 10
+        + importance_ratio * 20
+    )
     if asset.status == models.AssetStatus.REPLACEMENT_NEEDED:
         score += 15
 
@@ -45,5 +61,6 @@ def compute_replacement_metrics(asset: "models.Asset", records: list, today: dat
         "repairCost": repair_cost,
         "repairRatio": repair_ratio,
         "maintenanceCount": maintenance_count,
+        "categoryImportance": category_importance_score,
         "score": round(score, 1),
     }

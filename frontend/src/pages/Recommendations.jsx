@@ -1,15 +1,31 @@
 import React, { useState, useEffect } from 'react';
-import { aiApi } from '../services/api';
-import { FileText, Download } from 'lucide-react';
+import { aiApi, assetApi } from '../services/api';
+import { FileText, Download, ChevronDown, ChevronUp, Save } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
+import { useAuth } from '../context/AuthContext';
 import LoadingState from '../components/LoadingState';
 import Modal from '../components/Modal';
 
+const IMPORTANCE_SOURCE_LABEL = {
+  AI: 'AI 산정',
+  MANUAL: '관리자 지정',
+  DEFAULT: '기본값',
+};
+
 export default function Recommendations() {
   const toast = useToast();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
   const [recommendations, setRecommendations] = useState([]);
   const [budget, setBudget] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  // 카테고리별 교체 우선순위 중요도(관리자가 조회/수정)
+  const [showImportancePanel, setShowImportancePanel] = useState(false);
+  const [categoryImportance, setCategoryImportance] = useState([]);
+  const [loadingImportance, setLoadingImportance] = useState(false);
+  const [editingScores, setEditingScores] = useState({});
+  const [savingCategory, setSavingCategory] = useState(null);
 
   // 조달 사양서 생성 관련 상태
   const [specData, setSpecData] = useState(null);
@@ -82,6 +98,54 @@ export default function Recommendations() {
     }
   };
 
+  const loadCategoryImportance = async () => {
+    setLoadingImportance(true);
+    try {
+      const response = await assetApi.getCategoryImportance();
+      setCategoryImportance(response.data.data || []);
+    } catch (error) {
+      console.error('카테고리 중요도 로드 실패:', error);
+      toast.error('카테고리 중요도를 불러오지 못했습니다.');
+    } finally {
+      setLoadingImportance(false);
+    }
+  };
+
+  const toggleImportancePanel = () => {
+    const next = !showImportancePanel;
+    setShowImportancePanel(next);
+    if (next && categoryImportance.length === 0) {
+      loadCategoryImportance();
+    }
+  };
+
+  const handleSaveImportance = async (category) => {
+    const rawValue = editingScores[category];
+    const score = Number(rawValue);
+    if (rawValue === undefined || rawValue === '' || Number.isNaN(score) || score < 0 || score > 100) {
+      toast.error('중요도는 0~100 사이의 숫자로 입력해주세요.');
+      return;
+    }
+    setSavingCategory(category);
+    try {
+      await assetApi.updateCategoryImportance(category, score);
+      toast.success(`"${category}" 중요도를 저장했습니다.`);
+      await loadCategoryImportance();
+      setEditingScores((prev) => {
+        const next = { ...prev };
+        delete next[category];
+        return next;
+      });
+      // 화면에 이미 표시된 추천 목록의 점수도 최신 중요도를 반영하도록 다시 조회한다.
+      loadRecommendations(budget);
+    } catch (error) {
+      console.error('카테고리 중요도 저장 실패:', error);
+      toast.error('카테고리 중요도 저장에 실패했습니다.');
+    } finally {
+      setSavingCategory(null);
+    }
+  };
+
   if (loading) return <div className="card"><LoadingState /></div>;
 
   return (
@@ -105,8 +169,83 @@ export default function Recommendations() {
             >
               조회
             </button>
+            {isAdmin && (
+              <button
+                onClick={toggleImportancePanel}
+                className="btn btn-secondary flex items-center gap-1"
+              >
+                카테고리 중요도 관리
+                {showImportancePanel ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+              </button>
+            )}
           </div>
         </div>
+
+        {isAdmin && showImportancePanel && (
+          <div className="border rounded-lg p-4 mb-4 bg-gray-50 dark:bg-slate-900">
+            <div className="text-sm text-gray-600 dark:text-slate-400 mb-3">
+              카테고리(장비 종류)별로 교체 우선순위 점수에 반영되는 "업무 중요도"입니다. 새 카테고리는
+              자산이 처음 등록될 때 AI가 자동으로 산정하며(미설정/실패 시 기본값 50점), 아래에서 언제든
+              직접 값을 바꿀 수 있습니다.
+            </div>
+            {loadingImportance ? (
+              <LoadingState />
+            ) : categoryImportance.length === 0 ? (
+              <div className="text-center text-gray-500 dark:text-slate-400 py-4">
+                등록된 카테고리가 없습니다.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="table text-sm w-full">
+                  <thead className="table-header">
+                    <tr>
+                      <th className="table-cell">카테고리</th>
+                      <th className="table-cell">중요도</th>
+                      <th className="table-cell">산정 방식</th>
+                      <th className="table-cell">근거</th>
+                      <th className="table-cell"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {categoryImportance.map((row) => (
+                      <tr key={row.category}>
+                        <td className="table-cell font-medium">{row.category}</td>
+                        <td className="table-cell">
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            className="input w-20 py-1"
+                            value={editingScores[row.category] ?? row.score}
+                            onChange={(e) =>
+                              setEditingScores((prev) => ({ ...prev, [row.category]: e.target.value }))
+                            }
+                          />
+                        </td>
+                        <td className="table-cell whitespace-nowrap">
+                          {IMPORTANCE_SOURCE_LABEL[row.source] || row.source}
+                        </td>
+                        <td className="table-cell text-gray-500 dark:text-slate-400 max-w-xs truncate" title={row.reason}>
+                          {row.reason || '-'}
+                        </td>
+                        <td className="table-cell">
+                          <button
+                            onClick={() => handleSaveImportance(row.category)}
+                            disabled={savingCategory === row.category}
+                            className="btn btn-primary text-xs py-1 px-2 flex items-center gap-1"
+                          >
+                            <Save size={12} />
+                            {savingCategory === row.category ? '저장 중...' : '저장'}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
 
         {recommendations.length > 0 && (
           <div className="space-y-4">
@@ -125,7 +264,7 @@ export default function Recommendations() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm mb-3">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 text-sm mb-3">
                   <div>
                     <div className="text-gray-500 dark:text-slate-400">구매가</div>
                     <div className="font-medium">{rec.purchasePrice?.toLocaleString()}원</div>
@@ -141,6 +280,10 @@ export default function Recommendations() {
                   <div>
                     <div className="text-gray-500 dark:text-slate-400">고장횟수</div>
                     <div className="font-medium">{rec.maintenanceCount}회</div>
+                  </div>
+                  <div>
+                    <div className="text-gray-500 dark:text-slate-400">카테고리 중요도</div>
+                    <div className="font-medium">{rec.categoryImportance?.toFixed(0)}/100</div>
                   </div>
                 </div>
 
