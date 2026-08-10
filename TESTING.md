@@ -7,14 +7,15 @@
 
 | 구분 | 위치 | 실행 명령 | 최근 결과 |
 |---|---|---|---|
-| 백엔드 (pytest) | `backend-py/tests/` | `cd backend-py && python -m pytest tests/ -q` | **134개 전체 통과** |
-| 프론트엔드 (vitest) | `frontend/src/**/*.test.jsx` | `cd frontend && npx vitest run` | **96개 전체 통과** |
+| 백엔드 (pytest) | `backend-py/tests/` | `cd backend-py && python -m pytest tests/ -q` | **142개 전체 통과** |
+| 프론트엔드 (vitest) | `frontend/src/**/*.test.jsx` | `cd frontend && npx vitest run` | **104개 전체 통과** |
 
 ### 백엔드 테스트 파일 (17개)
 `test_ai_gating.py`, `test_ai_search_and_recommendation.py`, `test_assets.py`, `test_auth.py`,
-`test_budget_clamp.py`, `test_budgets.py`, `test_chat.py`, `test_client_ip.py`, `test_dashboard.py`,
-`test_files.py`, `test_permissions.py`, `test_qna_logic.py`, `test_rate_limit.py`, `test_reports.py`,
-`test_scoring.py`, `test_startup_security.py` (+ 픽스처 정의 `conftest.py`)
+`test_budget_clamp.py`, `test_budgets.py`, `test_category_importance.py`, `test_chat.py`,
+`test_client_ip.py`, `test_dashboard.py`, `test_files.py`, `test_permissions.py`, `test_qna_logic.py`,
+`test_rate_limit.py`, `test_reports.py`, `test_scoring.py`, `test_startup_security.py`
+(+ 픽스처 정의 `conftest.py`)
 
 ### 프론트엔드 테스트 파일 (15개)
 `AiAssistant`, `AssetDetail`, `Assets`, `AuditLog`, `Budget`, `Dashboard`, `Login`,
@@ -33,11 +34,16 @@ AI 분석) 기능이 통합되어 있고, 자산 등록용 엑셀 업로드까�
 1. **로컬 pre-push 훅** (`.githooks/pre-push` → `.git/hooks/pre-push`에 설치): `git push`할 때마다
    백엔드 pytest → 프론트엔드 vitest를 순서대로 자동 실행하고, 하나라도 실패하면 push 자체를 막는다.
    급하게 우회해야 하면 `git push --no-verify`를 쓰되 의도적으로만 사용한다.
-2. **GitHub Actions CI** (`.github/workflows/backend-tests.yml`, `frontend-tests.yml`): `main` 브랜치에
-   push되거나 PR이 열릴 때, 각각 `backend-py/`·`frontend/` 변경분에 한해 자동으로 같은 테스트를 재실행한다.
-   로컬 훅과 역할이 겹치는 게 아니라, 로컬 훅은 "push 이전에 더 빨리" 실패를 잡아주고 CI는 그 이후의
-   최종 확인 역할을 한다.
-3. **배포 후 검증** (`deploy.sh`): 테스트를 대신 돌려주진 않지만, 이미 검증된 커밋을 배포한 뒤 실제
+2. **GitHub Actions CI** (`.github/workflows/ci.yml`): `main`으로 향하는 PR이 열리거나 갱신될 때마다,
+   바뀐 쪽(`backend-py/` 변경 시 pytest, `frontend/` 변경 시 vitest)만 골라 자동으로 재실행한다.
+   원래는 `main`에 push된 뒤(=머지된 뒤)에만 `deploy.yml`이 테스트를 돌렸는데, 테스트가 깨진 PR이
+   그대로 머지되면 `main`이 깨진 채로 남고 배포도 막히는 문제가 실제로 있었다(아래 버그 표 참고).
+   그래서 머지 "전" 단계에 이 워크플로를 별도로 추가했다. 로컬 훅과 역할이 겹치는 게 아니라, 로컬
+   훅은 "push 이전에 더 빨리" 실패를 잡아주고 이 CI는 머지 직전의 최종 확인 역할을 한다.
+3. **배포 직전 재확인** (`.github/workflows/deploy.yml`): `main`에 push되면(=머지되면) pytest/vitest를
+   한 번 더 통과시킨 뒤에만 배포한다. PR 단계 CI(2번)와 같은 테스트를 또 도는 이유는, `--no-verify`로
+   로컬 훅을 우회했거나 훅이 설치되지 않은 환경에서 push된 경우까지 대비한 이중 안전장치이기 때문이다.
+4. **배포 후 검증** (`deploy.sh`): 테스트를 대신 돌려주진 않지만, 이미 검증된 커밋을 배포한 뒤 실제
    사이트/API 응답과 백엔드 트레이스백 여부를 자동으로 확인한다.
 
 ## 3. 이번 점검 기간에 발견·수정한 버그와 회귀 테스트 (결과)
@@ -55,6 +61,11 @@ AI 분석) 기능이 통합되어 있고, 자산 등록용 엑셀 업로드까�
 | 6 | 자산 카테고리 8종 하드코딩 (엑셀 일괄 등록 시 그 목록에 없는 카테고리 누락) | `e626029` | `test_asset_categories_endpoint_reflects_actual_data_not_a_hardcoded_list` (백엔드) + 브라우저에서 새 카테고리 자유 입력 확인 | ✅ |
 | 7 | 예산 배정 금액에 음수 허용 (다른 금액 필드와 달리 검증 누락) | `1a03868` | `test_set_budget_rejects_negative_amount` | ✅ |
 | 8 | 유지보수 분석 평균비용 타입 불일치, AI 진단 스트림 중 오류 문구가 답변에 이어붙음 | `69f7bd3` | 기존 `test_ai_gating.py`/`test_ai_search_and_recommendation.py` 스위트로 회귀 확인 (사소한 다듬기라 별도 테스트는 추가하지 않음) | ✅ |
+| 9 | `main`으로 향하는 PR에 머지 전 CI가 없어, 테스트가 깨진 PR이 그대로 머지되면 `main`이 배포 불가 상태로 남음 (실제로 한 번 발생) | `eba7aa4` | 별도 테스트가 아니라 워크플로 자체(`ci.yml`)가 회귀 방지 장치 | ✅ |
+| 10 | 자산 `category` 앞뒤 공백 미제거 → "NAS"와 "NAS "가 DB상 다른 값으로 취급되어 필터/그룹핑 및 `category_importance` 캐시가 갈라짐 | `08d8548` | `test_create_asset_strips_whitespace_from_category`, `test_create_asset_rejects_blank_category` | ✅ |
+| 11 | 대시보드 상위 교체 필요 목록이 카테고리 중요도를 반영하지 않고 항상 기본값(50.0)으로 계산 (추천/보고서 페이지와 계산식이 어긋남) | `5dd122a` | 기존 `test_dashboard.py` 스위트로 회귀 확인 | ✅ |
+| 12 | 배치 업로드가 파일 전체를 메모리에 올려 `MemoryMax` 보호가 다중 파일에는 적용되지 않음 | `5dd122a` | 기존 `test_files.py` 스위트로 회귀 확인 | ✅ |
+| 13 | 배치 적용 중 일부 파일 처리가 실패해도 그 파일이 만든 레코드가 배치 끝의 단일 커밋에 함께 반영됨 (실패한 파일의 변경이 롤백되지 않음) | `5dd122a` | 기존 `test_files.py` 스위트로 회귀 확인 | ✅ |
 
 이전 세션에서 고친 항목(참고용, 이번 정리 대상 밖):
 파일 재적용 중복 방지, 예산 시뮬레이션 카테고리 누락, 예산 0원 배지 버그, 챗봇 자동 스크롤 방해 등도
