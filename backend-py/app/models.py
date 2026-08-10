@@ -182,6 +182,29 @@ class WorkOrder(Base):
     created_at = Column(DateTime, server_default=func.now())
 
 
+class ImportanceSource(str, enum.Enum):
+    AI = "AI"
+    MANUAL = "MANUAL"
+    DEFAULT = "DEFAULT"
+
+
+class CategoryImportance(Base):
+    """자산 카테고리(자유 문자열)별 "중요도" 점수.
+
+    교체 우선순위 점수(scoring.py)에서 카테고리 간 업무 중요도 차이(예: NAS vs 정수기)를
+    반영하기 위한 값. 새 카테고리가 처음 등록될 때 AI가 한 번 산정해 캐싱하고,
+    관리자가 화면에서 언제든 덮어쓸 수 있다(source=MANUAL)."""
+    __tablename__ = "category_importance"
+
+    id = Column(BigIntegerPK, primary_key=True, autoincrement=True)
+    category = Column(String(100), unique=True, nullable=False, index=True)
+    importance_score = Column(DECIMAL(5, 1), nullable=False)
+    reason = Column(Text, nullable=True)
+    source = Column(Enum(ImportanceSource), default=ImportanceSource.DEFAULT, nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
 class AssetReplacementReason(Base):
     """교체 우선순위 추천 사유(AI 생성 텍스트) 캐시.
 

@@ -58,6 +58,8 @@ export const assetApi = {
   deleteMaintenanceRecord: (assetId, recordId) => api.delete(`/assets/${assetId}/maintenance/${recordId}`),
   getHistory: (id, params) => api.get(`/assets/${id}/history`, { params }),
   getAuditLogs: (params) => api.get('/assets/audit-logs', { params }),
+  getCategoryImportance: () => api.get('/assets/category-importance'),
+  updateCategoryImportance: (category, score) => api.put('/assets/category-importance', { category, score }),
 };
 
 // LLM 응답(GLM-5.2)은 수십 초가 걸릴 수 있어, AI 서술을 실제로 호출하는
