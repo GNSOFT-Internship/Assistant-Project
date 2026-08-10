@@ -1,0 +1,75 @@
+name: CI
+
+# main으로 향하는 PR에서 바뀐 쪽(backend-py 또는 frontend)의 테스트를 미리 통과시킨다.
+# deploy.yml은 push 이후(=머지 이후)에만 같은 테스트를 돌리기 때문에, 실패하면 이미
+# main이 깨진 상태에서 배포도 막히는 문제가 있었다. 이 워크플로우로 머지 전에 먼저
+# 걸러서 main을 항상 배포 가능한 상태로 유지한다. deploy.yml의 테스트는 pre-push
+# 훅 우회 등에 대비한 이중 안전장치이므로 그대로 둔다.
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  # 실제로 바뀐 쪽의 테스트만 돌리기 위해, 이번 PR에 backend-py/frontend
+  # 디렉터리가 포함됐는지 먼저 판별한다.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'backend-py/**'
+            frontend:
+              - 'frontend/**'
+
+  backend-test:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend-py
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: backend-py/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run pytest
+        run: pytest -v
+
+  frontend-test:
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run vitest
+        run: npm test
