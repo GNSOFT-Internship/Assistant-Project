@@ -4,6 +4,16 @@ from typing import Optional, List, Any
 from pydantic import BaseModel, Field, field_validator
 
 
+def _strip_category_value(value: str) -> str:
+    # category는 자유 문자열이라 엑셀 업로드 등에서 앞뒤 공백이 섞여 들어오기 쉽다.
+    # "NAS"와 "NAS "가 DB상 다른 값으로 취급되면 카테고리별 필터/그룹핑은 물론
+    # category_importance 캐시(카테고리명을 키로 씀)까지 쓸데없이 갈라지므로 여기서 통일한다.
+    stripped = value.strip()
+    if not stripped:
+        raise ValueError("카테고리를 입력해주세요.")
+    return stripped
+
+
 def _validate_not_future_iso_date(value: str) -> str:
     try:
         parsed = date.fromisoformat(value)
@@ -38,6 +48,7 @@ class AssetRequest(BaseModel):
     description: Optional[str] = None
 
     _validate_purchase_date = field_validator("purchaseDate")(_validate_not_future_iso_date)
+    _strip_category = field_validator("category")(_strip_category_value)
 
 
 class AssetDTO(BaseModel):
@@ -59,6 +70,8 @@ class AssetDTO(BaseModel):
 class CategoryImportanceUpdateRequest(BaseModel):
     category: str
     score: float = Field(ge=0, le=100)
+
+    _strip_category = field_validator("category")(_strip_category_value)
 
 
 class MaintenanceRecordRequest(BaseModel):
