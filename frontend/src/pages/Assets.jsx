@@ -799,7 +799,7 @@ export default function Assets() {
                                     </button>
                                   ) : (
                                     <span className="text-xs text-gray-500 dark:text-slate-400 flex items-center gap-1 px-1">
-                                      적용 불가
+                                      적용 가능한 항목 없음
                                     </span>
                                   )
                                 )}
@@ -809,7 +809,7 @@ export default function Assets() {
                                     disabled={docPendingIds.has(file.id)}
                                     className="btn btn-secondary text-xs py-1 px-2 flex items-center gap-1"
                                   >
-                                    <XCircle size={12} /> 취소
+                                    <XCircle size={12} /> 적용 취소
                                   </button>
                                 )}
                                 <button

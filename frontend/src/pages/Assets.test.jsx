@@ -250,6 +250,7 @@ describe('Assets', () => {
     });
 
     it('renders auto-detected asset-registration files without an unapply button', async () => {
+      const user = userEvent.setup();
       seedAdmin();
       fileApi.getAll.mockResolvedValue({
         data: {
@@ -274,6 +275,7 @@ describe('Assets', () => {
       });
       renderPage();
       await waitFor(() => expect(screen.getByText('sample_asset_registration.xlsx')).toBeInTheDocument());
+      await user.click(screen.getByText('sample_asset_registration.xlsx'));
       expect(screen.getByText('등록된 자산: 1건')).toBeInTheDocument();
       expect(screen.queryByText('적용 취소')).not.toBeInTheDocument();
     });
@@ -363,6 +365,7 @@ describe('Assets', () => {
       renderPage();
       await waitFor(() => expect(screen.getByText('has_errors.xlsx')).toBeInTheDocument());
 
+      await user.click(screen.getByText('has_errors.xlsx'));
       await user.click(screen.getByText(/행별 미리보기/));
       expect(screen.getByText('자산명: 값이 비어있습니다.')).toBeInTheDocument();
       const errorRow = screen.getByText('자산명: 값이 비어있습니다.').closest('tr');
@@ -396,6 +399,7 @@ describe('Assets', () => {
       renderPage();
       await waitFor(() => expect(screen.getByText('maint_has_errors.xlsx')).toBeInTheDocument());
 
+      await user.click(screen.getByText('maint_has_errors.xlsx'));
       await user.click(screen.getByText(/행별 미리보기/));
       expect(screen.getByText('정비일 형식 오류: 미정')).toBeInTheDocument();
       const errorRow = screen.getByText('정비일 형식 오류: 미정').closest('tr');
