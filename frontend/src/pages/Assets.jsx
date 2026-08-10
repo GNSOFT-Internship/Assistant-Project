@@ -350,7 +350,9 @@ export default function Assets() {
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   const docTotalPages = Math.max(1, Math.ceil(docFiles.length / DOC_PAGE_SIZE));
-  const pagedDocFiles = docFiles.slice((docPage - 1) * DOC_PAGE_SIZE, docPage * DOC_PAGE_SIZE);
+  // 최신 업로드일수록 위쪽에 보이도록 id(자동 증가) 내림차순으로 정렬한다.
+  const sortedDocFiles = [...docFiles].sort((a, b) => b.id - a.id);
+  const pagedDocFiles = sortedDocFiles.slice((docPage - 1) * DOC_PAGE_SIZE, docPage * DOC_PAGE_SIZE);
 
   // 파일이 삭제되는 등으로 목록이 줄어들어 지금 페이지가 더 이상 존재하지 않게 되면
   // 마지막 페이지로 당겨준다 (빈 페이지가 표시되는 것을 방지).
@@ -745,7 +747,6 @@ export default function Assets() {
                     <th className="table-cell">종류</th>
                     <th className="table-cell">상태</th>
                     <th className="table-cell">요약</th>
-                    {isAdmin && <th className="table-cell">작업</th>}
                     <th className="table-cell w-8"></th>
                   </tr>
                 </thead>
@@ -776,59 +777,58 @@ export default function Assets() {
                           <td className="table-cell text-gray-600 dark:text-slate-400 max-w-xs truncate" title={getDocFileSummaryText(file)}>
                             {getDocFileSummaryText(file)}
                           </td>
-                          {isAdmin && (
-                            <td className="table-cell" onClick={(e) => e.stopPropagation()}>
-                              <div className="flex gap-1 flex-wrap">
-                                {file.status === 'PENDING' && (
-                                  <button
-                                    onClick={() => handleDocProcess(file.id)}
-                                    disabled={docPendingIds.has(file.id)}
-                                    className="btn btn-secondary text-xs py-1 px-2 flex items-center gap-1"
-                                  >
-                                    <Play size={12} /> 분석
-                                  </button>
-                                )}
-                                {file.status === 'COMPLETED' && !file.applied && (
-                                  fileHasApplicableRows(file) ? (
-                                    <button
-                                      onClick={() => handleDocApply(file.id)}
-                                      disabled={docPendingIds.has(file.id)}
-                                      className="btn btn-primary text-xs py-1 px-2 flex items-center gap-1"
-                                    >
-                                      <CheckCircle size={12} /> 적용
-                                    </button>
-                                  ) : (
-                                    <span className="text-xs text-gray-500 dark:text-slate-400 flex items-center gap-1 px-1">
-                                      적용 가능한 항목 없음
-                                    </span>
-                                  )
-                                )}
-                                {file.applied && file.extractedSummary?.kind !== 'asset_registration' && (
-                                  <button
-                                    onClick={() => handleDocUnapply(file.id)}
-                                    disabled={docPendingIds.has(file.id)}
-                                    className="btn btn-secondary text-xs py-1 px-2 flex items-center gap-1"
-                                  >
-                                    <XCircle size={12} /> 적용 취소
-                                  </button>
-                                )}
-                                <button
-                                  onClick={() => handleDocDelete(file.id)}
-                                  disabled={docPendingIds.has(file.id)}
-                                  className="btn btn-danger text-xs py-1 px-2 flex items-center gap-1"
-                                >
-                                  <XCircle size={12} /> 삭제
-                                </button>
-                              </div>
-                            </td>
-                          )}
                           <td className="table-cell text-gray-400">
                             {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                           </td>
                         </tr>
                         {expanded && (
                           <tr>
-                            <td colSpan={isAdmin ? 6 : 5} className="table-cell bg-gray-50 dark:bg-slate-900">
+                            <td colSpan={5} className="table-cell bg-gray-50 dark:bg-slate-900">
+                  {isAdmin && (
+                    <div className="flex gap-2 flex-wrap" onClick={(e) => e.stopPropagation()}>
+                      {file.status === 'PENDING' && (
+                        <button
+                          onClick={() => handleDocProcess(file.id)}
+                          disabled={docPendingIds.has(file.id)}
+                          className="btn btn-secondary flex items-center gap-2"
+                        >
+                          <Play size={14} /> 분석
+                        </button>
+                      )}
+                      {file.status === 'COMPLETED' && !file.applied && (
+                        fileHasApplicableRows(file) ? (
+                          <button
+                            onClick={() => handleDocApply(file.id)}
+                            disabled={docPendingIds.has(file.id)}
+                            className="btn btn-primary flex items-center gap-2"
+                          >
+                            <CheckCircle size={14} /> 적용
+                          </button>
+                        ) : (
+                          <span className="text-sm text-gray-500 dark:text-slate-400 flex items-center gap-1 px-1">
+                            <XCircle size={14} /> 적용 가능한 항목 없음
+                          </span>
+                        )
+                      )}
+                      {file.applied && file.extractedSummary?.kind !== 'asset_registration' && (
+                        <button
+                          onClick={() => handleDocUnapply(file.id)}
+                          disabled={docPendingIds.has(file.id)}
+                          className="btn btn-secondary flex items-center gap-2"
+                        >
+                          <XCircle size={14} /> 적용 취소
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleDocDelete(file.id)}
+                        disabled={docPendingIds.has(file.id)}
+                        className="btn btn-danger flex items-center gap-2"
+                      >
+                        <XCircle size={14} /> 삭제
+                      </button>
+                    </div>
+                  )}
+
                   {file.status === 'FAILED' && file.errorMessage && (
                     <div className="mt-2 text-sm text-red-600">
                       오류: {file.errorMessage}
