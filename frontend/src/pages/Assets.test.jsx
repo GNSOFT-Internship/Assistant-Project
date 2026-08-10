@@ -183,10 +183,12 @@ describe('Assets', () => {
     });
 
     it('renders an uploaded file with its apply action', async () => {
+      const user = userEvent.setup();
       seedAdmin();
       fileApi.getAll.mockResolvedValue({ data: { data: [COMPLETED_DOC_FILE] } });
       renderPage();
       await waitFor(() => expect(screen.getByText('sample_maintenance.xlsx')).toBeInTheDocument());
+      await user.click(screen.getByText('sample_maintenance.xlsx'));
       expect(screen.getByText('적용')).toBeInTheDocument();
     });
 
@@ -201,15 +203,17 @@ describe('Assets', () => {
       fileApi.getAll.mockResolvedValue({ data: { data: sevenFiles } });
       renderPage();
 
-      await waitFor(() => expect(screen.getByText('file_1.xlsx')).toBeInTheDocument());
-      expect(screen.getByText('file_5.xlsx')).toBeInTheDocument();
-      expect(screen.queryByText('file_6.xlsx')).not.toBeInTheDocument();
+      // 최신 업로드(가장 큰 id)일수록 위쪽/앞 페이지에 오도록 정렬되므로
+      // 첫 페이지에는 file_7~file_3이 보인다.
+      await waitFor(() => expect(screen.getByText('file_7.xlsx')).toBeInTheDocument());
+      expect(screen.getByText('file_3.xlsx')).toBeInTheDocument();
+      expect(screen.queryByText('file_2.xlsx')).not.toBeInTheDocument();
       expect(screen.getByText('1 / 2')).toBeInTheDocument();
 
       await user.click(screen.getByLabelText('업로드 파일 다음 페이지'));
-      await waitFor(() => expect(screen.getByText('file_6.xlsx')).toBeInTheDocument());
-      expect(screen.getByText('file_7.xlsx')).toBeInTheDocument();
-      expect(screen.queryByText('file_1.xlsx')).not.toBeInTheDocument();
+      await waitFor(() => expect(screen.getByText('file_2.xlsx')).toBeInTheDocument());
+      expect(screen.getByText('file_1.xlsx')).toBeInTheDocument();
+      expect(screen.queryByText('file_7.xlsx')).not.toBeInTheDocument();
       expect(screen.getByText('2 / 2')).toBeInTheDocument();
     });
 
@@ -218,6 +222,8 @@ describe('Assets', () => {
       seedAdmin();
       fileApi.getAll.mockResolvedValue({ data: { data: [COMPLETED_DOC_FILE] } });
       renderPage();
+      await waitFor(() => expect(screen.getByText('sample_maintenance.xlsx')).toBeInTheDocument());
+      await user.click(screen.getByText('sample_maintenance.xlsx'));
       await waitFor(() => expect(screen.getByText('적용')).toBeInTheDocument());
 
       await user.click(screen.getByText('적용'));
@@ -233,6 +239,8 @@ describe('Assets', () => {
       fileApi.getAll.mockResolvedValue({ data: { data: [COMPLETED_DOC_FILE] } });
       fileApi.apply.mockResolvedValue({ data: { success: true } });
       renderPage();
+      await waitFor(() => expect(screen.getByText('sample_maintenance.xlsx')).toBeInTheDocument());
+      await user.click(screen.getByText('sample_maintenance.xlsx'));
       await waitFor(() => expect(screen.getByText('적용')).toBeInTheDocument());
 
       await user.click(screen.getByText('적용'));
@@ -242,10 +250,12 @@ describe('Assets', () => {
     });
 
     it('shows the applied badge and an unapply button once a file has been applied', async () => {
+      const user = userEvent.setup();
       seedAdmin();
       fileApi.getAll.mockResolvedValue({ data: { data: [{ ...COMPLETED_DOC_FILE, applied: true }] } });
       renderPage();
       await waitFor(() => expect(screen.getByText('적용됨')).toBeInTheDocument());
+      await user.click(screen.getByText('sample_maintenance.xlsx'));
       expect(screen.getByText('적용 취소')).toBeInTheDocument();
     });
 
@@ -281,6 +291,7 @@ describe('Assets', () => {
     });
 
     it('hides the apply button when every asset-registration row is a duplicate', async () => {
+      const user = userEvent.setup();
       seedAdmin();
       fileApi.getAll.mockResolvedValue({
         data: {
@@ -305,11 +316,13 @@ describe('Assets', () => {
       });
       renderPage();
       await waitFor(() => expect(screen.getByText('all_duplicates.xlsx')).toBeInTheDocument());
+      await user.click(screen.getByText('all_duplicates.xlsx'));
       expect(screen.getByText('적용 가능한 항목 없음')).toBeInTheDocument();
       expect(screen.queryByText('적용')).not.toBeInTheDocument();
     });
 
     it('hides the apply button when every maintenance row has an unmatched asset code', async () => {
+      const user = userEvent.setup();
       seedAdmin();
       fileApi.getAll.mockResolvedValue({
         data: {
@@ -334,6 +347,7 @@ describe('Assets', () => {
       });
       renderPage();
       await waitFor(() => expect(screen.getByText('all_unmatched.xlsx')).toBeInTheDocument());
+      await user.click(screen.getByText('all_unmatched.xlsx'));
       expect(screen.getByText('적용 가능한 항목 없음')).toBeInTheDocument();
       expect(screen.queryByText('적용')).not.toBeInTheDocument();
     });
