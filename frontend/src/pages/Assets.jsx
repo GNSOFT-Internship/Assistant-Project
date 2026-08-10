@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { assetApi, fileApi } from '../services/api';
 import {
-  Plus, Edit, Trash2, ChevronLeft, ChevronRight, Download, Upload, ArrowUp, ArrowDown, ArrowUpDown,
+  Plus, Edit, Trash2, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Download, Upload, ArrowUp, ArrowDown, ArrowUpDown,
   FileText, CheckCircle, XCircle, Loader, Play,
 } from 'lucide-react';
 import { AssetStatusBadge, FileStatusBadge } from '../components/StatusBadge';
@@ -49,7 +49,30 @@ export default function Assets() {
   const [docDragActive, setDocDragActive] = useState(false);
   const [docPendingIds, setDocPendingIds] = useState(new Set());
   const [docPage, setDocPage] = useState(1);
+  const [expandedDocFileIds, setExpandedDocFileIds] = useState(new Set());
   const docFileInputRef = useRef(null);
+
+  const toggleDocFileExpanded = (id) => {
+    setExpandedDocFileIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  // 요약 테이블의 "요약" 열에 파일 종류별로 핵심 정보 한 줄만 보여주기 위한 헬퍼.
+  // 상세 내용(행별 미리보기 등)은 행을 펼쳤을 때만 렌더링한다.
+  const getDocFileSummaryText = (file) => {
+    const s = file.extractedSummary;
+    if (!s) return '-';
+    if (s.kind === 'asset_registration' || s.kind === 'maintenance_records') {
+      return `총 ${s.totalRows}행 · 유효 ${s.validRows}행 · 오류 ${s.errorRowCount}행`;
+    }
+    if (s.kind === 'pdf_quote') {
+      return `${s.vendor || '업체 미상'} · ${s.totalAmount != null ? `${s.totalAmount.toLocaleString()}원` : '금액 미상'}`;
+    }
+    return '-';
+  };
 
   const [formData, setFormData] = useState({
     assetName: '', assetCode: '', category: '', location: '',
@@ -714,68 +737,98 @@ export default function Assets() {
               업로드된 파일이 없습니다.
             </div>
           ) : (
-            <div className="space-y-4">
-              {pagedDocFiles.map((file) => (
-                <div key={file.id} className="border rounded-lg p-4">
-                  <div className="flex justify-between items-start mb-2 flex-wrap gap-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <FileText className="text-blue-600 flex-shrink-0" size={20} />
-                      <div className="min-w-0">
-                        <div className="font-medium break-all">{file.originalFilename}</div>
-                        <div className="text-sm text-gray-500 dark:text-slate-400">{file.fileType}</div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <FileStatusBadge status={file.status} />
-                      {file.applied && <span className="badge-blue">적용됨</span>}
-                    </div>
-                  </div>
-
-                  {isAdmin && (
-                    <div className="flex gap-2 mt-3">
-                      {file.status === 'PENDING' && (
-                        <button
-                          onClick={() => handleDocProcess(file.id)}
-                          disabled={docPendingIds.has(file.id)}
-                          className="btn btn-secondary flex items-center gap-2"
+            <div className="overflow-x-auto">
+              <table className="table text-sm w-full">
+                <thead className="table-header">
+                  <tr>
+                    <th className="table-cell">파일명</th>
+                    <th className="table-cell">종류</th>
+                    <th className="table-cell">상태</th>
+                    <th className="table-cell">요약</th>
+                    {isAdmin && <th className="table-cell">작업</th>}
+                    <th className="table-cell w-8"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pagedDocFiles.map((file) => {
+                    const expanded = expandedDocFileIds.has(file.id);
+                    return (
+                      <React.Fragment key={file.id}>
+                        <tr
+                          className="cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-800"
+                          onClick={() => toggleDocFileExpanded(file.id)}
                         >
-                          <Play size={14} /> 분석
-                        </button>
-                      )}
-                      {file.status === 'COMPLETED' && !file.applied && (
-                        fileHasApplicableRows(file) ? (
-                          <button
-                            onClick={() => handleDocApply(file.id)}
-                            disabled={docPendingIds.has(file.id)}
-                            className="btn btn-primary flex items-center gap-2"
-                          >
-                            <CheckCircle size={14} /> 적용
-                          </button>
-                        ) : (
-                          <span className="text-sm text-gray-500 dark:text-slate-400 flex items-center gap-1 px-1">
-                            <XCircle size={14} /> 적용 가능한 항목 없음
-                          </span>
-                        )
-                      )}
-                      {file.applied && file.extractedSummary?.kind !== 'asset_registration' && (
-                        <button
-                          onClick={() => handleDocUnapply(file.id)}
-                          disabled={docPendingIds.has(file.id)}
-                          className="btn btn-secondary flex items-center gap-2"
-                        >
-                          <XCircle size={14} /> 적용 취소
-                        </button>
-                      )}
-                      <button
-                        onClick={() => handleDocDelete(file.id)}
-                        disabled={docPendingIds.has(file.id)}
-                        className="btn btn-danger flex items-center gap-2"
-                      >
-                        <XCircle size={14} /> 삭제
-                      </button>
-                    </div>
-                  )}
-
+                          <td className="table-cell">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <FileText className="text-blue-600 flex-shrink-0" size={16} />
+                              <span className="truncate max-w-[220px] inline-block align-middle" title={file.originalFilename}>
+                                {file.originalFilename}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="table-cell whitespace-nowrap">{file.fileType}</td>
+                          <td className="table-cell whitespace-nowrap">
+                            <div className="flex items-center gap-1">
+                              <FileStatusBadge status={file.status} />
+                              {file.applied && <span className="badge-blue">적용됨</span>}
+                            </div>
+                          </td>
+                          <td className="table-cell text-gray-600 dark:text-slate-400 max-w-xs truncate" title={getDocFileSummaryText(file)}>
+                            {getDocFileSummaryText(file)}
+                          </td>
+                          {isAdmin && (
+                            <td className="table-cell" onClick={(e) => e.stopPropagation()}>
+                              <div className="flex gap-1 flex-wrap">
+                                {file.status === 'PENDING' && (
+                                  <button
+                                    onClick={() => handleDocProcess(file.id)}
+                                    disabled={docPendingIds.has(file.id)}
+                                    className="btn btn-secondary text-xs py-1 px-2 flex items-center gap-1"
+                                  >
+                                    <Play size={12} /> 분석
+                                  </button>
+                                )}
+                                {file.status === 'COMPLETED' && !file.applied && (
+                                  fileHasApplicableRows(file) ? (
+                                    <button
+                                      onClick={() => handleDocApply(file.id)}
+                                      disabled={docPendingIds.has(file.id)}
+                                      className="btn btn-primary text-xs py-1 px-2 flex items-center gap-1"
+                                    >
+                                      <CheckCircle size={12} /> 적용
+                                    </button>
+                                  ) : (
+                                    <span className="text-xs text-gray-500 dark:text-slate-400 flex items-center gap-1 px-1">
+                                      적용 불가
+                                    </span>
+                                  )
+                                )}
+                                {file.applied && file.extractedSummary?.kind !== 'asset_registration' && (
+                                  <button
+                                    onClick={() => handleDocUnapply(file.id)}
+                                    disabled={docPendingIds.has(file.id)}
+                                    className="btn btn-secondary text-xs py-1 px-2 flex items-center gap-1"
+                                  >
+                                    <XCircle size={12} /> 취소
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => handleDocDelete(file.id)}
+                                  disabled={docPendingIds.has(file.id)}
+                                  className="btn btn-danger text-xs py-1 px-2 flex items-center gap-1"
+                                >
+                                  <XCircle size={12} /> 삭제
+                                </button>
+                              </div>
+                            </td>
+                          )}
+                          <td className="table-cell text-gray-400">
+                            {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                          </td>
+                        </tr>
+                        {expanded && (
+                          <tr>
+                            <td colSpan={isAdmin ? 6 : 5} className="table-cell bg-gray-50 dark:bg-slate-900">
                   {file.status === 'FAILED' && file.errorMessage && (
                     <div className="mt-2 text-sm text-red-600">
                       오류: {file.errorMessage}
@@ -928,8 +981,14 @@ export default function Assets() {
                       </details>
                     </div>
                   )}
-                </div>
-              ))}
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
 
