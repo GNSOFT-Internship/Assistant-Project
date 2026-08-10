@@ -451,8 +451,13 @@ def create_assets_from_rows(db: Session, rows: list[dict], changed_by: Optional[
     # 같은 배치 안에서 같은 카테고리가 여러 번 나와도 중요도는 한 번만 산정한다.
     seen_categories: set = set()
 
+    # 행마다 db.commit()으로 왕복하는 대신 SAVEPOINT로 행 단위 격리만 유지하고,
+    # 실제 커밋은 루프가 끝난 뒤 한 번만 한다 (N행 임포트가 N번의 트랜잭션 왕복을
+    # 만들지 않도록). 중복 자산번호로 실패한 행은 SAVEPOINT만 롤백되어 그 행의
+    # 변경만 취소되고, 이미 성공한 다른 행들은 영향받지 않는다.
     for item in rows:
         asset_req = schemas.AssetRequest(**item["assetRequest"])
+        savepoint = db.begin_nested()
         if asset_req.category not in seen_categories:
             category_importance.ensure_category_importance(db, asset_req.category)
             seen_categories.add(asset_req.category)
@@ -472,7 +477,7 @@ def create_assets_from_rows(db: Session, rows: list[dict], changed_by: Optional[
         try:
             db.flush()
         except IntegrityError:
-            db.rollback()
+            savepoint.rollback()
             errors.append({"row": item["row"], "error": f"자산번호 '{asset_req.assetCode}'가 이미 존재합니다."})
             continue
 
@@ -480,8 +485,11 @@ def create_assets_from_rows(db: Session, rows: list[dict], changed_by: Optional[
             db, asset, models.AuditAction.CREATE, changed_by,
             {field: {"old": None, "new": _field_value(asset, field)} for field, _ in _TRACKED_FIELDS},
         )
-        db.commit()
+        savepoint.commit()
         created += 1
+
+    if created:
+        db.commit()
 
     return created, errors
 

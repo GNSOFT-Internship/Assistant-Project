@@ -461,9 +461,11 @@ async def batch_upload_files(
             filename = _safe_stored_filename(original_filename)
             file_path = os.path.join(settings.UPLOAD_DIRECTORY, filename)
 
-            contents = await file.read()
+            # 단건 업로드(/upload)와 동일하게 청크 단위로 디스크에 흘려보낸다.
+            # 파일 전체를 메모리에 올리면 배치 업로드에서는 여러 파일이 동시에
+            # 쌓여 systemd MemoryMax 한도를 넘기기 더 쉽다.
             with open(file_path, "wb") as f:
-                f.write(contents)
+                shutil.copyfileobj(file.file, f)
 
             file_upload = models.FileUpload(
                 filename=filename,
@@ -523,8 +525,17 @@ def batch_apply_files(
         if file_upload.applied:
             continue
 
+        result = json.loads(file_upload.extracted_data) if file_upload.extracted_data else {}
+
+        # maintenance_records/pdf_quote 분기는 db.flush()만 쓰고 최종 커밋은 루프 밖에서
+        # 한 번에 이루어지므로, 이 파일 처리 중 예외가 나면 SAVEPOINT로 이 파일이 만든
+        # 레코드만 롤백한다 (applied=False로 남아 재적용해도 중복이 생기지 않는다).
+        # asset_registration 분기(create_assets_from_rows)는 행마다 자체적으로
+        # commit()/rollback()하므로 여기 SAVEPOINT로 감싸지 않는다 — 감싸면 내부 commit이
+        # SAVEPOINT를 조기 해제해, 이후 실패한 다른 파일의 rollback이 이미 끝난 파일들의
+        # 커밋까지 되돌릴 수 있다.
+        savepoint = db.begin_nested() if result.get("kind") in ("maintenance_records", "pdf_quote") else None
         try:
-            result = json.loads(file_upload.extracted_data) if file_upload.extracted_data else {}
             created_count = 0
             created_ids = []
             source_label = f"엑셀 업로드: {file_upload.original_filename}"
@@ -610,9 +621,13 @@ def batch_apply_files(
 
             file_upload.applied = True
             file_upload.updated_at = datetime.now()
+            if savepoint is not None:
+                savepoint.commit()
             success_count += 1
             total_records_created += created_count
         except Exception as e:
+            if savepoint is not None:
+                savepoint.rollback()
             errors.append(f"Error applying {file_upload.original_filename}: {e}")
 
     db.commit()
