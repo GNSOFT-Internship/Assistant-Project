@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from .. import models
+from .. import category_importance, models
 from ..config import settings
 from ..database import get_db
 from ..scoring import compute_replacement_metrics
@@ -61,9 +61,15 @@ def get_dashboard_data(db: Session = Depends(get_db)):
         for r in records:
             records_by_asset.setdefault(r.asset_id, []).append(r)
 
+        importance_cache: dict = {}
         scored = []
         for asset in replacement_needed_list:
-            metrics = compute_replacement_metrics(asset, records_by_asset.get(asset.id, []))
+            if asset.category not in importance_cache:
+                importance_cache[asset.category] = category_importance.get_importance_score(db, asset.category)
+            metrics = compute_replacement_metrics(
+                asset, records_by_asset.get(asset.id, []),
+                category_importance_score=importance_cache[asset.category],
+            )
             scored.append({
                 "assetId": asset.id,
                 "assetName": asset.asset_name,

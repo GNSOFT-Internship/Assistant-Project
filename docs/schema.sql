@@ -40,7 +40,7 @@ CREATE TABLE `maintenance_record` (
     `asset_id` BIGINT NOT NULL,
     `maintenance_date` DATE NOT NULL,
     `maintenance_type` ENUM('ROUTINE', 'REPAIR', 'REPLACEMENT', 'INSPECTION') NOT NULL,
-    `cost` DECIMAL(15, 2) NOT NULL,
+    `cost` DECIMAL(15, 2),
     `description` TEXT,
     `technician` VARCHAR(100),
     `failure_type` VARCHAR(200),
@@ -101,6 +101,26 @@ CREATE TABLE `budget` (
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY `uq_budget_year_month` (`year`, `month`)
+);
+
+-- CategoryImportance 테이블 (자산 카테고리별 업무 중요도 점수, 교체 우선순위 계산에 사용)
+CREATE TABLE `category_importance` (
+    `id` BIGINT PRIMARY KEY AUTO_INCREMENT,
+    `category` VARCHAR(100) NOT NULL UNIQUE,
+    `importance_score` DECIMAL(5, 1) NOT NULL,
+    `reason` TEXT,
+    `source` ENUM('AI', 'MANUAL', 'DEFAULT') NOT NULL DEFAULT 'DEFAULT',
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- AssetReplacementReason 테이블 (교체 우선순위 추천 사유 AI 생성 텍스트 캐시)
+CREATE TABLE `asset_replacement_reason` (
+    `asset_id` BIGINT PRIMARY KEY,
+    `metrics_hash` VARCHAR(64) NOT NULL,
+    `reason` TEXT NOT NULL,
+    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (`asset_id`) REFERENCES `asset`(`id`) ON DELETE CASCADE
 );
 
 -- WorkOrder 테이블 (AI 유지보수 작업 지시서)
