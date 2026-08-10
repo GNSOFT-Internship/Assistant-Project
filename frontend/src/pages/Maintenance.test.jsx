@@ -158,4 +158,26 @@ describe('Maintenance', () => {
 
     expect(screen.getAllByText('종료월이 시작월보다 빠릅니다. 범위를 다시 선택해주세요.').length).toBeGreaterThan(0);
   });
+
+  it('paginates the full failure type list 10 at a time with prev/next controls', async () => {
+    const user = userEvent.setup();
+    const manyFailureTypes = Object.fromEntries(
+      Array.from({ length: 15 }, (_, i) => [`고장유형${String(i + 1).padStart(2, '0')}`, 15 - i])
+    );
+    aiApi.getMaintenanceAnalysis.mockResolvedValue({
+      data: { data: { ...ANALYSIS, failurePatterns: manyFailureTypes } },
+    });
+    renderPage();
+
+    await waitFor(() => expect(screen.getByText('고장유형01')).toBeInTheDocument());
+    expect(screen.getByText('고장유형10')).toBeInTheDocument();
+    expect(screen.queryByText('고장유형11')).not.toBeInTheDocument();
+    expect(screen.getByText('1 / 2')).toBeInTheDocument();
+
+    await user.click(screen.getByLabelText('고장 유형 다음 페이지'));
+    await waitFor(() => expect(screen.getByText('고장유형11')).toBeInTheDocument());
+    expect(screen.getByText('고장유형15')).toBeInTheDocument();
+    expect(screen.queryByText('고장유형01')).not.toBeInTheDocument();
+    expect(screen.getByText('2 / 2')).toBeInTheDocument();
+  });
 });
