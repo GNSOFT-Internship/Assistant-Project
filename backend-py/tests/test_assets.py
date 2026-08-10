@@ -182,6 +182,19 @@ def test_create_asset_rejects_future_purchase_date(client, admin_headers):
     assert resp.status_code == 422
 
 
+def test_create_asset_strips_whitespace_from_category(client, admin_headers):
+    """category는 자유 문자열이라 앞뒤 공백이 섞여 들어오면 " NAS "와 "NAS"가 서로
+    다른 카테고리로 취급되어 필터/그룹핑과 category_importance 캐시가 갈라진다."""
+    asset = _create_asset(client, admin_headers, assetCode="TEST-ASSET-010", category="  NAS  ")
+    assert asset["category"] == "NAS"
+
+
+def test_create_asset_rejects_blank_category(client, admin_headers):
+    payload = {**ASSET_PAYLOAD, "assetCode": "TEST-ASSET-011", "category": "   "}
+    resp = client.post("/api/assets", json=payload, headers=admin_headers)
+    assert resp.status_code == 422
+
+
 def test_add_maintenance_record_rejects_negative_cost(client, admin_headers):
     asset = _create_asset(client, admin_headers, assetCode="TEST-ASSET-010")
     payload = {**MAINTENANCE_PAYLOAD, "cost": -500}
