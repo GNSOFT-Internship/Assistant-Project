@@ -14,12 +14,19 @@ CREATE TABLE `app_user` (
     `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
+-- Category 테이블 (자산 카테고리 마스터)
+CREATE TABLE `category` (
+    `id` BIGINT PRIMARY KEY AUTO_INCREMENT,
+    `name` VARCHAR(100) NOT NULL UNIQUE,
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Asset 테이블 (자산 관리)
 CREATE TABLE `asset` (
     `id` BIGINT PRIMARY KEY AUTO_INCREMENT,
     `asset_name` VARCHAR(200) NOT NULL,
-    `asset_code` VARCHAR(50) NOT NULL UNIQUE,
-    `category` VARCHAR(100) NOT NULL,
+    `asset_code` INT NOT NULL UNIQUE COMMENT '시스템이 자동 채번하는 자산번호 (1부터 순차 증가)',
+    `category_id` BIGINT NOT NULL,
     `location` VARCHAR(200),
     `responsible_person` VARCHAR(100),
     `purchase_date` DATE NOT NULL,
@@ -29,7 +36,7 @@ CREATE TABLE `asset` (
     `description` TEXT,
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX `idx_category` (`category`),
+    FOREIGN KEY (`category_id`) REFERENCES `category`(`id`),
     INDEX `idx_status` (`status`),
     INDEX `idx_purchase_date` (`purchase_date`)
 );
@@ -70,7 +77,7 @@ CREATE TABLE `file_upload` (
 CREATE TABLE `asset_audit_log` (
     `id` BIGINT PRIMARY KEY AUTO_INCREMENT,
     `asset_id` BIGINT NOT NULL,
-    `asset_code` VARCHAR(50),
+    `asset_code` INT,
     `action` ENUM('CREATE', 'UPDATE', 'DELETE') NOT NULL,
     `changed_by` VARCHAR(50),
     `changes` TEXT,
@@ -106,12 +113,13 @@ CREATE TABLE `budget` (
 -- CategoryImportance 테이블 (자산 카테고리별 업무 중요도 점수, 교체 우선순위 계산에 사용)
 CREATE TABLE `category_importance` (
     `id` BIGINT PRIMARY KEY AUTO_INCREMENT,
-    `category` VARCHAR(100) NOT NULL UNIQUE,
+    `category_id` BIGINT NOT NULL UNIQUE,
     `importance_score` DECIMAL(5, 1) NOT NULL,
     `reason` TEXT,
     `source` ENUM('AI', 'MANUAL', 'DEFAULT') NOT NULL DEFAULT 'DEFAULT',
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (`category_id`) REFERENCES `category`(`id`)
 );
 
 -- AssetReplacementReason 테이블 (교체 우선순위 추천 사유 AI 생성 텍스트 캐시)
@@ -143,33 +151,44 @@ INSERT INTO `app_user` (`username`, `password`, `role`, `email`) VALUES
 ('admin', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', 'ADMIN', 'admin@example.com'),
 ('user1', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', 'USER', 'user1@example.com');
 
+-- 카테고리 마스터 데이터
+INSERT INTO `category` (`name`) VALUES
+('IT 장비'),
+('사무기기'),
+('설비'),
+('전기설비'),
+('안전설비'),
+('보안장비'),
+('가구'),
+('측정장비');
+
 -- 자산 데이터 (20 건 이상)
-INSERT INTO `asset` (`asset_name`, `asset_code`, `category`, `location`, `responsible_person`, `purchase_date`, `purchase_price`, `useful_life`, `status`, `description`) VALUES
-('노트북 Dell Latitude 5520', 'ASSET-001', 'IT 장비', '본관 1 층 사무실', '김철수', '2019-06-15', 1200000, 5, 'ACTIVE', '개발팀용 고사양 노트북'),
-('노트북 HP EliteBook 840', 'ASSET-002', 'IT 장비', '본관 2 층 회의실', '이영희', '2020-03-20', 1500000, 5, 'ACTIVE', '관리팀용 노트북'),
-('데스크톱 Lenovo ThinkCentre', 'ASSET-003', 'IT 장비', '본관 3 층', '박민수', '2018-09-10', 800000, 5, 'REPLACEMENT_NEEDED', '구형 모델, 성능 저하'),
-('프린터 HP LaserJet Pro', 'ASSET-004', '사무기기', '본관 1 층', '김철수', '2021-01-15', 450000, 7, 'ACTIVE', '레이저 프린터'),
-('복사기 Canon imageRUNNER', 'ASSET-005', '사무기기', '본관 1 층', '이영희', '2017-05-20', 2500000, 10, 'UNDER_MAINTENANCE', '정기점검 중'),
-('에어컨 삼성 스탠드형', 'ASSET-006', '설비', '본관 2 층', '박민수', '2019-07-01', 600000, 10, 'ACTIVE', '20 평형 스탠드 에어컨'),
-('에어컨 LG 벽걸이', 'ASSET-007', '설비', '본관 3 층', '김철수', '2020-06-15', 400000, 10, 'ACTIVE', '14 평형 벽걸이'),
-('UPS 배터리스톱', 'ASSET-008', '전기설비', '본관 지하', '이영희', '2018-03-10', 1800000, 8, 'REPLACEMENT_NEEDED', '배터리 수명 다됨'),
-('화재경보기 호니웰', 'ASSET-009', '안전설비', '전체 구역', '박민수', '2016-11-20', 3200000, 15, 'ACTIVE', '연동형 화재경보 시스템'),
-('소화기 분말형 6kg', 'ASSET-010', '안전설비', '각 층', '김철수', '2020-01-10', 35000, 10, 'ACTIVE', '층당 10 개씩 배치'),
-('엘리베이터 현대엘리베이터', 'ASSET-011', '설비', '본관', '이영희', '2015-04-01', 15000000, 20, 'ACTIVE', '승객용 2 대'),
-('비상조명등', 'ASSET-012', '전기설비', '전체 구역', '박민수', '2019-08-15', 850000, 10, 'ACTIVE', 'LED 비상조명'),
-(' CCTV 카메라', 'ASSET-013', '보안장비', '입구/복도', '김철수', '2021-03-01', 1200000, 7, 'ACTIVE', 'HD 카메라 20 대'),
-('액세서리 서버', 'ASSET-014', 'IT 장비', '서버실', '이영희', '2017-09-10', 8000000, 5, 'REPLACEMENT_NEEDED', '구형 서버, 교체 필요'),
-('네트워크 스위치', 'ASSET-015', 'IT 장비', '서버실', '박민수', '2020-02-15', 1500000, 7, 'ACTIVE', '24 포트 기가비트'),
-('무선 AP', 'ASSET-016', 'IT 장비', '전체 구역', '김철수', '2021-06-01', 450000, 5, 'ACTIVE', 'Wi-Fi 6 지원'),
-('프로젝터 EPSON', 'ASSET-017', '사무기기', '회의실 A', '이영희', '2019-04-20', 900000, 7, 'ACTIVE', '비즈니스 프로젝터'),
-('화이트보드 전자', 'ASSET-018', '사무기기', '회의실 B', '박민수', '2020-09-10', 1200000, 10, 'ACTIVE', '터치스크린 방식'),
-('책상 사무용', 'ASSET-019', '가구', '본관', '김철수', '2018-01-15', 150000, 15, 'ACTIVE', '조절식 사무용 책상'),
-('의자 사무용', 'ASSET-020', '가구', '본관', '이영희', '2018-01-15', 80000, 10, 'ACTIVE', '에르고노믹 체어'),
-('냉장고', 'ASSET-021', '사무기기', '휴게실', '박민수', '2021-02-01', 500000, 10, 'ACTIVE', '2 도어 냉장고'),
-('전자레인지', 'ASSET-022', '사무기기', '휴게실', '김철수', '2020-05-15', 120000, 7, 'ACTIVE', '마이크로웨이브'),
-('정수기', 'ASSET-023', '사무기기', '본관 1 층', '이영희', '2019-03-10', 250000, 8, 'ACTIVE', '냉온정수기'),
-('진단용 PC', 'ASSET-024', 'IT 장비', '유지보수실', '박민수', '2018-11-20', 1100000, 5, 'INACTIVE', '고장으로 사용중단'),
-('테스트 장비', 'ASSET-025', '측정장비', '유지보수실', '김철수', '2020-07-01', 2200000, 7, 'ACTIVE', '멀티미터/오실로스코프');
+INSERT INTO `asset` (`asset_name`, `asset_code`, `category_id`, `location`, `responsible_person`, `purchase_date`, `purchase_price`, `useful_life`, `status`, `description`) VALUES
+('노트북 Dell Latitude 5520', 1, 1, '본관 1 층 사무실', '김철수', '2019-06-15', 1200000, 5, 'ACTIVE', '개발팀용 고사양 노트북'),
+('노트북 HP EliteBook 840', 2, 1, '본관 2 층 회의실', '이영희', '2020-03-20', 1500000, 5, 'ACTIVE', '관리팀용 노트북'),
+('데스크톱 Lenovo ThinkCentre', 3, 1, '본관 3 층', '박민수', '2018-09-10', 800000, 5, 'REPLACEMENT_NEEDED', '구형 모델, 성능 저하'),
+('프린터 HP LaserJet Pro', 4, 2, '본관 1 층', '김철수', '2021-01-15', 450000, 7, 'ACTIVE', '레이저 프린터'),
+('복사기 Canon imageRUNNER', 5, 2, '본관 1 층', '이영희', '2017-05-20', 2500000, 10, 'UNDER_MAINTENANCE', '정기점검 중'),
+('에어컨 삼성 스탠드형', 6, 3, '본관 2 층', '박민수', '2019-07-01', 600000, 10, 'ACTIVE', '20 평형 스탠드 에어컨'),
+('에어컨 LG 벽걸이', 7, 3, '본관 3 층', '김철수', '2020-06-15', 400000, 10, 'ACTIVE', '14 평형 벽걸이'),
+('UPS 배터리스톱', 8, 4, '본관 지하', '이영희', '2018-03-10', 1800000, 8, 'REPLACEMENT_NEEDED', '배터리 수명 다됨'),
+('화재경보기 호니웰', 9, 5, '전체 구역', '박민수', '2016-11-20', 3200000, 15, 'ACTIVE', '연동형 화재경보 시스템'),
+('소화기 분말형 6kg', 10, 5, '각 층', '김철수', '2020-01-10', 35000, 10, 'ACTIVE', '층당 10 개씩 배치'),
+('엘리베이터 현대엘리베이터', 11, 3, '본관', '이영희', '2015-04-01', 15000000, 20, 'ACTIVE', '승객용 2 대'),
+('비상조명등', 12, 4, '전체 구역', '박민수', '2019-08-15', 850000, 10, 'ACTIVE', 'LED 비상조명'),
+(' CCTV 카메라', 13, 6, '입구/복도', '김철수', '2021-03-01', 1200000, 7, 'ACTIVE', 'HD 카메라 20 대'),
+('액세서리 서버', 14, 1, '서버실', '이영희', '2017-09-10', 8000000, 5, 'REPLACEMENT_NEEDED', '구형 서버, 교체 필요'),
+('네트워크 스위치', 15, 1, '서버실', '박민수', '2020-02-15', 1500000, 7, 'ACTIVE', '24 포트 기가비트'),
+('무선 AP', 16, 1, '전체 구역', '김철수', '2021-06-01', 450000, 5, 'ACTIVE', 'Wi-Fi 6 지원'),
+('프로젝터 EPSON', 17, 2, '회의실 A', '이영희', '2019-04-20', 900000, 7, 'ACTIVE', '비즈니스 프로젝터'),
+('화이트보드 전자', 18, 2, '회의실 B', '박민수', '2020-09-10', 1200000, 10, 'ACTIVE', '터치스크린 방식'),
+('책상 사무용', 19, 7, '본관', '김철수', '2018-01-15', 150000, 15, 'ACTIVE', '조절식 사무용 책상'),
+('의자 사무용', 20, 7, '본관', '이영희', '2018-01-15', 80000, 10, 'ACTIVE', '에르고노믹 체어'),
+('냉장고', 21, 2, '휴게실', '박민수', '2021-02-01', 500000, 10, 'ACTIVE', '2 도어 냉장고'),
+('전자레인지', 22, 2, '휴게실', '김철수', '2020-05-15', 120000, 7, 'ACTIVE', '마이크로웨이브'),
+('정수기', 23, 2, '본관 1 층', '이영희', '2019-03-10', 250000, 8, 'ACTIVE', '냉온정수기'),
+('진단용 PC', 24, 1, '유지보수실', '박민수', '2018-11-20', 1100000, 5, 'INACTIVE', '고장으로 사용중단'),
+('테스트 장비', 25, 8, '유지보수실', '김철수', '2020-07-01', 2200000, 7, 'ACTIVE', '멀티미터/오실로스코프');
 
 -- 유지보수 이력 데이터
 INSERT INTO `maintenance_record` (`asset_id`, `maintenance_date`, `maintenance_type`, `cost`, `description`, `technician`, `failure_type`) VALUES

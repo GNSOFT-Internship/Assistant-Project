@@ -2,7 +2,6 @@ import io
 
 ASSET_PAYLOAD = {
     "assetName": "권한 테스트 자산",
-    "assetCode": "TEST-PERM-001",
     "category": "IT 장비",
     "location": "테스트실",
     "responsiblePerson": "테스트담당",

@@ -25,7 +25,7 @@ function seedAdmin() {
 const RECOMMENDATION = {
   assetId: 1,
   assetName: '데스크톱 Lenovo ThinkCentre',
-  assetCode: 'ASSET-003',
+  assetCode: 3,
   score: 111.2,
   purchasePrice: 800000,
   totalRepairCost: 345000,

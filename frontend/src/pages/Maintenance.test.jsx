@@ -51,7 +51,7 @@ describe('Maintenance', () => {
     aiApi.getAssetsByFailureType.mockResolvedValue({
       data: {
         data: [
-          { id: 1, assetName: '노트북 Dell Latitude 5520', assetCode: 'ASSET-001', category: 'IT 장비', status: 'ACTIVE', occurrenceCount: 3 },
+          { id: 1, assetName: '노트북 Dell Latitude 5520', assetCode: 1, category: 'IT 장비', status: 'ACTIVE', occurrenceCount: 3 },
         ],
       },
     });
@@ -74,12 +74,12 @@ describe('Maintenance', () => {
     aiApi.getAssetsByFailureType.mockResolvedValue({
       data: {
         data: [
-          { id: 1, assetName: '노트북 Dell Latitude 5520', assetCode: 'ASSET-001', category: 'IT 장비', status: 'ACTIVE', occurrenceCount: 3 },
+          { id: 1, assetName: '노트북 Dell Latitude 5520', assetCode: 1, category: 'IT 장비', status: 'ACTIVE', occurrenceCount: 3 },
         ],
       },
     });
     assetApi.getById.mockResolvedValue({
-      data: { data: { id: 1, assetName: '노트북 Dell Latitude 5520', assetCode: 'ASSET-001', category: 'IT 장비', location: '본관', responsiblePerson: '김철수', purchaseDate: '2020-01-01', purchasePrice: 1200000, status: 'ACTIVE' } },
+      data: { data: { id: 1, assetName: '노트북 Dell Latitude 5520', assetCode: 1, category: 'IT 장비', location: '본관', responsiblePerson: '김철수', purchaseDate: '2020-01-01', purchasePrice: 1200000, status: 'ACTIVE' } },
     });
     assetApi.getMaintenanceHistory.mockResolvedValue({ data: { data: { items: [] } } });
 

@@ -5,7 +5,6 @@ from app.routers.files import _safe_stored_filename
 
 ASSET_PAYLOAD = {
     "assetName": "테스트 파일업로드 자산",
-    "assetCode": "TEST-FILE-001",
     "category": "IT 장비",
     "location": "테스트실",
     "responsiblePerson": "테스트담당",
@@ -16,23 +15,30 @@ ASSET_PAYLOAD = {
     "description": "pytest로 만든 자산",
 }
 
-CSV_CONTENT = (
-    "자산코드,정비일,정비유형,비용,설명,담당자,고장유형\n"
-    "TEST-FILE-001,2026-05-01,수리,30000,테스트 수리 A,김테스트,테스트고장\n"
-    "TEST-FILE-999,2026-05-02,수리,20000,오탈자 코드 테스트,이테스트,없음\n"
-)
+
+def _maintenance_csv(asset_code):
+    return (
+        "자산코드,정비일,정비유형,비용,설명,담당자,고장유형\n"
+        f"{asset_code},2026-05-01,수리,30000,테스트 수리 A,김테스트,테스트고장\n"
+    )
 
 
-def _upload_csv(client, admin_headers):
-    files = {"file": ("test_upload.csv", io.BytesIO(CSV_CONTENT.encode("utf-8")), "text/csv")}
+def _upload_csv(client, admin_headers, csv_content, filename="test_upload.csv"):
+    files = {"file": (filename, io.BytesIO(csv_content.encode("utf-8")), "text/csv")}
     resp = client.post("/api/files/upload", files=files, headers=admin_headers)
     assert resp.status_code == 200, resp.text
     return resp.json()["data"]["id"]
 
 
 def test_upload_process_reports_unmatched_asset_code(client, admin_headers):
-    client.post("/api/assets", json=ASSET_PAYLOAD, headers=admin_headers)
-    file_id = _upload_csv(client, admin_headers)
+    asset = client.post("/api/assets", json=ASSET_PAYLOAD, headers=admin_headers).json()["data"]
+    unmatched_code = asset["assetCode"] + 9999
+    csv_content = (
+        "자산코드,정비일,정비유형,비용,설명,담당자,고장유형\n"
+        f"{asset['assetCode']},2026-05-01,수리,30000,테스트 수리 A,김테스트,테스트고장\n"
+        f"{unmatched_code},2026-05-02,수리,20000,오탈자 코드 테스트,이테스트,없음\n"
+    )
+    file_id = _upload_csv(client, admin_headers, csv_content)
 
     process_resp = client.post(f"/api/files/{file_id}/process", headers=admin_headers)
     assert process_resp.status_code == 200
@@ -40,16 +46,16 @@ def test_upload_process_reports_unmatched_asset_code(client, admin_headers):
 
     assert summary["kind"] == "maintenance_records"
     assert summary["validRows"] == 2
-    assert summary["unmatchedAssetCodes"] == ["TEST-FILE-999"]
+    assert summary["unmatchedAssetCodes"] == [unmatched_code]
 
     rows_by_code = {r["assetCode"]: r for r in summary["records"]}
-    assert rows_by_code["TEST-FILE-001"]["assetExists"] is True
-    assert rows_by_code["TEST-FILE-999"]["assetExists"] is False
+    assert rows_by_code[asset["assetCode"]]["assetExists"] is True
+    assert rows_by_code[unmatched_code]["assetExists"] is False
 
 
 def test_apply_only_creates_records_for_matched_assets(client, admin_headers):
     asset = client.post("/api/assets", json=ASSET_PAYLOAD, headers=admin_headers).json()["data"]
-    file_id = _upload_csv(client, admin_headers)
+    file_id = _upload_csv(client, admin_headers, _maintenance_csv(asset["assetCode"]))
     client.post(f"/api/files/{file_id}/process", headers=admin_headers)
 
     apply_resp = client.post(f"/api/files/{file_id}/apply", headers=admin_headers)
@@ -68,7 +74,7 @@ def test_apply_only_creates_records_for_matched_assets(client, admin_headers):
 
 def test_apply_logs_history_grouped_by_asset(client, admin_headers):
     asset = client.post("/api/assets", json=ASSET_PAYLOAD, headers=admin_headers).json()["data"]
-    file_id = _upload_csv(client, admin_headers)
+    file_id = _upload_csv(client, admin_headers, _maintenance_csv(asset["assetCode"]))
     client.post(f"/api/files/{file_id}/process", headers=admin_headers)
     client.post(f"/api/files/{file_id}/apply", headers=admin_headers)
 
@@ -80,7 +86,7 @@ def test_apply_logs_history_grouped_by_asset(client, admin_headers):
 
 def test_unapply_removes_exactly_the_created_records(client, admin_headers):
     asset = client.post("/api/assets", json=ASSET_PAYLOAD, headers=admin_headers).json()["data"]
-    file_id = _upload_csv(client, admin_headers)
+    file_id = _upload_csv(client, admin_headers, _maintenance_csv(asset["assetCode"]))
     client.post(f"/api/files/{file_id}/process", headers=admin_headers)
     client.post(f"/api/files/{file_id}/apply", headers=admin_headers)
 
@@ -105,11 +111,12 @@ def test_unapply_removes_exactly_the_created_records(client, admin_headers):
 def test_batch_upload_and_batch_apply(client, admin_headers):
     # 1. 자산 생성
     asset = client.post("/api/assets", json=ASSET_PAYLOAD, headers=admin_headers).json()["data"]
+    csv_content = _maintenance_csv(asset["assetCode"])
 
     # 2. 다중 파일 업로드 API 호출
     files = [
-        ("files", ("batch_1.csv", io.BytesIO(CSV_CONTENT.encode("utf-8")), "text/csv")),
-        ("files", ("batch_2.csv", io.BytesIO(CSV_CONTENT.encode("utf-8")), "text/csv"))
+        ("files", ("batch_1.csv", io.BytesIO(csv_content.encode("utf-8")), "text/csv")),
+        ("files", ("batch_2.csv", io.BytesIO(csv_content.encode("utf-8")), "text/csv"))
     ]
     resp = client.post("/api/files/batch-upload", files=files, headers=admin_headers)
     assert resp.status_code == 200
@@ -151,8 +158,8 @@ def test_reprocessing_an_applied_file_is_rejected(client, admin_headers):
     """적용된 파일을 재분석하면 appliedMaintenanceRecordIds가 담긴 extracted_data가
     통째로 덮어써져, 이후 적용취소가 지울 대상을 못 찾고 재적용 시 중복 생성으로
     이어지는 버그가 있었다. 재분석 자체를 막아 원천 차단한다."""
-    client.post("/api/assets", json=ASSET_PAYLOAD, headers=admin_headers)
-    file_id = _upload_csv(client, admin_headers)
+    asset = client.post("/api/assets", json=ASSET_PAYLOAD, headers=admin_headers).json()["data"]
+    file_id = _upload_csv(client, admin_headers, _maintenance_csv(asset["assetCode"]))
     client.post(f"/api/files/{file_id}/process", headers=admin_headers)
     client.post(f"/api/files/{file_id}/apply", headers=admin_headers)
 
@@ -170,8 +177,8 @@ def test_unapply_fails_loudly_when_tracking_info_is_missing(client, admin_header
     유지보수 기록을 고아로 방치하지 말고 명확히 에러를 내야 한다."""
     from app import models
 
-    client.post("/api/assets", json=ASSET_PAYLOAD, headers=admin_headers)
-    file_id = _upload_csv(client, admin_headers)
+    asset = client.post("/api/assets", json=ASSET_PAYLOAD, headers=admin_headers).json()["data"]
+    file_id = _upload_csv(client, admin_headers, _maintenance_csv(asset["assetCode"]))
     client.post(f"/api/files/{file_id}/process", headers=admin_headers)
     client.post(f"/api/files/{file_id}/apply", headers=admin_headers)
 
@@ -212,11 +219,12 @@ def _upload_asset_registration_excel(client, admin_headers, rows):
 
 
 def test_asset_registration_excel_is_auto_detected_and_applies_creates_assets(client, admin_headers):
-    """자산 등록용 엑셀(자산번호/자산명/... 컬럼)을 업로드하면, 유지보수 내역 업로드와
-    같은 드롭존/파이프라인을 타면서도 컬럼 구성만 보고 자동으로 자산 등록으로 처리돼야 한다."""
+    """자산 등록용 엑셀(자산명/카테고리/... 컬럼)을 업로드하면, 유지보수 내역 업로드와
+    같은 드롭존/파이프라인을 타면서도 컬럼 구성만 보고 자동으로 자산 등록으로 처리돼야 한다.
+    자산번호는 더 이상 엑셀에서 받지 않고 서버가 자동 채번한다."""
     file_id = _upload_asset_registration_excel(client, admin_headers, [
         {
-            "자산번호": "FILEREG-001", "자산명": "업로드 자동판별 프린터", "카테고리": "IT 장비",
+            "자산명": "업로드 자동판별 프린터", "카테고리": "IT 장비",
             "위치": "1층", "담당자": "홍길동", "구매일": "2022-01-15",
             "구매가": 500000, "내용연수(년)": 5, "상태": "ACTIVE", "설명": None,
         },
@@ -227,32 +235,41 @@ def test_asset_registration_excel_is_auto_detected_and_applies_creates_assets(cl
     summary = process_resp.json()["data"]["extractedSummary"]
     assert summary["kind"] == "asset_registration"
     assert summary["validRows"] == 1
-    assert summary["rows"][0]["assetCode"] == "FILEREG-001"
-    assert summary["rows"][0]["assetExists"] is False
+    assert summary["rows"][0]["assetName"] == "업로드 자동판별 프린터"
 
     apply_resp = client.post(f"/api/files/{file_id}/apply", headers=admin_headers)
     assert apply_resp.status_code == 200
     assert apply_resp.json()["data"]["extractedSummary"]["appliedAssetCount"] == 1
 
-    resp = client.get("/api/assets?search=FILEREG-001", headers=admin_headers)
-    codes = [i["assetCode"] for i in resp.json()["data"]["items"]]
-    assert "FILEREG-001" in codes
+    resp = client.get("/api/assets?search=업로드 자동판별 프린터", headers=admin_headers)
+    items = resp.json()["data"]["items"]
+    assert any(i["assetName"] == "업로드 자동판별 프린터" and isinstance(i["assetCode"], int) for i in items)
 
 
-def test_asset_registration_apply_skips_duplicate_asset_codes(client, admin_headers):
-    client.post("/api/assets", json={**ASSET_PAYLOAD, "assetCode": "FILEREG-DUP"}, headers=admin_headers)
+def test_asset_registration_apply_creates_assets_with_sequential_codes(client, admin_headers):
+    """한 엑셀 안의 여러 신규 자산 행은 각각 서버가 채번한 서로 다른 자산번호를 받는다."""
     file_id = _upload_asset_registration_excel(client, admin_headers, [
         {
-            "자산번호": "FILEREG-DUP", "자산명": "중복 자산", "카테고리": "IT 장비",
+            "자산명": "일괄등록 자산 A", "카테고리": "IT 장비",
             "위치": "1층", "담당자": "홍길동", "구매일": "2022-01-15",
             "구매가": 500000, "내용연수(년)": 5, "상태": "ACTIVE", "설명": None,
+        },
+        {
+            "자산명": "일괄등록 자산 B", "카테고리": "IT 장비",
+            "위치": "1층", "담당자": "홍길동", "구매일": "2022-01-15",
+            "구매가": 300000, "내용연수(년)": 4, "상태": "ACTIVE", "설명": None,
         },
     ])
     client.post(f"/api/files/{file_id}/process", headers=admin_headers)
 
     apply_resp = client.post(f"/api/files/{file_id}/apply", headers=admin_headers)
     assert apply_resp.status_code == 200
-    assert apply_resp.json()["data"]["extractedSummary"]["appliedAssetCount"] == 0
+    assert apply_resp.json()["data"]["extractedSummary"]["appliedAssetCount"] == 2
+
+    resp = client.get("/api/assets?search=일괄등록", headers=admin_headers)
+    items = sorted(resp.json()["data"]["items"], key=lambda i: i["assetCode"])
+    assert len(items) == 2
+    assert items[1]["assetCode"] == items[0]["assetCode"] + 1
 
 
 def test_asset_registration_unapply_is_rejected(client, admin_headers):
@@ -260,7 +277,7 @@ def test_asset_registration_unapply_is_rejected(client, admin_headers):
     삭제되지 않게 명시적으로 막는다."""
     file_id = _upload_asset_registration_excel(client, admin_headers, [
         {
-            "자산번호": "FILEREG-002", "자산명": "적용취소 테스트", "카테고리": "IT 장비",
+            "자산명": "적용취소 테스트", "카테고리": "IT 장비",
             "위치": "1층", "담당자": "홍길동", "구매일": "2022-01-15",
             "구매가": 500000, "내용연수(년)": 5, "상태": "ACTIVE", "설명": None,
         },
@@ -275,10 +292,10 @@ def test_asset_registration_unapply_is_rejected(client, admin_headers):
 def test_maintenance_csv_recognizes_unified_asset_number_column(client, admin_headers):
     """유지보수 내역서도 자산 등록용 엑셀과 같은 "자산번호" 컬럼명을 쓸 수 있어야 한다
     (예전 "자산코드" 컬럼명도 하위 호환으로 계속 인식된다 — 위 CSV_CONTENT 테스트가 그걸 검증)."""
-    client.post("/api/assets", json=ASSET_PAYLOAD, headers=admin_headers)
+    asset = client.post("/api/assets", json=ASSET_PAYLOAD, headers=admin_headers).json()["data"]
     csv_content = (
         "자산번호,정비일,정비유형,비용,설명\n"
-        "TEST-FILE-001,2026-05-01,수리,30000,통일된 컬럼명 테스트\n"
+        f"{asset['assetCode']},2026-05-01,수리,30000,통일된 컬럼명 테스트\n"
     )
     files = {"file": ("unified_column.csv", io.BytesIO(csv_content.encode("utf-8")), "text/csv")}
     upload_resp = client.post("/api/files/upload", files=files, headers=admin_headers)

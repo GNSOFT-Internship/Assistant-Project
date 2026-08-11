@@ -8,7 +8,6 @@ from datetime import datetime
 
 ASSET_PAYLOAD = {
     "assetName": "보고서 테스트 자산",
-    "assetCode": "TEST-REPORT-001",
     "category": "IT 장비",
     "location": "테스트실",
     "responsiblePerson": "테스트담당",
@@ -49,9 +48,9 @@ def test_monthly_report_totals_and_status_breakdown_match_actual_data(client, ad
     유지보수 비용은 이제 "그 달에 실제로 발생한" 이력만 집계하므로(진짜 월간 통계),
     두 건 모두 같은 달(2024-05)에 두고 그 달을 명시적으로 조회한다.
     """
-    _create_asset(client, admin_headers, assetCode="TEST-REPORT-A", status="ACTIVE")
-    _create_asset(client, admin_headers, assetCode="TEST-REPORT-B", status="ACTIVE")
-    replacement_needed = _create_asset(client, admin_headers, assetCode="TEST-REPORT-C", status="REPLACEMENT_NEEDED")
+    _create_asset(client, admin_headers, status="ACTIVE")
+    _create_asset(client, admin_headers, status="ACTIVE")
+    replacement_needed = _create_asset(client, admin_headers, status="REPLACEMENT_NEEDED")
 
     client.post(
         f"/api/assets/{replacement_needed['id']}/maintenance",
@@ -79,14 +78,14 @@ def test_monthly_report_repeated_failure_count_requires_two_or_more_repairs(clie
     resp_before = client.get("/api/reports/monthly", headers=admin_headers)
     baseline = resp_before.json()["data"]["repeatedFailureCount"]
 
-    single_repair = _create_asset(client, admin_headers, assetCode="TEST-REPORT-SINGLE")
+    single_repair = _create_asset(client, admin_headers)
     client.post(
         f"/api/assets/{single_repair['id']}/maintenance",
         json={"maintenanceDate": "2024-05-01", "maintenanceType": "REPAIR", "cost": 10000, "description": "1회 수리"},
         headers=admin_headers,
     )
 
-    many_routine = _create_asset(client, admin_headers, assetCode="TEST-REPORT-ROUTINE")
+    many_routine = _create_asset(client, admin_headers)
     for i in range(3):
         client.post(
             f"/api/assets/{many_routine['id']}/maintenance",
@@ -98,7 +97,7 @@ def test_monthly_report_repeated_failure_count_requires_two_or_more_repairs(clie
     resp_mid = client.get("/api/reports/monthly", headers=admin_headers)
     assert resp_mid.json()["data"]["repeatedFailureCount"] == baseline
 
-    repeated = _create_asset(client, admin_headers, assetCode="TEST-REPORT-REPEATED")
+    repeated = _create_asset(client, admin_headers)
     client.post(
         f"/api/assets/{repeated['id']}/maintenance",
         json={"maintenanceDate": "2024-05-01", "maintenanceType": "REPAIR", "cost": 10000, "description": "수리A"},
@@ -121,7 +120,7 @@ def test_monthly_report_includes_repeated_failure_asset_detail_and_category_cost
     달에 걸쳐 있어도 되지만, costByCategory는 "그 달에 실제로 발생한" 비용만 집계하므로
     두 수리 모두 같은 달(2024-05)에 두고 그 달을 명시적으로 조회한다.
     """
-    asset = _create_asset(client, admin_headers, assetCode="TEST-REPORT-DETAIL", category="IT 장비")
+    asset = _create_asset(client, admin_headers, category="IT 장비")
     client.post(
         f"/api/assets/{asset['id']}/maintenance",
         json={"maintenanceDate": "2024-05-01", "maintenanceType": "REPAIR", "cost": 10000, "description": "수리A"},
@@ -136,7 +135,7 @@ def test_monthly_report_includes_repeated_failure_asset_detail_and_category_cost
     resp = client.get("/api/reports/monthly", params={"year": 2024, "month": 5}, headers=admin_headers)
     data = resp.json()["data"]
 
-    detail = next((a for a in data["repeatedFailureAssets"] if a["assetCode"] == "TEST-REPORT-DETAIL"), None)
+    detail = next((a for a in data["repeatedFailureAssets"] if a["assetName"] == "보고서 테스트 자산"), None)
     assert detail is not None
     assert detail["failureCount"] >= 2
     assert detail["totalCost"] >= 25000
@@ -146,7 +145,7 @@ def test_monthly_report_includes_repeated_failure_asset_detail_and_category_cost
 def test_monthly_report_cost_by_month_only_includes_the_reported_month(client, admin_headers):
     """'월별 비용 추이'는 보고 대상 월과 무관한 과거 전체 이력이 아니라, 그 달 자체의
     비용만 담아야 한다(반복 고장/교체 추천처럼 구매 이후 누적 이력을 보는 지표와는 다름)."""
-    asset = _create_asset(client, admin_headers, assetCode="TEST-REPORT-COSTBYMONTH")
+    asset = _create_asset(client, admin_headers)
     client.post(
         f"/api/assets/{asset['id']}/maintenance",
         json={"maintenanceDate": "2023-01-15", "maintenanceType": "REPAIR", "cost": 999000, "description": "작년 수리"},
@@ -167,7 +166,7 @@ def test_monthly_report_cost_by_month_only_includes_the_reported_month(client, a
 
 def test_monthly_report_pdf_reflects_new_sections(client, admin_headers):
     """반복 고장 자산/카테고리별 비용 섹션이 추가된 뒤에도 PDF가 정상 생성되는지 확인한다."""
-    asset = _create_asset(client, admin_headers, assetCode="TEST-REPORT-PDF-DETAIL")
+    asset = _create_asset(client, admin_headers)
     client.post(
         f"/api/assets/{asset['id']}/maintenance",
         json={"maintenanceDate": "2024-05-01", "maintenanceType": "REPAIR", "cost": 10000, "description": "수리A"},
@@ -216,8 +215,8 @@ def test_monthly_report_status_reflects_historical_value_not_current(client, adm
     """
     from app import models
 
-    asset = _create_asset(client, admin_headers, assetCode="TEST-REPORT-HIST", status="ACTIVE")
-    update_payload = {**ASSET_PAYLOAD, "assetCode": "TEST-REPORT-HIST", "status": "REPLACEMENT_NEEDED"}
+    asset = _create_asset(client, admin_headers, status="ACTIVE")
+    update_payload = {**ASSET_PAYLOAD, "status": "REPLACEMENT_NEEDED"}
     resp = client.put(f"/api/assets/{asset['id']}", json=update_payload, headers=admin_headers)
     assert resp.status_code == 200
 

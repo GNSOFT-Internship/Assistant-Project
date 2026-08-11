@@ -3,7 +3,6 @@
 
 ASSET_PAYLOAD = {
     "assetName": "AI 게이팅 테스트 자산",
-    "assetCode": "TEST-GATE-001",
     "category": "IT 장비",
     "location": "테스트실",
     "responsiblePerson": "테스트담당",
@@ -152,7 +151,7 @@ def test_simulate_budget(client, admin_headers):
 def test_simulate_budget_includes_non_standard_categories(client, admin_headers):
     """표준 8종 카테고리(IT 장비/사무기기/설비/전기설비/안전설비/보안장비/가구/측정장비)에
     없는 카테고리로 등록된 자산도 예산 배분 계산에서 조용히 누락되면 안 된다."""
-    client.post("/api/assets", json={**ASSET_PAYLOAD, "assetCode": "TEST-GATE-CAT", "category": "네트워크장비"}, headers=admin_headers)
+    client.post("/api/assets", json={**ASSET_PAYLOAD, "category": "네트워크장비"}, headers=admin_headers)
 
     resp = client.post("/api/ai/budgets/simulate", json={"totalBudget": 10000000.0}, headers=admin_headers)
     assert resp.status_code == 200

@@ -75,7 +75,7 @@ export default function Assets() {
   };
 
   const [formData, setFormData] = useState({
-    assetName: '', assetCode: '', category: '', location: '',
+    assetName: '', category: '', location: '',
     responsiblePerson: '', purchaseDate: '', purchasePrice: '',
     usefulLife: 5, status: 'ACTIVE', description: ''
   });
@@ -236,14 +236,14 @@ export default function Assets() {
     }
   };
 
-  // 분석은 끝났지만(COMPLETED) 실제로 적용했을 때 아무것도 생성되지 않는 파일(자산 등록은
-  // 전부 이미 존재하는 자산번호, 유지보수/견적서는 일치하는 자산이 하나도 없는 경우)은
-  // 적용 버튼을 눌러도 0건으로 끝나 헷갈리므로, 애초에 적용 버튼을 숨긴다.
+  // 분석은 끝났지만(COMPLETED) 실제로 적용했을 때 아무것도 생성되지 않는 파일(유지보수/
+  // 견적서는 일치하는 자산이 하나도 없는 경우)은 적용 버튼을 눌러도 0건으로 끝나 헷갈리므로,
+  // 애초에 적용 버튼을 숨긴다. 자산 등록은 자산번호가 자동 채번이라 항상 신규 생성된다.
   const fileHasApplicableRows = (file) => {
     const summary = file.extractedSummary;
     if (!summary) return true;
     if (summary.kind === 'asset_registration') {
-      return (summary.rows || []).some((r) => !r.assetExists);
+      return (summary.rows || []).length > 0;
     }
     if (summary.kind === 'maintenance_records') {
       return (summary.records || []).some((r) => r.assetExists);
@@ -396,7 +396,6 @@ export default function Assets() {
     setEditingAsset(asset);
     setFormData({
       assetName: asset.assetName || '',
-      assetCode: asset.assetCode || '',
       category: asset.category || '',
       location: asset.location || '',
       responsiblePerson: asset.responsiblePerson || '',
@@ -412,7 +411,7 @@ export default function Assets() {
   const resetForm = () => {
     setEditingAsset(null);
     setFormData({
-      assetName: '', assetCode: '', category: '', location: '',
+      assetName: '', category: '', location: '',
       responsiblePerson: '', purchaseDate: '', purchasePrice: '',
       usefulLife: 5, status: 'ACTIVE', description: ''
     });
@@ -838,11 +837,6 @@ export default function Assets() {
                   {file.extractedSummary?.kind === 'asset_registration' && (
                     <div className="mt-3 bg-gray-50 dark:bg-slate-900 rounded p-3 text-sm space-y-1">
                       <div>총 {file.extractedSummary.totalRows}행 중 유효 {file.extractedSummary.validRows}행, 오류 {file.extractedSummary.errorRowCount}행</div>
-                      {file.extractedSummary.duplicateAssetCodes?.length > 0 && (
-                        <div className="text-yellow-700">
-                          이미 존재하는 자산번호: {file.extractedSummary.duplicateAssetCodes.join(', ')}
-                        </div>
-                      )}
                       {file.applied && (
                         <div className="text-green-700 font-medium">
                           등록된 자산: {file.extractedSummary.appliedAssetCount ?? 0}건
@@ -859,7 +853,6 @@ export default function Assets() {
                               <thead className="table-header">
                                 <tr>
                                   <th className="table-cell">행</th>
-                                  <th className="table-cell">자산번호</th>
                                   <th className="table-cell">자산명</th>
                                   <th className="table-cell">카테고리</th>
                                   <th className="table-cell">상태</th>
@@ -871,17 +864,14 @@ export default function Assets() {
                                   ...(file.extractedSummary.rows || []).map((r) => ({ ...r, isError: false })),
                                   ...(file.extractedSummary.errorRows || []).map((e) => ({ ...e, isError: true })),
                                 ].sort((a, b) => a.row - b.row).map((r) => (
-                                  <tr key={r.row} className={r.isError ? 'bg-red-50 dark:bg-red-500/10' : (r.assetExists ? 'bg-yellow-50 dark:bg-yellow-500/10' : '')}>
+                                  <tr key={r.row} className={r.isError ? 'bg-red-50 dark:bg-red-500/10' : ''}>
                                     <td className="table-cell">{r.row}</td>
-                                    <td className="table-cell">{r.isError ? '-' : r.assetCode}</td>
                                     <td className="table-cell">{r.isError ? '-' : r.assetName}</td>
                                     <td className="table-cell">{r.isError ? '-' : r.category}</td>
                                     <td className="table-cell">
                                       {r.isError
                                         ? <span className="text-red-700">오류</span>
-                                        : r.assetExists
-                                          ? <span className="text-yellow-700">중복</span>
-                                          : <span className="text-green-700">신규</span>}
+                                        : <span className="text-green-700">신규</span>}
                                     </td>
                                     <td className="table-cell text-red-700">{r.isError ? r.error : ''}</td>
                                   </tr>
@@ -1036,16 +1026,6 @@ export default function Assets() {
                   className="input"
                   value={formData.assetName}
                   onChange={(e) => setFormData({ ...formData, assetName: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">자산번호</label>
-                <input
-                  type="text"
-                  required
-                  className="input"
-                  value={formData.assetCode}
-                  onChange={(e) => setFormData({ ...formData, assetCode: e.target.value })}
                 />
               </div>
               <div>

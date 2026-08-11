@@ -8,7 +8,6 @@ conftest.py가 GN_API_KEY=""로 테스트를 돌리므로 AI는 항상 미설정
 
 ASSET_PAYLOAD = {
     "assetName": "테스트 NAS",
-    "assetCode": "CATIMP-001",
     "category": "테스트카테고리-NAS",
     "location": "서버실",
     "responsiblePerson": "테스트담당",
@@ -39,8 +38,8 @@ def test_new_category_gets_default_importance_on_asset_creation(client, admin_he
 
 
 def test_existing_category_is_not_recomputed(client, admin_headers):
-    _create_asset(client, admin_headers, assetCode="CATIMP-002", category="테스트카테고리-공유")
-    _create_asset(client, admin_headers, assetCode="CATIMP-003", category="테스트카테고리-공유")
+    _create_asset(client, admin_headers, category="테스트카테고리-공유")
+    _create_asset(client, admin_headers, category="테스트카테고리-공유")
 
     resp = client.get("/api/assets/category-importance", headers=admin_headers)
     rows = [r for r in resp.json()["data"] if r["category"] == "테스트카테고리-공유"]
@@ -80,11 +79,11 @@ def test_higher_category_importance_increases_replacement_score(client, admin_he
     """같은 조건(사용기간/수리비/유지보수 없음)의 두 자산 중, 카테고리 중요도를
     95점으로 올린 쪽이 그대로 50점인 쪽보다 교체 우선순위 점수가 높아야 한다."""
     asset_low = _create_asset(
-        client, admin_headers, assetCode="CATIMP-LOW", category="테스트카테고리-낮음",
+        client, admin_headers, category="테스트카테고리-낮음",
         purchaseDate="2024-01-01",
     )
     asset_high = _create_asset(
-        client, admin_headers, assetCode="CATIMP-HIGH", category="테스트카테고리-높음",
+        client, admin_headers, category="테스트카테고리-높음",
         purchaseDate="2024-01-01",
     )
     resp = client.put(
@@ -96,5 +95,5 @@ def test_higher_category_importance_increases_replacement_score(client, admin_he
 
     resp = client.post("/api/ai/replacement-recommendation", json={}, headers=admin_headers)
     assert resp.status_code == 200
-    recs = {r["assetCode"]: r for r in resp.json()["data"]["recommendations"]}
-    assert recs[asset_high["assetCode"]]["score"] > recs[asset_low["assetCode"]]["score"]
+    recs = {r["assetId"]: r for r in resp.json()["data"]["recommendations"]}
+    assert recs[asset_high["id"]]["score"] > recs[asset_low["id"]]["score"]

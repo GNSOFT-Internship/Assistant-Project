@@ -55,16 +55,16 @@ describe('AuditLog', () => {
       data: {
         data: {
           items: [
-            { id: 1, createdAt: '2026-07-13T09:00:00', changedBy: 'admin', action: 'CREATE', assetCode: 'ASSET-001', changes: null },
+            { id: 1, createdAt: '2026-07-13T09:00:00', changedBy: 'admin', action: 'CREATE', assetCode: 1, changes: null },
           ],
           total: 1,
         },
       },
     });
     renderPage();
-    await waitFor(() => expect(screen.getByText('ASSET-001')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('1')).toBeInTheDocument());
     // 필터 드롭다운에도 "등록" 옵션이 있으므로 배지 쪽만 지정해서 확인한다.
-    expect(screen.getByText('ASSET-001').closest('tr')).toHaveTextContent('등록');
+    expect(screen.getByText('1').closest('tr')).toHaveTextContent('등록');
   });
 
   it('searches audit logs by asset name (not asset code)', async () => {
@@ -74,14 +74,14 @@ describe('AuditLog', () => {
       data: {
         data: {
           items: [
-            { id: 1, createdAt: '2026-07-13T09:00:00', changedBy: 'admin', action: 'CREATE', assetCode: 'ASSET-001', assetName: '검색용 테스트 노트북', changes: null },
+            { id: 1, createdAt: '2026-07-13T09:00:00', changedBy: 'admin', action: 'CREATE', assetCode: 1, assetName: '검색용 테스트 노트북', changes: null },
           ],
           total: 1,
         },
       },
     });
     renderPage();
-    await waitFor(() => expect(screen.getByText('ASSET-001')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('1')).toBeInTheDocument());
     expect(screen.getByText('검색용 테스트 노트북')).toBeInTheDocument();
 
     await user.type(screen.getByPlaceholderText('자산명 검색...'), '테스트 노트북');

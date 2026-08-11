@@ -37,7 +37,6 @@ class LoginResponse(BaseModel):
 
 class AssetRequest(BaseModel):
     assetName: str
-    assetCode: str
     category: str
     location: Optional[str] = None
     responsiblePerson: Optional[str] = None
@@ -54,7 +53,7 @@ class AssetRequest(BaseModel):
 class AssetDTO(BaseModel):
     id: int
     assetName: str
-    assetCode: str
+    assetCode: int
     category: str
     location: Optional[str] = None
     responsiblePerson: Optional[str] = None

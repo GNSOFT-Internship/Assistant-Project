@@ -32,7 +32,7 @@ vi.mock('../services/api', () => ({
 const SAMPLE_ASSET = {
   id: 1,
   assetName: '노트북 Dell Latitude 5520',
-  assetCode: 'ASSET-001',
+  assetCode: 1,
   category: 'IT 장비',
   location: '본관 5층',
   purchaseDate: '2020-01-01',
@@ -276,8 +276,7 @@ describe('Assets', () => {
               validRows: 1,
               errorRowCount: 0,
               errorRows: [],
-              duplicateAssetCodes: [],
-              rows: [{ row: 2, assetCode: 'FILEREG-001', assetName: '테스트 자산', category: 'IT 장비', assetExists: false }],
+              rows: [{ row: 2, assetName: '테스트 자산', category: 'IT 장비' }],
               appliedAssetCount: 1,
             },
           }],
@@ -288,37 +287,6 @@ describe('Assets', () => {
       await user.click(screen.getByText('sample_asset_registration.xlsx'));
       expect(screen.getByText('등록된 자산: 1건')).toBeInTheDocument();
       expect(screen.queryByText('적용 취소')).not.toBeInTheDocument();
-    });
-
-    it('hides the apply button when every asset-registration row is a duplicate', async () => {
-      const user = userEvent.setup();
-      seedAdmin();
-      fileApi.getAll.mockResolvedValue({
-        data: {
-          data: [{
-            id: 3,
-            originalFilename: 'all_duplicates.xlsx',
-            fileType: 'EXCEL',
-            status: 'COMPLETED',
-            applied: false,
-            extractedSummary: {
-              kind: 'asset_registration',
-              totalRows: 1,
-              validRows: 1,
-              errorRowCount: 0,
-              errorRows: [],
-              duplicateAssetCodes: ['IT-001'],
-              rows: [{ row: 2, assetCode: 'IT-001', assetName: '중복 자산', category: 'IT 장비', assetExists: true }],
-              appliedAssetCount: null,
-            },
-          }],
-        },
-      });
-      renderPage();
-      await waitFor(() => expect(screen.getByText('all_duplicates.xlsx')).toBeInTheDocument());
-      await user.click(screen.getByText('all_duplicates.xlsx'));
-      expect(screen.getByText('적용 가능한 항목 없음')).toBeInTheDocument();
-      expect(screen.queryByText('적용')).not.toBeInTheDocument();
     });
 
     it('hides the apply button when every maintenance row has an unmatched asset code', async () => {
@@ -339,7 +307,7 @@ describe('Assets', () => {
               errorRowCount: 0,
               errorRows: [],
               unmatchedAssetCodes: ['ZZZ-999'],
-              records: [{ row: 2, assetCode: 'ZZZ-999', assetExists: false, maintenanceDate: '2026-06-22', maintenanceType: 'REPAIR', cost: 30000, description: null }],
+              records: [{ row: 2, assetCode: 999, assetExists: false, maintenanceDate: '2026-06-22', maintenanceType: 'REPAIR', cost: 30000, description: null }],
               appliedRecordCount: null,
             },
           }],
@@ -369,8 +337,7 @@ describe('Assets', () => {
               validRows: 1,
               errorRowCount: 1,
               errorRows: [{ row: 3, error: '자산명: 값이 비어있습니다.' }],
-              duplicateAssetCodes: [],
-              rows: [{ row: 2, assetCode: 'IT-950', assetName: '정상 자산', category: 'IT 장비', assetExists: false }],
+              rows: [{ row: 2, assetName: '정상 자산', category: 'IT 장비' }],
               appliedAssetCount: null,
             },
           }],
@@ -404,7 +371,7 @@ describe('Assets', () => {
               errorRowCount: 1,
               errorRows: [{ row: 3, reason: '정비일 형식 오류: 미정' }],
               unmatchedAssetCodes: [],
-              records: [{ row: 2, assetCode: 'IT-001', assetExists: true, maintenanceDate: '2026-06-10', maintenanceType: 'REPAIR', cost: 45000, description: '정상' }],
+              records: [{ row: 2, assetCode: 1, assetExists: true, maintenanceDate: '2026-06-10', maintenanceType: 'REPAIR', cost: 45000, description: '정상' }],
               appliedRecordCount: null,
             },
           }],

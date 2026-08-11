@@ -82,14 +82,11 @@ def file_to_response(f: models.FileUpload) -> dict:
                     "validRows": parsed.get("validRows"),
                     "errorRowCount": len(parsed.get("errorRows", [])),
                     "errorRows": parsed.get("errorRows", []),
-                    "duplicateAssetCodes": parsed.get("duplicateAssetCodes", []),
                     "rows": [
                         {
                             "row": r["row"],
-                            "assetCode": r["assetRequest"]["assetCode"],
                             "assetName": r["assetRequest"]["assetName"],
                             "category": r["assetRequest"]["category"],
-                            "assetExists": r.get("assetExists", False),
                         }
                         for r in parsed.get("rows", [])
                     ],
@@ -174,10 +171,14 @@ def _parse_maintenance_rows(df):
     errors = []
     for idx, row in df.iterrows():
         line_no = idx + 2  # header is row 1
-        asset_code = str(row.get(col_map["asset_code"], "")).strip()
+        asset_code_raw = str(row.get(col_map["asset_code"], "")).strip()
         maint_date_raw = str(row.get(col_map["maintenance_date"], "")).strip()
-        if not asset_code or not maint_date_raw:
-            errors.append({"row": line_no, "reason": "자산번호 또는 정비일 누락"})
+        try:
+            asset_code = int(float(asset_code_raw)) if asset_code_raw else None
+        except ValueError:
+            asset_code = None
+        if asset_code is None or not maint_date_raw:
+            errors.append({"row": line_no, "reason": "자산번호가 숫자가 아니거나 정비일이 누락되었습니다."})
             continue
 
         try:
@@ -220,16 +221,15 @@ def _parse_pdf(file_path: str) -> str:
     return "\n".join(text_parts)
 
 
-_ASSET_CODE_LABELED_RE = re.compile(r"자산\s?(?:코드|번호)\s*[:\-]?\s*([A-Za-z]+-\d+)")
-_ASSET_CODE_BARE_RE = re.compile(r"\b([A-Z]{2,}-\d{2,})\b")
+_ASSET_CODE_LABELED_RE = re.compile(r"자산\s?(?:코드|번호)\s*[:\-]?\s*(\d+)")
 _TOTAL_AMOUNT_RE = re.compile(r"(?:합\s?계|총\s?금액|총액|견적\s?금액)\s*[:\-]?\s*([\d,]+)\s*원?")
 _QUOTE_DATE_RE = re.compile(r"(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})")
 _VENDOR_RE = re.compile(r"(?:상호|업체명|공급자)\s*[:\-]?\s*([^\n]+)")
 
 
 def _parse_pdf_quote(text: str) -> dict:
-    asset_code_match = _ASSET_CODE_LABELED_RE.search(text) or _ASSET_CODE_BARE_RE.search(text)
-    asset_code = asset_code_match.group(1) if asset_code_match else None
+    asset_code_match = _ASSET_CODE_LABELED_RE.search(text)
+    asset_code = int(asset_code_match.group(1)) if asset_code_match else None
 
     total_match = _TOTAL_AMOUNT_RE.search(text)
     total_amount = None
@@ -316,25 +316,12 @@ def _process_file_task_logic(file_upload: models.FileUpload, db: Session):
                 asset_df = _read_spreadsheet_df(file_upload.file_path, file_upload.file_type, as_str=False)
                 valid_rows, errors = parse_asset_import_rows(asset_df)
 
-                asset_codes = {r["assetRequest"]["assetCode"] for r in valid_rows}
-                existing_codes = set()
-                if asset_codes:
-                    existing_codes = {
-                        a.asset_code
-                        for a in db.query(models.Asset.asset_code)
-                        .filter(models.Asset.asset_code.in_(asset_codes))
-                        .all()
-                    }
-                for r in valid_rows:
-                    r["assetExists"] = r["assetRequest"]["assetCode"] in existing_codes
-
                 result = {
                     "kind": "asset_registration",
                     "filename": file_upload.original_filename,
                     "totalRows": len(valid_rows) + len(errors),
                     "validRows": len(valid_rows),
                     "errorRows": errors,
-                    "duplicateAssetCodes": sorted({r["assetRequest"]["assetCode"] for r in valid_rows if r["assetExists"]}),
                     "rows": valid_rows,
                 }
             elif kind == "maintenance_records":

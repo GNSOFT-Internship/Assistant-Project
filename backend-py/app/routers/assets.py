@@ -8,7 +8,7 @@ import pandas as pd
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import ValidationError
-from sqlalchemy import func, or_
+from sqlalchemy import String, cast, func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -131,6 +131,13 @@ def _log_change(
     db.add(entry)
 
 
+def _next_asset_code(db: Session) -> int:
+    """새 자산에 부여할 다음 자산번호(1부터 순차 증가)를 서버가 자동으로 계산한다.
+    동시 등록 시 레이스 컨디션을 줄이기 위해 같은 트랜잭션 안에서 행 잠금을 걸고 조회한다."""
+    max_code = db.query(func.max(models.Asset.asset_code)).with_for_update().scalar()
+    return (max_code or 0) + 1
+
+
 _ASSET_SORT_COLUMNS = {
     "assetName": models.Asset.asset_name,
     "assetCode": models.Asset.asset_code,
@@ -155,10 +162,10 @@ def get_all_assets(
     if search:
         like = f"%{search}%"
         query = query.filter(
-            or_(models.Asset.asset_name.like(like), models.Asset.asset_code.like(like))
+            or_(models.Asset.asset_name.like(like), cast(models.Asset.asset_code, String).like(like))
         )
     if category:
-        query = query.filter(models.Asset.category == category)
+        query = query.join(models.Category).filter(models.Category.name == category)
 
     total = query.count()
     page = max(1, page)
@@ -198,10 +205,10 @@ def export_assets(
     if search:
         like = f"%{search}%"
         query = query.filter(
-            or_(models.Asset.asset_name.like(like), models.Asset.asset_code.like(like))
+            or_(models.Asset.asset_name.like(like), cast(models.Asset.asset_code, String).like(like))
         )
     if category:
-        query = query.filter(models.Asset.category == category)
+        query = query.join(models.Category).filter(models.Category.name == category)
 
     sort_column = _ASSET_SORT_COLUMNS.get(sortBy)
     if sort_column is not None:
@@ -249,7 +256,11 @@ def get_asset_categories(db: Session = Depends(get_db)):
     데이터와 어긋날 수 있으므로, 실제로 쓰이고 있는 값을 DB에서 그대로 가져온다."""
     categories = [
         row[0] for row in
-        db.query(models.Asset.category).distinct().order_by(models.Asset.category).all()
+        db.query(models.Category.name)
+        .join(models.Asset, models.Asset.category_id == models.Category.id)
+        .distinct()
+        .order_by(models.Category.name)
+        .all()
     ]
     return {"success": True, "message": None, "data": categories}
 
@@ -260,7 +271,8 @@ def list_category_importance(db: Session = Depends(get_db)):
     자동으로 채워지므로, 여기 없는 카테고리는 아직 자산이 하나도 없다는 뜻이다."""
     rows = (
         db.query(models.CategoryImportance)
-        .order_by(models.CategoryImportance.category)
+        .join(models.Category)
+        .order_by(models.Category.name)
         .all()
     )
     return {
@@ -356,7 +368,6 @@ def get_all_audit_logs(
 
 
 _IMPORT_COLUMN_MAP = {
-    "자산번호": "assetCode",
     "자산명": "assetName",
     "카테고리": "category",
     "위치": "location",
@@ -367,7 +378,7 @@ _IMPORT_COLUMN_MAP = {
     "상태": "status",
     "설명": "description",
 }
-_IMPORT_REQUIRED_COLUMNS = {"자산번호", "자산명", "카테고리", "구매일", "구매가", "내용연수(년)"}
+_IMPORT_REQUIRED_COLUMNS = {"자산명", "카테고리", "구매일", "구매가", "내용연수(년)"}
 _IMPORT_FIELD_KOR = {eng: kor for kor, eng in _IMPORT_COLUMN_MAP.items()}
 
 
@@ -458,13 +469,14 @@ def create_assets_from_rows(db: Session, rows: list[dict], changed_by: Optional[
     for item in rows:
         asset_req = schemas.AssetRequest(**item["assetRequest"])
         savepoint = db.begin_nested()
+        category_row = category_importance.get_or_create_category(db, asset_req.category)
         if asset_req.category not in seen_categories:
             category_importance.ensure_category_importance(db, asset_req.category)
             seen_categories.add(asset_req.category)
         asset = models.Asset(
             asset_name=asset_req.assetName,
-            asset_code=asset_req.assetCode,
-            category=asset_req.category,
+            asset_code=_next_asset_code(db),
+            category_ref=category_row,
             location=asset_req.location,
             responsible_person=asset_req.responsiblePerson,
             purchase_date=date.fromisoformat(asset_req.purchaseDate),
@@ -478,7 +490,7 @@ def create_assets_from_rows(db: Session, rows: list[dict], changed_by: Optional[
             db.flush()
         except IntegrityError:
             savepoint.rollback()
-            errors.append({"row": item["row"], "error": f"자산번호 '{asset_req.assetCode}'가 이미 존재합니다."})
+            errors.append({"row": item["row"], "error": "자산번호 채번 중 충돌이 발생했습니다. 다시 시도해주세요."})
             continue
 
         _log_change(
@@ -542,10 +554,11 @@ def create_asset(
     db: Session = Depends(get_db),
     current_user: dict = Depends(auth.require_admin),
 ):
+    category_row = category_importance.get_or_create_category(db, request.category)
     asset = models.Asset(
         asset_name=request.assetName,
-        asset_code=request.assetCode,
-        category=request.category,
+        asset_code=_next_asset_code(db),
+        category_ref=category_row,
         location=request.location,
         responsible_person=request.responsiblePerson,
         purchase_date=date.fromisoformat(request.purchaseDate),
@@ -585,8 +598,7 @@ def update_asset(
     before = {field: _field_value(asset, field) for field, _ in _TRACKED_FIELDS}
 
     asset.asset_name = request.assetName
-    asset.asset_code = request.assetCode
-    asset.category = request.category
+    asset.category_ref = category_importance.get_or_create_category(db, request.category)
     asset.location = request.location
     asset.responsible_person = request.responsiblePerson
     asset.purchase_date = date.fromisoformat(request.purchaseDate)
