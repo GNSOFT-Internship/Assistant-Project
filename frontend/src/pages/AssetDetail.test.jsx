@@ -27,7 +27,7 @@ vi.mock('../services/api', () => ({
 const SAMPLE_ASSET = {
   id: 1,
   assetName: '노트북 Dell Latitude 5520',
-  assetCode: 'ASSET-001',
+  assetCode: 1,
   category: 'IT 장비',
   location: '본관 5층',
   responsiblePerson: '김철수',

@@ -75,7 +75,7 @@ describe('AiAssistant', () => {
           answer: '3년 이상 사용한 노트북은 총 1건입니다.',
           hasFilter: true,
           assets: [
-            { id: 1, assetName: '노트북 Dell Latitude 5520', assetCode: 'ASSET-001', category: 'IT 장비', status: 'ACTIVE' },
+            { id: 1, assetName: '노트북 Dell Latitude 5520', assetCode: 1, category: 'IT 장비', status: 'ACTIVE' },
           ],
         },
       },
@@ -99,7 +99,7 @@ describe('AiAssistant', () => {
           answer: '검색 결과입니다.',
           hasFilter: true,
           assets: [
-            { id: 1, assetName: '노트북 Dell Latitude 5520', assetCode: 'ASSET-001', category: 'IT 장비', status: 'ACTIVE' },
+            { id: 1, assetName: '노트북 Dell Latitude 5520', assetCode: 1, category: 'IT 장비', status: 'ACTIVE' },
           ],
         },
       },
@@ -109,7 +109,7 @@ describe('AiAssistant', () => {
         data: {
           id: 1,
           assetName: '노트북 Dell Latitude 5520',
-          assetCode: 'ASSET-001',
+          assetCode: 1,
           status: 'ACTIVE',
           category: 'IT 장비',
           purchasePrice: 1200000,

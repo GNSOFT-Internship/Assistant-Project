@@ -2,7 +2,6 @@ from datetime import datetime
 
 ASSET_PAYLOAD = {
     "assetName": "대시보드 테스트 자산",
-    "assetCode": "TEST-DASH-001",
     "category": "IT 장비",
     "location": "테스트실",
     "responsiblePerson": "테스트담당",
@@ -51,7 +50,6 @@ def test_dashboard_top_replacement_needed_only_includes_that_status_sorted_by_sc
 
     low_priority = {
         **ASSET_PAYLOAD,
-        "assetCode": "TEST-DASH-002",
         "assetName": "낮은 우선순위 자산",
         "purchaseDate": "2024-01-01",
         "usefulLife": 10,
@@ -59,7 +57,6 @@ def test_dashboard_top_replacement_needed_only_includes_that_status_sorted_by_sc
     }
     high_priority = {
         **ASSET_PAYLOAD,
-        "assetCode": "TEST-DASH-003",
         "assetName": "높은 우선순위 자산",
         "purchaseDate": "2010-01-01",
         "usefulLife": 3,
@@ -73,5 +70,5 @@ def test_dashboard_top_replacement_needed_only_includes_that_status_sorted_by_sc
     top = resp.json()["data"]["topReplacementNeeded"]
 
     assert len(top) == 2
-    assert [t["assetCode"] for t in top] == ["TEST-DASH-003", "TEST-DASH-002"]
+    assert [t["assetName"] for t in top] == ["높은 우선순위 자산", "낮은 우선순위 자산"]
     assert top[0]["score"] >= top[1]["score"]

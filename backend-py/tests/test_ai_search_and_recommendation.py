@@ -6,7 +6,6 @@
 
 ASSET_PAYLOAD = {
     "assetName": "자연어검색 테스트 노트북",
-    "assetCode": "TEST-SEARCH-001",
     "category": "IT 장비",
     "location": "테스트실",
     "responsiblePerson": "테스트담당",
@@ -39,26 +38,26 @@ def test_natural_language_search_empty_query_returns_all_assets(client, admin_he
     assert resp.status_code == 200
     data = resp.json()["data"]
     assert data["hasFilter"] is False
-    assert any(a["assetCode"] == "TEST-SEARCH-001" for a in data["assets"])
+    assert any(a["assetName"] == "자연어검색 테스트 노트북" for a in data["assets"])
 
 
 def test_natural_language_search_keyword_fallback_filters_by_name(client, admin_headers):
-    _create_asset(client, admin_headers, assetName="자연어검색 테스트 노트북", assetCode="TEST-SEARCH-002")
-    _create_asset(client, admin_headers, assetName="전혀 다른 프린터", assetCode="TEST-SEARCH-003")
+    _create_asset(client, admin_headers, assetName="자연어검색 테스트 노트북")
+    _create_asset(client, admin_headers, assetName="전혀 다른 프린터")
 
     resp = client.post("/api/ai/natural-language-search", json={"query": "노트북"}, headers=admin_headers)
     assert resp.status_code == 200
     data = resp.json()["data"]
-    codes = {a["assetCode"] for a in data["assets"]}
-    assert "TEST-SEARCH-002" in codes
-    assert "TEST-SEARCH-003" not in codes
+    names = {a["assetName"] for a in data["assets"]}
+    assert "자연어검색 테스트 노트북" in names
+    assert "전혀 다른 프린터" not in names
 
 
 def test_natural_language_search_price_condition_is_applied_by_code(client, admin_headers, monkeypatch):
     """가격 조건(minPrice/maxPrice)은 LLM이 숫자만 추출하고, 실제 비교는 코드가 확정적으로
     수행해야 한다. LLM이 조건과 무관한 explanation을 내놔도 결과는 정확해야 한다."""
-    cheap = _create_asset(client, admin_headers, assetCode="TEST-SEARCH-CHEAP", purchasePrice=500000)
-    expensive = _create_asset(client, admin_headers, assetCode="TEST-SEARCH-EXP", purchasePrice=1610000)
+    cheap = _create_asset(client, admin_headers, assetName="저가 테스트 자산", purchasePrice=500000)
+    expensive = _create_asset(client, admin_headers, assetName="고가 테스트 자산", purchasePrice=1610000)
 
     from app.routers import ai as ai_router
 
@@ -79,15 +78,15 @@ def test_natural_language_search_price_condition_is_applied_by_code(client, admi
     resp = client.post("/api/ai/natural-language-search", json={"query": "100만원 이하인 자산"}, headers=admin_headers)
     assert resp.status_code == 200
     data = resp.json()["data"]
-    codes = {a["assetCode"] for a in data["assets"]}
-    assert "TEST-SEARCH-CHEAP" in codes
-    assert "TEST-SEARCH-EXP" not in codes
+    names = {a["assetName"] for a in data["assets"]}
+    assert "저가 테스트 자산" in names
+    assert "고가 테스트 자산" not in names
     assert data["hasFilter"] is True
 
 
 def test_replacement_recommendation_without_budget_returns_top_five(client, admin_headers):
     for i in range(7):
-        asset = _create_asset(client, admin_headers, assetCode=f"TEST-REC-{i:03d}", purchasePrice=100000)
+        asset = _create_asset(client, admin_headers, purchasePrice=100000)
         client.post(
             f"/api/assets/{asset['id']}/maintenance",
             json={**MAINTENANCE_PAYLOAD, "cost": 10000 * (i + 1)},
@@ -106,7 +105,7 @@ def test_replacement_recommendation_without_budget_returns_top_five(client, admi
 
 
 def test_replacement_recommendation_respects_budget_cap(client, admin_headers):
-    asset = _create_asset(client, admin_headers, assetCode="TEST-REC-BUDGET", purchasePrice=500000)
+    asset = _create_asset(client, admin_headers, purchasePrice=500000)
     client.post(f"/api/assets/{asset['id']}/maintenance", json=MAINTENANCE_PAYLOAD, headers=admin_headers)
 
     resp = client.post("/api/ai/replacement-recommendation", json={"budget": 100000}, headers=admin_headers)
@@ -120,7 +119,7 @@ def test_replacement_recommendation_respects_budget_cap(client, admin_headers):
 def test_replacement_recommendation_reason_is_cached_until_metrics_change(client, admin_headers, monkeypatch):
     """근거 수치(사용기간/수리비율/고장횟수/점수)가 안 바뀌었으면 AI를 다시 호출하지 않고
     DB에 저장된 이유 문구를 재사용해야 한다. 수치가 바뀌면 그때는 다시 호출해야 한다."""
-    asset = _create_asset(client, admin_headers, assetCode="TEST-REC-CACHE", purchasePrice=500000)
+    asset = _create_asset(client, admin_headers, purchasePrice=500000)
     client.post(f"/api/assets/{asset['id']}/maintenance", json=MAINTENANCE_PAYLOAD, headers=admin_headers)
 
     from app.routers import ai as ai_router
@@ -169,8 +168,8 @@ def test_replacement_recommendation_reason_is_cached_until_metrics_change(client
 
 
 def test_failure_assets_returns_occurrence_counts_sorted_desc(client, admin_headers):
-    asset_a = _create_asset(client, admin_headers, assetCode="TEST-FAIL-A")
-    asset_b = _create_asset(client, admin_headers, assetCode="TEST-FAIL-B")
+    asset_a = _create_asset(client, admin_headers, assetName="고장분석 자산 A")
+    asset_b = _create_asset(client, admin_headers, assetName="고장분석 자산 B")
 
     client.post(f"/api/assets/{asset_a['id']}/maintenance", json=MAINTENANCE_PAYLOAD, headers=admin_headers)
     client.post(
@@ -187,14 +186,14 @@ def test_failure_assets_returns_occurrence_counts_sorted_desc(client, admin_head
     )
     assert resp.status_code == 200
     data = resp.json()["data"]
-    by_code = {item["assetCode"]: item["occurrenceCount"] for item in data}
-    assert by_code["TEST-FAIL-A"] == 2
-    assert by_code["TEST-FAIL-B"] == 1
-    assert data[0]["assetCode"] == "TEST-FAIL-A"  # 발생 횟수 내림차순 정렬
+    by_id = {item["id"]: item["occurrenceCount"] for item in data}
+    assert by_id[asset_a["id"]] == 2
+    assert by_id[asset_b["id"]] == 1
+    assert data[0]["id"] == asset_a["id"]  # 발생 횟수 내림차순 정렬
 
 
 def test_failure_assets_respects_month_range_filter(client, admin_headers):
-    asset = _create_asset(client, admin_headers, assetCode="TEST-FAIL-RANGE")
+    asset = _create_asset(client, admin_headers)
     client.post(
         f"/api/assets/{asset['id']}/maintenance",
         json={**MAINTENANCE_PAYLOAD, "maintenanceDate": "2023-01-15"},

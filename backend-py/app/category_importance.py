@@ -74,14 +74,37 @@ def _ask_ai_for_importance(category: str) -> tuple[float, str]:
     return score, reason
 
 
+def get_or_create_category(db: Session, name: str) -> models.Category:
+    """카테고리 이름으로 category 테이블 행을 반환한다. 없으면 새로 만든다.
+
+    ensure_category_importance와 동일하게, 호출자가 이후 commit하는 것을 전제로
+    flush만 하며 동시 요청으로 인한 unique 제약 충돌은 재조회로 흡수한다."""
+    existing = db.query(models.Category).filter(models.Category.name == name).first()
+    if existing is not None:
+        return existing
+
+    record = models.Category(name=name)
+    db.add(record)
+    try:
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        existing = db.query(models.Category).filter(models.Category.name == name).first()
+        if existing is not None:
+            return existing
+        raise
+    return record
+
+
 def ensure_category_importance(db: Session, category: str) -> models.CategoryImportance:
     """카테고리 중요도 레코드를 반환한다. 없으면 AI로 산정(실패/미설정 시 기본값)해서 새로 만든다.
 
     호출자가 이후 자신의 트랜잭션을 commit하는 것을 전제로 flush만 한다
     (자산 생성 흐름 중간에 끼어 호출되는 경우가 많아 여기서 임의로 commit하지 않는다)."""
+    category_row = get_or_create_category(db, category)
     existing = (
         db.query(models.CategoryImportance)
-        .filter(models.CategoryImportance.category == category)
+        .filter(models.CategoryImportance.category_id == category_row.id)
         .first()
     )
     if existing is not None:
@@ -100,7 +123,7 @@ def ensure_category_importance(db: Session, category: str) -> models.CategoryImp
             reason = "AI 호출 실패로 기본값(중립) 적용"
 
     record = models.CategoryImportance(
-        category=category, importance_score=score, reason=reason, source=source,
+        category_id=category_row.id, importance_score=score, reason=reason, source=source,
     )
     db.add(record)
     try:
@@ -110,7 +133,7 @@ def ensure_category_importance(db: Session, category: str) -> models.CategoryImp
         db.rollback()
         existing = (
             db.query(models.CategoryImportance)
-            .filter(models.CategoryImportance.category == category)
+            .filter(models.CategoryImportance.category_id == category_row.id)
             .first()
         )
         if existing is not None:
@@ -121,13 +144,15 @@ def ensure_category_importance(db: Session, category: str) -> models.CategoryImp
 
 def get_importance_score(db: Session, category: str) -> float:
     """스코어링에서 쓰는 조회용 헬퍼. 없으면 즉석에서 만들고(self-healing) 커밋까지 한다."""
-    existing = (
-        db.query(models.CategoryImportance)
-        .filter(models.CategoryImportance.category == category)
-        .first()
-    )
-    if existing is not None:
-        return float(existing.importance_score)
+    category_row = db.query(models.Category).filter(models.Category.name == category).first()
+    if category_row is not None:
+        existing = (
+            db.query(models.CategoryImportance)
+            .filter(models.CategoryImportance.category_id == category_row.id)
+            .first()
+        )
+        if existing is not None:
+            return float(existing.importance_score)
 
     # 새로 만드는 경우: 호출자가 커밋하지 않을 수도 있는 읽기 경로(추천/보고서 조회)에서
     # 온 것일 수 있으므로, 여기서 직접 커밋해 다음 조회부터는 캐시가 재사용되게 한다.
@@ -140,13 +165,14 @@ def get_importance_score(db: Session, category: str) -> float:
 def set_manual_importance(db: Session, category: str, score: float, changed_by: str = None) -> models.CategoryImportance:
     """관리자가 화면에서 직접 값을 덮어쓴다. 이후 AI가 자동으로 재계산하지 않는다."""
     score = min(max(float(score), 0.0), 100.0)
+    category_row = get_or_create_category(db, category)
     record = (
         db.query(models.CategoryImportance)
-        .filter(models.CategoryImportance.category == category)
+        .filter(models.CategoryImportance.category_id == category_row.id)
         .first()
     )
     if record is None:
-        record = models.CategoryImportance(category=category, importance_score=score)
+        record = models.CategoryImportance(category_id=category_row.id, importance_score=score)
         db.add(record)
     else:
         record.importance_score = score

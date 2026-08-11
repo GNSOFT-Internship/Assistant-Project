@@ -14,6 +14,7 @@ from sqlalchemy import (
     Integer,
     UniqueConstraint,
 )
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from .database import Base
@@ -51,13 +52,28 @@ class AssetStatus(str, enum.Enum):
     UNDER_MAINTENANCE = "UNDER_MAINTENANCE"
 
 
+class Category(Base):
+    """자산 카테고리(장비 종류)의 정규화된 마스터 테이블.
+
+    자산코드와 마찬가지로 카테고리명(문자열)이 여러 테이블(asset, category_importance)에
+    중복 저장되며 자연키로 취급되던 문제를 없애기 위해 별도 테이블로 뺐다. 이름 자체는
+    API 요청/응답에서 여전히 문자열로 주고받는다 — Asset.category 프로퍼티가 이 테이블을
+    조회해 이름을 돌려준다."""
+    __tablename__ = "category"
+
+    id = Column(BigIntegerPK, primary_key=True, autoincrement=True)
+    name = Column(String(100), unique=True, nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+
+
 class Asset(Base):
     __tablename__ = "asset"
 
     id = Column(BigIntegerPK, primary_key=True, autoincrement=True)
     asset_name = Column(String(200), nullable=False)
-    asset_code = Column(String(50), unique=True, nullable=False)
-    category = Column(String(100), nullable=False)
+    asset_code = Column(Integer, unique=True, nullable=False)
+    category_id = Column(BigInteger, ForeignKey("category.id"), nullable=False)
+    category_ref = relationship("Category", lazy="joined")
     location = Column(String(200), nullable=True)
     responsible_person = Column(String(100), nullable=True)
     purchase_date = Column(Date, nullable=False)
@@ -67,6 +83,10 @@ class Asset(Base):
     description = Column(Text, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    @property
+    def category(self):
+        return self.category_ref.name if self.category_ref else None
 
 
 class MaintenanceType(str, enum.Enum):
@@ -131,7 +151,7 @@ class AssetAuditLog(Base):
     # asset_id는 자산이 삭제된 뒤에도 이력이 남아야 하므로 FK를 걸지 않는다.
     id = Column(BigIntegerPK, primary_key=True, autoincrement=True)
     asset_id = Column(BigInteger, nullable=False, index=True)
-    asset_code = Column(String(50), nullable=True)
+    asset_code = Column(Integer, nullable=True)
     action = Column(Enum(AuditAction), nullable=False)
     changed_by = Column(String(50), nullable=True)
     changes = Column(Text, nullable=True)
@@ -189,7 +209,7 @@ class ImportanceSource(str, enum.Enum):
 
 
 class CategoryImportance(Base):
-    """자산 카테고리(자유 문자열)별 "중요도" 점수.
+    """자산 카테고리별 "중요도" 점수.
 
     교체 우선순위 점수(scoring.py)에서 카테고리 간 업무 중요도 차이(예: NAS vs 정수기)를
     반영하기 위한 값. 새 카테고리가 처음 등록될 때 AI가 한 번 산정해 캐싱하고,
@@ -197,12 +217,17 @@ class CategoryImportance(Base):
     __tablename__ = "category_importance"
 
     id = Column(BigIntegerPK, primary_key=True, autoincrement=True)
-    category = Column(String(100), unique=True, nullable=False, index=True)
+    category_id = Column(BigInteger, ForeignKey("category.id"), unique=True, nullable=False)
+    category_ref = relationship("Category", lazy="joined")
     importance_score = Column(DECIMAL(5, 1), nullable=False)
     reason = Column(Text, nullable=True)
     source = Column(Enum(ImportanceSource), default=ImportanceSource.DEFAULT, nullable=False)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    @property
+    def category(self):
+        return self.category_ref.name if self.category_ref else None
 
 
 class AssetReplacementReason(Base):

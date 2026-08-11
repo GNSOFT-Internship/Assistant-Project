@@ -414,7 +414,7 @@ def _build_pdf(report_data: dict, narrative: dict) -> bytes:
 
     elements.append(Paragraph("4. 반복 고장 자산", heading_style))
     repeat_table_data = [["자산명", "자산번호", "고장횟수", "누적 수리비"]] + [
-        [a["assetName"], a["assetCode"], f"{a['failureCount']}회", f"{a['totalCost']:,.0f}원"]
+        [a["assetName"], str(a["assetCode"]), f"{a['failureCount']}회", f"{a['totalCost']:,.0f}원"]
         for a in report_data["repeatedFailureAssets"]
     ]
     if len(repeat_table_data) > 1:
@@ -434,7 +434,7 @@ def _build_pdf(report_data: dict, narrative: dict) -> bytes:
 
     elements.append(Paragraph("5. 교체 우선순위 추천", heading_style))
     candidate_table_data = [["자산명", "자산번호", "사용/내용연수", "수리비율", "점수"]] + [
-        [c["assetName"], c["assetCode"], f"{c['usedYears']}/{c['usefulLife']}년", f"{c['repairRatio'] * 100:.0f}%", str(c["score"])]
+        [c["assetName"], str(c["assetCode"]), f"{c['usedYears']}/{c['usefulLife']}년", f"{c['repairRatio'] * 100:.0f}%", str(c["score"])]
         for c in report_data["replacementCandidates"]
     ]
     if len(candidate_table_data) > 1:
