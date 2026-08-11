@@ -44,6 +44,10 @@ export default function Assets() {
   // 헷갈린다는 피드백에 따라 이 드롭존 하나로 합쳤다. 어떤 파일인지는 서버가 컬럼
   // 구성을 보고 자동으로 판별한다(자산번호+자산명/카테고리/... vs 자산번호+정비일).
   const [docFiles, setDocFiles] = useState([]);
+  // 서버 응답(업로드+분석 완료)을 기다리지 않고, 파일을 고른 즉시 "뭘 선택했는지"
+  // 바로 보여주기 위한 임시 목록. 업로드 요청이 끝나면(성공/실패 무관) 비우고,
+  // 이후로는 서버가 내려주는 진짜 docFiles 목록이 그 자리를 대신한다.
+  const [pendingUploadFiles, setPendingUploadFiles] = useState([]);
   const [uploadingDocs, setUploadingDocs] = useState(false);
   const [applyingAllDocs, setApplyingAllDocs] = useState(false);
   const [docDragActive, setDocDragActive] = useState(false);
@@ -198,6 +202,7 @@ export default function Assets() {
   };
 
   const uploadDocFilesBatch = async (fileList) => {
+    setPendingUploadFiles(Array.from(fileList).map((f) => ({ name: f.name, size: f.size })));
     setUploadingDocs(true);
     const uploadFormData = new FormData();
     for (let i = 0; i < fileList.length; i++) {
@@ -206,12 +211,13 @@ export default function Assets() {
 
     try {
       await fileApi.batchUpload(uploadFormData);
-      loadDocFiles();
+      await loadDocFiles();
     } catch (error) {
       console.error('업로드 실패:', error);
       toast.error('파일 대량 업로드 및 비동기 배치 등록 실패');
     } finally {
       setUploadingDocs(false);
+      setPendingUploadFiles([]);
       if (docFileInputRef.current) docFileInputRef.current.value = '';
     }
   };
@@ -669,6 +675,26 @@ export default function Assets() {
         ) : (
           <div className="text-center text-gray-500 dark:text-slate-400 py-4">
             파일 업로드는 관리자만 가능합니다. 아래에서 업로드된 파일을 조회할 수 있습니다.
+          </div>
+        )}
+
+        {pendingUploadFiles.length > 0 && (
+          <div className="mt-4 border rounded-lg p-3 bg-blue-50 dark:bg-blue-500/10 border-blue-100 dark:border-blue-500/20">
+            <div className="text-sm font-medium text-blue-800 dark:text-blue-300 mb-2 flex items-center gap-2">
+              <Loader className="animate-spin" size={14} />
+              선택한 파일 {pendingUploadFiles.length}건 업로드 중...
+            </div>
+            <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-1">
+              {pendingUploadFiles.map((f, idx) => (
+                <li key={idx} className="flex items-center gap-2 min-w-0">
+                  <FileText size={14} className="flex-shrink-0" />
+                  <span className="truncate">{f.name}</span>
+                  <span className="text-xs text-blue-400 dark:text-blue-500 flex-shrink-0">
+                    ({(f.size / 1024).toFixed(0)}KB)
+                  </span>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
 
