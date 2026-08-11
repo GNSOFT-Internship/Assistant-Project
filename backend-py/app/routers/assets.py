@@ -300,11 +300,37 @@ def update_category_importance(
     """관리자가 AI가 매긴(또는 기본값) 카테고리 중요도를 직접 덮어쓴다.
     이후에는 source가 MANUAL로 표시되고, AI가 자동으로 재계산하지 않는다."""
     record = category_importance.set_manual_importance(
-        db, request.category, request.score, changed_by=current_user.get("username"),
+        db, request.category, request.score,
+        changed_by=current_user.get("username"), reason=request.reason,
     )
     return {
         "success": True,
         "message": "카테고리 중요도가 저장되었습니다.",
+        "data": {
+            "category": record.category,
+            "score": float(record.importance_score),
+            "reason": record.reason,
+            "source": record.source.value if record.source else None,
+            "updatedAt": record.updated_at,
+        },
+    }
+
+
+@router.post("/category-importance/ai-recompute")
+def recompute_category_importance_with_ai(
+    request: schemas.CategoryImportanceAiRecomputeRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(auth.require_admin),
+):
+    """관리자가 이미 지정한 값(MANUAL)이 있어도 참고하지 않고, AI에게 새로 물어봐서
+    점수/근거를 다시 산정해 덮어쓴다."""
+    try:
+        record = category_importance.recompute_ai_importance(db, request.category)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {
+        "success": True,
+        "message": "AI가 카테고리 중요도를 다시 산정했습니다.",
         "data": {
             "category": record.category,
             "score": float(record.importance_score),
@@ -596,6 +622,7 @@ def update_asset(
         raise HTTPException(status_code=404, detail="Asset not found")
 
     before = {field: _field_value(asset, field) for field, _ in _TRACKED_FIELDS}
+    old_category_id = asset.category_id
 
     asset.asset_name = request.assetName
     asset.category_ref = category_importance.get_or_create_category(db, request.category)
@@ -620,6 +647,8 @@ def update_asset(
 
     db.commit()
     db.refresh(asset)
+    if old_category_id != asset.category_id:
+        category_importance.delete_category_if_orphaned(db, old_category_id)
     return {"success": True, "message": "Asset updated successfully", "data": asset_to_dto(asset)}
 
 
@@ -810,6 +839,7 @@ def delete_asset(
 ):
     asset = db.query(models.Asset).filter(models.Asset.id == asset_id).first()
     if asset is not None:
+        category_id = asset.category_id
         _log_change(
             db,
             asset,
@@ -819,4 +849,5 @@ def delete_asset(
         )
         db.delete(asset)
         db.commit()
+        category_importance.delete_category_if_orphaned(db, category_id)
     return {"success": True, "message": "Asset deleted", "data": None}

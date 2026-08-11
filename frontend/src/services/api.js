@@ -59,7 +59,8 @@ export const assetApi = {
   getHistory: (id, params) => api.get(`/assets/${id}/history`, { params }),
   getAuditLogs: (params) => api.get('/assets/audit-logs', { params }),
   getCategoryImportance: () => api.get('/assets/category-importance'),
-  updateCategoryImportance: (category, score) => api.put('/assets/category-importance', { category, score }),
+  updateCategoryImportance: (category, score, reason) => api.put('/assets/category-importance', { category, score, reason }),
+  recomputeCategoryImportanceWithAi: (category) => api.post('/assets/category-importance/ai-recompute', { category }),
 };
 
 // LLM 응답(GLM-5.2)은 수십 초가 걸릴 수 있어, AI 서술을 실제로 호출하는

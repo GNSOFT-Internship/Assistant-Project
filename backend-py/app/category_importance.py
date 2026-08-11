@@ -48,16 +48,19 @@ _IMPORTANCE_SYSTEM_PROMPT = """당신은 공공기관 시설·자산 관리 전�
 - 0~9 (거의 영향 없음): 장식품, 소모성 비품 등
 
 카테고리명만으로 판단이 애매하면 가장 보수적으로(중간값 쪽으로) 추정하되,
-반드시 한 문장으로 구체적인 근거를 함께 제시하세요."""
+근거는 화면 표 한 줄에 그대로 들어가야 하므로 반드시 40자 이내의 간결한
+한 문장으로 제시하세요 (마침표 포함 40자 이내, 부연 설명 없이 핵심만)."""
 
 _IMPORTANCE_SCHEMA = {
     "type": "object",
     "properties": {
         "score": {"type": "number", "description": "0~100 사이 중요도 점수 (정수 또는 소수)"},
-        "reason": {"type": "string", "description": "이 점수를 준 구체적인 근거 한 문장 (한국어)"},
+        "reason": {"type": "string", "description": "이 점수를 준 근거를 40자 이내로 간결하게 (한국어)"},
     },
     "required": ["score", "reason"],
 }
+
+_REASON_MAX_LENGTH = 40
 
 
 def _ask_ai_for_importance(category: str) -> tuple[float, str]:
@@ -71,6 +74,10 @@ def _ask_ai_for_importance(category: str) -> tuple[float, str]:
     score = float(result.get("score", DEFAULT_IMPORTANCE_SCORE))
     score = min(max(score, 0.0), 100.0)
     reason = str(result.get("reason") or "").strip()
+    # 프롬프트로 길이를 요청해도 모델이 가끔 넘길 수 있어, 화면이 깨지지 않도록
+    # 최종 안전장치로 한 번 더 자른다.
+    if len(reason) > _REASON_MAX_LENGTH:
+        reason = reason[: _REASON_MAX_LENGTH - 1].rstrip() + "…"
     return score, reason
 
 
@@ -162,8 +169,30 @@ def get_importance_score(db: Session, category: str) -> float:
     return float(record.importance_score)
 
 
-def set_manual_importance(db: Session, category: str, score: float, changed_by: str = None) -> models.CategoryImportance:
-    """관리자가 화면에서 직접 값을 덮어쓴다. 이후 AI가 자동으로 재계산하지 않는다."""
+def delete_category_if_orphaned(db: Session, category_id: int) -> bool:
+    """category_id를 참조하는 자산이 하나도 남아있지 않으면, category_importance와
+    category 행까지 함께 정리한다 (자산 삭제나 카테고리 변경으로 고아가 된 카테고리).
+
+    호출자가 자산 쪽 변경(삭제/카테고리 변경)을 이미 커밋한 뒤에 불러야 정확한
+    개수를 센다. 정리했으면 True, 아직 자산이 남아있어 그대로 뒀으면 False."""
+    remaining = db.query(models.Asset).filter(models.Asset.category_id == category_id).count()
+    if remaining > 0:
+        return False
+
+    db.query(models.CategoryImportance).filter(
+        models.CategoryImportance.category_id == category_id
+    ).delete()
+    db.query(models.Category).filter(models.Category.id == category_id).delete()
+    db.commit()
+    return True
+
+
+def set_manual_importance(
+    db: Session, category: str, score: float, changed_by: str = None, reason: str = None,
+) -> models.CategoryImportance:
+    """관리자가 화면에서 직접 값(및 근거)을 덮어쓴다. 이후 AI가 자동으로 재계산하지 않는다.
+
+    reason을 비워두면 "관리자가 직접 설정"이라는 기본 문구가 들어간다."""
     score = min(max(float(score), 0.0), 100.0)
     category_row = get_or_create_category(db, category)
     record = (
@@ -177,7 +206,33 @@ def set_manual_importance(db: Session, category: str, score: float, changed_by: 
     else:
         record.importance_score = score
     record.source = models.ImportanceSource.MANUAL
-    record.reason = f"관리자({changed_by})가 직접 설정" if changed_by else "관리자가 직접 설정"
+    reason = (reason or "").strip()
+    record.reason = reason or (f"관리자({changed_by})가 직접 설정" if changed_by else "관리자가 직접 설정")
+    db.commit()
+    db.refresh(record)
+    return record
+
+
+def recompute_ai_importance(db: Session, category: str) -> models.CategoryImportance:
+    """관리자가 이미 지정한 값(MANUAL)이 있어도 무시하고, AI에게 새로 물어봐서
+    점수/근거를 덮어쓴다. AI가 설정되어 있지 않으면 ValueError를 던진다."""
+    if not llm.is_configured():
+        raise ValueError("AI가 설정되어 있지 않아 재산정할 수 없습니다.")
+
+    score, reason = _ask_ai_for_importance(category)
+
+    category_row = get_or_create_category(db, category)
+    record = (
+        db.query(models.CategoryImportance)
+        .filter(models.CategoryImportance.category_id == category_row.id)
+        .first()
+    )
+    if record is None:
+        record = models.CategoryImportance(category_id=category_row.id)
+        db.add(record)
+    record.importance_score = score
+    record.reason = reason
+    record.source = models.ImportanceSource.AI
     db.commit()
     db.refresh(record)
     return record

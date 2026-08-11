@@ -15,6 +15,7 @@ vi.mock('../services/api', () => ({
   assetApi: {
     getCategoryImportance: vi.fn(),
     updateCategoryImportance: vi.fn(),
+    recomputeCategoryImportanceWithAi: vi.fn(),
   },
 }));
 
@@ -160,6 +161,27 @@ describe('Recommendations', () => {
     await user.type(scoreInput, '95');
     await user.click(screen.getByText('저장'));
 
-    await waitFor(() => expect(assetApi.updateCategoryImportance).toHaveBeenCalledWith('NAS', 95));
+    await waitFor(() => expect(assetApi.updateCategoryImportance).toHaveBeenCalledWith('NAS', 95, 'AI 미설정으로 기본값 적용'));
+  });
+
+  it('lets an admin trigger an AI recompute that ignores the current manual value', async () => {
+    const user = userEvent.setup();
+    seedAdmin();
+    aiApi.getReplacementRecommendation.mockResolvedValue({ data: { data: { recommendations: [] } } });
+    assetApi.getCategoryImportance.mockResolvedValue({
+      data: { data: [{ category: 'NAS', score: 10, reason: '관리자가 낮게 설정함', source: 'MANUAL' }] },
+    });
+    assetApi.recomputeCategoryImportanceWithAi.mockResolvedValue({
+      data: { data: { category: 'NAS', score: 88, reason: 'AI가 새로 산정한 근거', source: 'AI' } },
+    });
+    renderPage();
+    await waitFor(() => expect(screen.getByText('교체 권장 자산이 없습니다.')).toBeInTheDocument());
+
+    await user.click(screen.getByText('카테고리 중요도 관리'));
+    await waitFor(() => expect(screen.getByText('NAS')).toBeInTheDocument());
+
+    await user.click(screen.getByText('AI 재산정'));
+
+    await waitFor(() => expect(assetApi.recomputeCategoryImportanceWithAi).toHaveBeenCalledWith('NAS'));
   });
 });

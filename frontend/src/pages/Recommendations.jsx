@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { aiApi, assetApi } from '../services/api';
-import { FileText, Download, ChevronDown, ChevronUp, Save } from 'lucide-react';
+import { FileText, Download, ChevronDown, ChevronUp, Save, Sparkles } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import LoadingState from '../components/LoadingState';
@@ -25,7 +25,9 @@ export default function Recommendations() {
   const [categoryImportance, setCategoryImportance] = useState([]);
   const [loadingImportance, setLoadingImportance] = useState(false);
   const [editingScores, setEditingScores] = useState({});
+  const [editingReasons, setEditingReasons] = useState({});
   const [savingCategory, setSavingCategory] = useState(null);
+  const [aiRecomputingCategory, setAiRecomputingCategory] = useState(null);
 
   // 조달 사양서 생성 관련 상태
   const [specData, setSpecData] = useState(null);
@@ -119,19 +121,25 @@ export default function Recommendations() {
     }
   };
 
-  const handleSaveImportance = async (category) => {
+  const handleSaveImportance = async (category, currentReason) => {
     const rawValue = editingScores[category];
     const score = Number(rawValue);
     if (rawValue === undefined || rawValue === '' || Number.isNaN(score) || score < 0 || score > 100) {
       toast.error('중요도는 0~100 사이의 숫자로 입력해주세요.');
       return;
     }
+    const reason = editingReasons[category] ?? currentReason ?? '';
     setSavingCategory(category);
     try {
-      await assetApi.updateCategoryImportance(category, score);
+      await assetApi.updateCategoryImportance(category, score, reason);
       toast.success(`"${category}" 중요도를 저장했습니다.`);
       await loadCategoryImportance();
       setEditingScores((prev) => {
+        const next = { ...prev };
+        delete next[category];
+        return next;
+      });
+      setEditingReasons((prev) => {
         const next = { ...prev };
         delete next[category];
         return next;
@@ -143,6 +151,31 @@ export default function Recommendations() {
       toast.error('카테고리 중요도 저장에 실패했습니다.');
     } finally {
       setSavingCategory(null);
+    }
+  };
+
+  const handleAiRecompute = async (category) => {
+    setAiRecomputingCategory(category);
+    try {
+      await assetApi.recomputeCategoryImportanceWithAi(category);
+      toast.success(`"${category}" 중요도를 AI가 다시 산정했습니다.`);
+      await loadCategoryImportance();
+      setEditingScores((prev) => {
+        const next = { ...prev };
+        delete next[category];
+        return next;
+      });
+      setEditingReasons((prev) => {
+        const next = { ...prev };
+        delete next[category];
+        return next;
+      });
+      loadRecommendations(budget);
+    } catch (error) {
+      console.error('AI 중요도 재산정 실패:', error);
+      toast.error(error.response?.data?.detail || 'AI 중요도 재산정에 실패했습니다.');
+    } finally {
+      setAiRecomputingCategory(null);
     }
   };
 
@@ -225,18 +258,37 @@ export default function Recommendations() {
                         <td className="table-cell whitespace-nowrap">
                           {IMPORTANCE_SOURCE_LABEL[row.source] || row.source}
                         </td>
-                        <td className="table-cell text-gray-500 dark:text-slate-400 max-w-xs truncate" title={row.reason}>
-                          {row.reason || '-'}
+                        <td className="table-cell">
+                          <input
+                            type="text"
+                            maxLength={60}
+                            className="input w-56 py-1 text-gray-600 dark:text-slate-300"
+                            value={editingReasons[row.category] ?? row.reason ?? ''}
+                            onChange={(e) =>
+                              setEditingReasons((prev) => ({ ...prev, [row.category]: e.target.value }))
+                            }
+                          />
                         </td>
                         <td className="table-cell">
-                          <button
-                            onClick={() => handleSaveImportance(row.category)}
-                            disabled={savingCategory === row.category}
-                            className="btn btn-primary text-xs py-1 px-2 flex items-center gap-1"
-                          >
-                            <Save size={12} />
-                            {savingCategory === row.category ? '저장 중...' : '저장'}
-                          </button>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => handleSaveImportance(row.category, row.reason)}
+                              disabled={savingCategory === row.category || aiRecomputingCategory === row.category}
+                              className="btn btn-primary text-xs py-1 px-2 flex items-center gap-1"
+                            >
+                              <Save size={12} />
+                              {savingCategory === row.category ? '저장 중...' : '저장'}
+                            </button>
+                            <button
+                              onClick={() => handleAiRecompute(row.category)}
+                              disabled={aiRecomputingCategory === row.category || savingCategory === row.category}
+                              title="관리자가 지정한 값을 참고하지 않고 AI가 새로 산정합니다"
+                              className="btn btn-secondary text-xs py-1 px-2 flex items-center gap-1"
+                            >
+                              <Sparkles size={12} />
+                              {aiRecomputingCategory === row.category ? '산정 중...' : 'AI 재산정'}
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
