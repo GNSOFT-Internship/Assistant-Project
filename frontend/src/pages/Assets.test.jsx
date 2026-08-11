@@ -192,6 +192,32 @@ describe('Assets', () => {
       expect(screen.getByText('적용')).toBeInTheDocument();
     });
 
+    it('shows the selected file names immediately, before the upload request resolves', async () => {
+      const user = userEvent.setup();
+      seedAdmin();
+      let resolveUpload;
+      fileApi.batchUpload.mockReturnValue(
+        new Promise((resolve) => { resolveUpload = resolve; })
+      );
+      renderPage();
+      await waitFor(() => expect(screen.getByText('업로드된 파일이 없습니다.')).toBeInTheDocument());
+
+      const file1 = new File(['a'], 'asset_reg.xlsx', {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+      const file2 = new File(['b'], 'maintenance.csv', { type: 'text/csv' });
+      const input = document.querySelector('input[type="file"]');
+      await user.upload(input, [file1, file2]);
+
+      // 서버 응답을 아직 안 보냈는데도(resolveUpload 호출 전) 선택한 파일명이 바로 보여야 한다.
+      expect(screen.getByText('선택한 파일 2건 업로드 중...')).toBeInTheDocument();
+      expect(screen.getByText('asset_reg.xlsx')).toBeInTheDocument();
+      expect(screen.getByText('maintenance.csv')).toBeInTheDocument();
+
+      resolveUpload({ data: {} });
+      await waitFor(() => expect(screen.queryByText('선택한 파일 2건 업로드 중...')).not.toBeInTheDocument());
+    });
+
     it('paginates the uploaded file list 5 at a time with prev/next controls', async () => {
       const user = userEvent.setup();
       seedAdmin();
