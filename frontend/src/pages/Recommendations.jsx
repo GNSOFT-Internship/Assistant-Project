@@ -258,11 +258,11 @@ export default function Recommendations() {
                         <td className="table-cell whitespace-nowrap">
                           {IMPORTANCE_SOURCE_LABEL[row.source] || row.source}
                         </td>
-                        <td className="table-cell">
-                          <input
-                            type="text"
+                        <td className="table-cell min-w-[260px]">
+                          <textarea
+                            rows={2}
                             maxLength={60}
-                            className="input w-56 py-1 text-gray-600 dark:text-slate-300"
+                            className="input w-full py-1 resize-y text-gray-600 dark:text-slate-300"
                             value={editingReasons[row.category] ?? row.reason ?? ''}
                             onChange={(e) =>
                               setEditingReasons((prev) => ({ ...prev, [row.category]: e.target.value }))
