@@ -69,6 +69,13 @@ class AssetDTO(BaseModel):
 class CategoryImportanceUpdateRequest(BaseModel):
     category: str
     score: float = Field(ge=0, le=100)
+    reason: Optional[str] = None
+
+    _strip_category = field_validator("category")(_strip_category_value)
+
+
+class CategoryImportanceAiRecomputeRequest(BaseModel):
+    category: str
 
     _strip_category = field_validator("category")(_strip_category_value)
 
