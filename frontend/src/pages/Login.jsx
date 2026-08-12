@@ -128,7 +128,6 @@ export default function Login() {
 
         <div className="text-center text-sm text-gray-500 dark:text-slate-400 mt-6 space-y-1">
           <p>관리자: admin / admin123</p>
-          <p>일반 사용자: user / user123</p>
         </div>
       </div>
     </div>

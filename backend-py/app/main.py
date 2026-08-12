@@ -59,12 +59,17 @@ def on_startup():
         )
 
     if settings.SEED_DEFAULT_USERS:
-        seed_initial_users()
+        seed_initial_admin()
     else:
         _reject_if_default_credentials_active()
 
 
-def seed_initial_users():
+def seed_initial_admin():
+    """admin 계정이 없으면 기본값(admin/admin123)으로 만든다.
+    예전에는 user/user123도 함께 만들었는데, 관리자가 운영 서버에서 그
+    계정을 삭제해도 다음 재시작 때 자동으로 되살아나 버리는 문제가 있었다.
+    로그인 계정 관리는 운영자가 DB를 직접 수정하는 방식이므로, 여기서는
+    최소한(관리자 계정 하나)만 보장한다."""
     db = SessionLocal()
     try:
         if db.query(models.User).filter(models.User.username == "admin").first() is None:
@@ -77,17 +82,6 @@ def seed_initial_users():
             db.add(admin)
             db.commit()
             print("Admin user created: admin / admin123")
-
-        if db.query(models.User).filter(models.User.username == "user").first() is None:
-            user = models.User(
-                username="user",
-                password=auth.hash_password("user123"),
-                role=models.UserRole.USER,
-                email="user@example.com",
-            )
-            db.add(user)
-            db.commit()
-            print("User created: user / user123")
     finally:
         db.close()
 
