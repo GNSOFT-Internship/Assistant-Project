@@ -33,7 +33,7 @@ export function useProcurementSpecModal() {
   const download = async () => {
     setDownloading(true);
     try {
-      const response = await aiApi.downloadProcurementSpecPdf(assetId, specData);
+      const response = await aiApi.downloadProcurementSpecPdf(assetId);
       const blob = new Blob([response.data], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');

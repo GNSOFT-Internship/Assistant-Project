@@ -13,7 +13,7 @@
       style 속성을 직접 찍기 때문 - script-src를 막는 게 토큰 탈취 방지의
       핵심이라 style은 트레이드오프로 허용한다.
     -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net data:; img-src 'self' data:; connect-src 'self' http://localhost:8080; object-src 'none'; base-uri 'self'; form-action 'self';" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net data:; img-src 'self' data:; connect-src 'self' http://localhost:8080; object-src 'none'; base-uri 'self'; form-action 'self';" />
     <title>자산관리 시스템</title>
   </head>
   <body>

@@ -4,8 +4,9 @@ import { assetApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import LoadingState from '../components/LoadingState';
 import Dropdown from '../components/Dropdown';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { ASSET_STATUS } from '../components/StatusBadge';
+import Pagination from '../components/Pagination';
+import useDebouncedValue from '../hooks/useDebouncedValue';
 
 const PAGE_SIZE = 30;
 
@@ -171,16 +172,8 @@ export default function AuditLog() {
   const [page, setPage] = useState(1);
   const [actionFilter, setActionFilter] = useState('');
   const [searchInput, setSearchInput] = useState('');
-  const [search, setSearch] = useState('');
+  const search = useDebouncedValue(searchInput, 400);
   const [loading, setLoading] = useState(true);
-
-  // 검색어 입력을 400ms 디바운스해서 키 입력마다 요청이 나가지 않도록 함 (Assets 페이지와 동일한 패턴)
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setSearch(searchInput);
-    }, 400);
-    return () => clearTimeout(timer);
-  }, [searchInput]);
 
   const loadLogs = useCallback(async () => {
     setLoading(true);
@@ -281,26 +274,7 @@ export default function AuditLog() {
         )}
 
         {!loading && total > 0 && (
-          <div className="flex items-center justify-between mt-4 text-sm text-gray-600 dark:text-slate-400">
-            <div>전체 {total}건 중 {(page - 1) * PAGE_SIZE + 1}-{Math.min(page * PAGE_SIZE, total)}건</div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page <= 1}
-                className="btn btn-secondary px-2 py-1 disabled:opacity-40"
-              >
-                <ChevronLeft size={16} />
-              </button>
-              <span>{page} / {totalPages}</span>
-              <button
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page >= totalPages}
-                className="btn btn-secondary px-2 py-1 disabled:opacity-40"
-              >
-                <ChevronRight size={16} />
-              </button>
-            </div>
-          </div>
+          <Pagination page={page} totalPages={totalPages} total={total} pageSize={PAGE_SIZE} onChange={setPage} />
         )}
       </div>
     </div>

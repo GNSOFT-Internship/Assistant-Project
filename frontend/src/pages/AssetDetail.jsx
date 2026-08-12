@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { assetApi, aiApi } from '../services/api';
-import { Calendar, DollarSign, Clock, Package, History, Edit, Trash2, FileText, Send, MessageSquare, Loader, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Calendar, DollarSign, Clock, Package, History, Edit, Trash2, FileText, Send, MessageSquare, Loader } from 'lucide-react';
 import { AssetStatusBadge, MaintenanceTypeBadge } from '../components/StatusBadge';
 import LoadingState from '../components/LoadingState';
 import Modal from '../components/Modal';
 import ProcurementSpecModal, { useProcurementSpecModal } from '../components/ProcurementSpecModal';
+import Pagination from '../components/Pagination';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
@@ -480,29 +481,13 @@ export default function AssetDetail() {
         ))}
 
         {maintenanceTotal > HISTORY_PAGE_SIZE && (
-          <div className="flex items-center justify-between mt-4 text-sm text-gray-600 dark:text-slate-400">
-            <div>
-              전체 {maintenanceTotal}건 중 {(maintenancePage - 1) * HISTORY_PAGE_SIZE + 1}-
-              {Math.min(maintenancePage * HISTORY_PAGE_SIZE, maintenanceTotal)}건
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => loadMaintenance(maintenancePage - 1)}
-                disabled={maintenancePage <= 1}
-                className="btn btn-secondary px-2 py-1 disabled:opacity-40"
-              >
-                <ChevronLeft size={16} />
-              </button>
-              <span>{maintenancePage} / {Math.max(1, Math.ceil(maintenanceTotal / HISTORY_PAGE_SIZE))}</span>
-              <button
-                onClick={() => loadMaintenance(maintenancePage + 1)}
-                disabled={maintenancePage >= Math.ceil(maintenanceTotal / HISTORY_PAGE_SIZE)}
-                className="btn btn-secondary px-2 py-1 disabled:opacity-40"
-              >
-                <ChevronRight size={16} />
-              </button>
-            </div>
-          </div>
+          <Pagination
+            page={maintenancePage}
+            totalPages={Math.max(1, Math.ceil(maintenanceTotal / HISTORY_PAGE_SIZE))}
+            total={maintenanceTotal}
+            pageSize={HISTORY_PAGE_SIZE}
+            onChange={loadMaintenance}
+          />
         )}
       </Modal>
 
@@ -563,29 +548,13 @@ export default function AssetDetail() {
         ))}
 
         {historyTotal > HISTORY_PAGE_SIZE && (
-          <div className="flex items-center justify-between mt-4 text-sm text-gray-600 dark:text-slate-400">
-            <div>
-              전체 {historyTotal}건 중 {(historyPage - 1) * HISTORY_PAGE_SIZE + 1}-
-              {Math.min(historyPage * HISTORY_PAGE_SIZE, historyTotal)}건
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => loadHistory(historyPage - 1)}
-                disabled={historyPage <= 1}
-                className="btn btn-secondary px-2 py-1 disabled:opacity-40"
-              >
-                <ChevronLeft size={16} />
-              </button>
-              <span>{historyPage} / {Math.max(1, Math.ceil(historyTotal / HISTORY_PAGE_SIZE))}</span>
-              <button
-                onClick={() => loadHistory(historyPage + 1)}
-                disabled={historyPage >= Math.ceil(historyTotal / HISTORY_PAGE_SIZE)}
-                className="btn btn-secondary px-2 py-1 disabled:opacity-40"
-              >
-                <ChevronRight size={16} />
-              </button>
-            </div>
-          </div>
+          <Pagination
+            page={historyPage}
+            totalPages={Math.max(1, Math.ceil(historyTotal / HISTORY_PAGE_SIZE))}
+            total={historyTotal}
+            pageSize={HISTORY_PAGE_SIZE}
+            onChange={loadHistory}
+          />
         )}
       </Modal>
 
