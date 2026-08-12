@@ -12,6 +12,7 @@ const CURRENT_YEAR = now.getFullYear();
 const CURRENT_MONTH = now.getMonth() + 1;
 const YEAR_OPTIONS = Array.from({ length: 6 }, (_, i) => CURRENT_YEAR - i);
 const MONTH_OPTIONS = Array.from({ length: 12 }, (_, i) => i + 1);
+const HISTORY_PAGE_SIZE = 10;
 
 export default function Reports() {
   const toast = useToast();
@@ -29,9 +30,45 @@ export default function Reports() {
   }, [activeTab]);
   const [historyEntries, setHistoryEntries] = React.useState([]);
   const [historyLoading, setHistoryLoading] = React.useState(false);
+  // '다운로드 기록' 탭을 보고 있지 않은 상태에서 다운로드가 끝나면 true가 되어, 탭
+  // 버튼 위에 빨간 점이 뜬다. 그 탭을 클릭하는 순간 false로 꺼진다(알림 배지처럼).
+  const [hasNewDownload, setHasNewDownload] = React.useState(false);
+  // 방금 새로 저장된 기록의 id들. 여기 들어있는 동안만 목록 안에서 'NEW' 배지를 보여주고,
+  // 일정 시간 뒤 자동으로 지운다(오래된 항목까지 계속 NEW로 남아있지 않도록).
+  const [newEntryIds, setNewEntryIds] = React.useState(() => new Set());
+  const newEntryTimersRef = React.useRef({});
+  const markEntryAsNew = React.useCallback((id) => {
+    setNewEntryIds((prev) => new Set(prev).add(id));
+    clearTimeout(newEntryTimersRef.current[id]);
+    newEntryTimersRef.current[id] = setTimeout(() => {
+      setNewEntryIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      delete newEntryTimersRef.current[id];
+    }, 10000);
+  }, []);
+  React.useEffect(() => {
+    const timers = newEntryTimersRef.current;
+    return () => Object.values(timers).forEach(clearTimeout);
+  }, []);
   // 다운로드가 진행 중인 연/월. null이 아니면 기록 탭에 "다운로드 중..." 회색 임시 행을
   // 하나 보여준다 - 완료되면 이 값이 비워지고 실제 기록(historyEntries)에 항목이 생긴다.
   const [pendingHistoryEntry, setPendingHistoryEntry] = React.useState(null);
+
+  // 10개 넘어가면 페이지를 나눈다. 페이지 수는 딱히 상한을 두지 않고 기록이 있는 만큼
+  // 계속 늘어난다. 삭제로 인해 지금 페이지가 더 이상 존재하지 않게 되면 자동으로
+  // 마지막 유효한 페이지로 당겨온다.
+  const [historyPage, setHistoryPage] = React.useState(1);
+  const historyTotalPages = Math.max(1, Math.ceil(historyEntries.length / HISTORY_PAGE_SIZE));
+  React.useEffect(() => {
+    if (historyPage > historyTotalPages) setHistoryPage(historyTotalPages);
+  }, [historyPage, historyTotalPages]);
+  const historyPageEntries = historyEntries.slice(
+    (historyPage - 1) * HISTORY_PAGE_SIZE,
+    historyPage * HISTORY_PAGE_SIZE
+  );
 
   const [loading, setLoading] = React.useState(true);
   const [report, setReport] = React.useState(null);
@@ -78,6 +115,7 @@ export default function Reports() {
     try {
       const entries = await pdfHistory.listEntries();
       setHistoryEntries(entries);
+      setHistoryPage(1);
     } catch (error) {
       console.error('다운로드 기록 로드 실패:', error);
       toast.error('다운로드 기록을 불러오는 중 오류가 발생했습니다.');
@@ -153,9 +191,16 @@ export default function Reports() {
       // 그 값이 갱신되지 않아 목록이 안 채워지는 버그가 있었다. ref는 항상 최신 탭을
       // 가리키므로 다운로드가 끝나는 시점에 실제로 그 탭을 보고 있는지 정확히 알 수 있다.)
       try {
-        await pdfHistory.addEntry({ year: reqYear, month: reqMonth, filename, blob });
+        const savedEntry = await pdfHistory.addEntry({ year: reqYear, month: reqMonth, filename, blob });
         setPendingHistoryEntry(null);
-        if (activeTabRef.current === 'history') refreshHistory();
+        markEntryAsNew(savedEntry.id);
+        if (activeTabRef.current === 'history') {
+          refreshHistory();
+        } else {
+          // '보고서 생성' 탭에 있는 채로 다운로드가 끝난 경우에만 알림 점을 켠다.
+          // 이미 기록 탭을 보고 있었다면 새 항목이 바로 눈에 보이니 점을 켤 필요가 없다.
+          setHasNewDownload(true);
+        }
       } catch (historyError) {
         console.error('다운로드 기록 저장 실패:', historyError);
       }
@@ -215,9 +260,13 @@ export default function Reports() {
     }
   };
 
+  // bytes.toFixed(0)처럼 정수로 반올림하면 8.0KB든 8.4KB든 전부 '8KB'로 뭉뚱그려져서
+  // 마치 고정된 더미 값처럼 보인다. 실제 파일 크기를 소수점 한 자리까지 보여주고,
+  // 정확한 바이트 수는 title 툴팁으로 확인할 수 있게 한다.
   const formatFileSize = (bytes) => {
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)}KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+    if (bytes < 1024) return `${bytes}B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(2)}MB`;
   };
 
   const formatGeneratedAt = (isoString) =>
@@ -250,8 +299,11 @@ export default function Reports() {
                 보고서 생성
               </button>
               <button
-                onClick={() => setActiveTab('history')}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
+                onClick={() => {
+                  setActiveTab('history');
+                  setHasNewDownload(false);
+                }}
+                className={`relative px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
                   activeTab === 'history'
                     ? 'bg-blue-600 text-white'
                     : 'text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700'
@@ -259,6 +311,9 @@ export default function Reports() {
               >
                 <History size={14} />
                 다운로드 기록
+                {hasNewDownload && (
+                  <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white dark:ring-slate-800" />
+                )}
               </button>
             </div>
           </div>
@@ -422,70 +477,107 @@ export default function Reports() {
                 아직 다운로드한 보고서가 없습니다. &apos;보고서 생성&apos; 탭에서 PDF를 받으면 여기에 기록됩니다.
               </p>
             ) : (
-              <table className="table">
-                <thead className="table-header">
-                  <tr>
-                    <th className="table-cell">보고 대상</th>
-                    <th className="table-cell">다운로드 일시</th>
-                    <th className="table-cell">파일 크기</th>
-                    <th className="table-cell"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pendingHistoryEntry && (
+              <div className="overflow-x-auto -mx-2">
+                <table className="table">
+                  <thead className="table-header">
                     <tr>
-                      <td className="table-cell font-medium text-gray-400 dark:text-slate-500">
-                        {pendingHistoryEntry.year}년 {pendingHistoryEntry.month}월
-                      </td>
-                      <td className="table-cell text-gray-400 dark:text-slate-500">
-                        <span className="flex items-center gap-1.5">
-                          <Loader2 size={14} className="animate-spin" />
-                          다운로드 중...
-                        </span>
-                      </td>
-                      <td className="table-cell text-gray-400 dark:text-slate-500">-</td>
-                      <td className="table-cell">
-                        <div className="flex items-center gap-2">
-                          <button disabled className="btn btn-secondary flex items-center gap-1.5 opacity-40 cursor-not-allowed">
-                            <Download size={14} />
-                            다운로드
-                          </button>
-                          <button disabled className="btn btn-danger flex items-center gap-1.5 opacity-40 cursor-not-allowed">
-                            <Trash2 size={14} />
-                            삭제
-                          </button>
-                        </div>
-                      </td>
+                      <th className="table-cell">보고 대상</th>
+                      <th className="table-cell">다운로드 일시</th>
+                      <th className="table-cell text-right">파일 크기</th>
+                      <th className="table-cell"></th>
                     </tr>
-                  )}
-                  {historyEntries.map((entry) => (
-                    <tr key={entry.id}>
-                      <td className="table-cell font-medium">{entry.year}년 {entry.month}월</td>
-                      <td className="table-cell">{formatGeneratedAt(entry.generatedAt)}</td>
-                      <td className="table-cell">{formatFileSize(entry.size)}</td>
-                      <td className="table-cell">
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => handleHistoryDownload(entry)}
-                            className="btn btn-secondary flex items-center gap-1.5"
-                          >
-                            <Download size={14} />
-                            다운로드
-                          </button>
-                          <button
-                            onClick={() => handleHistoryDelete(entry)}
-                            className="btn btn-danger flex items-center gap-1.5"
-                            title="기록 삭제"
-                          >
-                            <Trash2 size={14} />
-                            삭제
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {historyPage === 1 && pendingHistoryEntry && (
+                      <tr>
+                        <td className="table-cell font-medium text-gray-400 dark:text-slate-500">
+                          {pendingHistoryEntry.year}년 {pendingHistoryEntry.month}월
+                        </td>
+                        <td className="table-cell text-gray-400 dark:text-slate-500">
+                          <span className="flex items-center gap-1.5">
+                            <Loader2 size={14} className="animate-spin" />
+                            다운로드 중...
+                          </span>
+                        </td>
+                        <td className="table-cell text-gray-400 dark:text-slate-500 text-right">-</td>
+                        <td className="table-cell">
+                          <div className="flex items-center justify-end gap-2">
+                            <button disabled className="btn btn-secondary flex items-center gap-1.5 opacity-40 cursor-not-allowed">
+                              <Download size={14} />
+                              다운로드
+                            </button>
+                            <button disabled className="btn btn-danger flex items-center gap-1.5 opacity-40 cursor-not-allowed">
+                              <Trash2 size={14} />
+                              삭제
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                    {historyPageEntries.map((entry) => (
+                      <tr key={entry.id}>
+                        <td className="table-cell font-medium">
+                          <span className="inline-flex items-center gap-2">
+                            {entry.year}년 {entry.month}월
+                            {newEntryIds.has(entry.id) && (
+                              <span className="badge-blue !py-0 !px-1.5 text-[10px] tracking-wide">NEW</span>
+                            )}
+                          </span>
+                        </td>
+                        <td className="table-cell">{formatGeneratedAt(entry.generatedAt)}</td>
+                        <td
+                          className="table-cell text-right tabular-nums"
+                          title={`${entry.size.toLocaleString('ko-KR')} bytes`}
+                        >
+                          {formatFileSize(entry.size)}
+                        </td>
+                        <td className="table-cell">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => handleHistoryDownload(entry)}
+                              className="btn btn-secondary flex items-center gap-1.5"
+                            >
+                              <Download size={14} />
+                              다운로드
+                            </button>
+                            <button
+                              onClick={() => handleHistoryDelete(entry)}
+                              className="btn btn-danger flex items-center gap-1.5"
+                              title="기록 삭제"
+                            >
+                              <Trash2 size={14} />
+                              삭제
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {!historyLoading && historyTotalPages > 1 && (
+              <div className="flex items-center justify-between mt-4 text-sm text-gray-500 dark:text-slate-400">
+                <span>
+                  {historyPage} / {historyTotalPages} 페이지 · 총 {historyEntries.length}건
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setHistoryPage((p) => Math.max(1, p - 1))}
+                    disabled={historyPage === 1}
+                    className="btn btn-secondary px-3 py-1.5 text-xs"
+                  >
+                    이전
+                  </button>
+                  <button
+                    onClick={() => setHistoryPage((p) => Math.min(historyTotalPages, p + 1))}
+                    disabled={historyPage === historyTotalPages}
+                    className="btn btn-secondary px-3 py-1.5 text-xs"
+                  >
+                    다음
+                  </button>
+                </div>
+              </div>
             )}
           </div>
         )}
