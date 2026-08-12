@@ -876,8 +876,8 @@ def delete_file(
     try:
         if file_upload.file_path and os.path.exists(file_upload.file_path):
             os.remove(file_upload.file_path)
-    except OSError as e:
-        print(f"File deletion failed: {e}")
+    except OSError:
+        logger.warning("업로드 파일 삭제 실패: %s", file_upload.file_path, exc_info=True)
 
     db.delete(file_upload)
     db.commit()

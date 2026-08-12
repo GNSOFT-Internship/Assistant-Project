@@ -204,8 +204,16 @@ export default function AiAssistant() {
                         {msg.assets.map((asset) => (
                           <tr
                             key={asset.id}
+                            role="button"
+                            tabIndex={0}
                             className="border-t cursor-pointer hover:bg-gray-50 hover:dark:bg-slate-900"
                             onClick={() => handleAssetClick(asset.id)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                handleAssetClick(asset.id);
+                              }
+                            }}
                           >
                             <td className="table-cell font-medium">{asset.assetName}</td>
                             <td className="table-cell">{asset.assetCode}</td>

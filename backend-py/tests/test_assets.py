@@ -268,6 +268,22 @@ def test_get_all_assets_search_matches_numeric_asset_code(client, admin_headers)
     assert any(i["id"] == asset["id"] for i in items)
 
 
+def test_get_all_assets_search_escapes_like_wildcards(client, admin_headers):
+    """search에 %나 _가 리터럴로 들어있으면 와일드카드로 동작하면 안 된다
+    (B8) - 이스케이프하지 않으면 "PT_100" 검색이 "PTX100"처럼 밑줄 자리에
+    아무 글자나 들어간 이름까지 잘못 매칭해버린다."""
+    underscore_asset = _create_asset(client, admin_headers, assetName="PT_100 압력센서")
+    _create_asset(client, admin_headers, assetName="PTX100 압력센서")
+
+    resp = client.get("/api/assets?search=PT_100", headers=admin_headers)
+    assert resp.status_code == 200
+    items = resp.json()["data"]["items"]
+    matched_ids = {i["id"] for i in items}
+
+    assert underscore_asset["id"] in matched_ids
+    assert all(i["assetName"] == "PT_100 압력센서" for i in items)
+
+
 def _make_import_excel(rows):
     df = pd.DataFrame(rows)
     buffer = io.BytesIO()
