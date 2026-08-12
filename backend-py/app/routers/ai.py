@@ -702,7 +702,6 @@ def get_or_create_work_order(maintenance_record_id: int, db: Session = Depends(g
     # 2. 없으면 유지보수 기록 조회 및 관련 자산 정보 수집
     record = db.query(models.MaintenanceRecord).filter(models.MaintenanceRecord.id == maintenance_record_id).first()
     if not record:
-        from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="Maintenance record not found")
 
     asset = db.query(models.Asset).filter(models.Asset.id == record.asset_id).first()
@@ -1092,6 +1091,12 @@ def simulate_budget(request: schemas.BudgetSimulationRequest, db: Session = Depe
             totalAllocated=sum(item.allocatedAmount for item in allocations),
             summary="AI 시뮬레이터 연동 장애로 인해 과거 지출 비중 기반의 가중치로 대체 계산된 최적 예산 시뮬레이션 결과입니다."
         )
+
+
+# ---------------------------------------------------------------------------
+# 8. AI 조달 규격서/RFP 생성
+# ---------------------------------------------------------------------------
+
 _PROCUREMENT_SCHEMA = {
     "type": "object",
     "properties": {

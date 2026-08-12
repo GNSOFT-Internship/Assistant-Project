@@ -217,7 +217,7 @@ def answer_question(db: Session, question: str) -> dict:
 
 
 def _fallback_answer(db: Session, question: str, all_assets) -> dict:
-    """LLM 미설정 시 사용하는 규칙 기반 폴백."""
+    """규칙 기반 폴백. LLM이 미설정이거나 호출에 실패했을 때 answer_question에서 사용한다."""
     q = question.lower()
 
     if "노트북" in q or "pc" in q or "컴퓨터" in q:

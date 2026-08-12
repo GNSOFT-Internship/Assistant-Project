@@ -251,7 +251,6 @@ export default function Budget() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left Column: AI Forecast */}
         <div className="card space-y-4">
           <h3 className="text-lg font-semibold flex items-center gap-2">
             🔮 AI 차년도 예산 예측
@@ -309,7 +308,6 @@ export default function Budget() {
           )}
         </div>
 
-        {/* Right Column: AI Simulator */}
         <div className="card space-y-4">
           <h3 className="text-lg font-semibold flex items-center gap-2">
             📊 AI 예산 최적화 시뮬레이터
