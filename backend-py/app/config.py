@@ -32,5 +32,12 @@ class Settings:
         if ip.strip()
     )
 
+    # 업로드 파일(엑셀/PDF/배치 업로드) 하나당 허용하는 최대 크기.
+    # systemd MemoryMax는 프로세스 메모리만 제한할 뿐, 디스크에 그대로 쌓이는
+    # 파일 용량이나 엑셀 압축 해제 과정에서 잠깐 메모리에 올라가는 양은 막지
+    # 못하므로, 업로드를 받는 시점에 서버가 직접 상한을 강제한다.
+    MAX_UPLOAD_SIZE_MB: int = int(os.getenv("MAX_UPLOAD_SIZE_MB", "20"))
+    MAX_UPLOAD_SIZE_BYTES: int = MAX_UPLOAD_SIZE_MB * 1024 * 1024
+
 
 settings = Settings()
