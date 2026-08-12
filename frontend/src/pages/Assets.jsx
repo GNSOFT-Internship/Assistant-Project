@@ -8,6 +8,7 @@ import {
 import { AssetStatusBadge, FileStatusBadge } from '../components/StatusBadge';
 import LoadingState from '../components/LoadingState';
 import Modal from '../components/Modal';
+import Dropdown from '../components/Dropdown';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
@@ -530,16 +531,13 @@ export default function Assets() {
             onChange={(e) => setSearchInput(e.target.value)}
             className="input flex-1"
           />
-          <select
+          <Dropdown
+            id="asset-category-filter"
             value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-            className="input sm:w-40"
-          >
-            <option value="">전체 카테고리</option>
-            {categories.map((c) => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </select>
+            onChange={(v) => setCategoryFilter(v)}
+            widthClass="sm:w-40"
+            options={[{ value: '', label: '전체 카테고리' }, ...categories.map((c) => ({ value: c, label: c }))]}
+          />
         </div>
 
         {loading ? (
