@@ -357,14 +357,12 @@ export default function AssetDetail() {
             </div>
           </div>
 
-          {/* AI 고장 자가 진단 챗봇 카드 */}
           <div className="card flex flex-col h-[420px] p-4 space-y-3">
             <h3 className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2 border-b border-slate-100 dark:border-slate-700 pb-2">
               <MessageSquare className="text-blue-600 animate-pulse" size={18} />
               AI 고장 진단 챗봇
             </h3>
 
-            {/* Chat Messages Log */}
             <div ref={chatContainerRef} className="flex-1 overflow-y-auto space-y-3 pr-1 text-xs scrollbar-hide">
               {chatHistory.map((msg, index) => (
                 <div
@@ -393,7 +391,6 @@ export default function AssetDetail() {
               )}
             </div>
 
-            {/* Chat Input Field */}
             <form onSubmit={handleSendChat} className="flex gap-1.5 border-t border-slate-100 dark:border-slate-700 pt-2 flex-shrink-0">
               <input
                 type="text"
@@ -627,7 +624,6 @@ export default function AssetDetail() {
         </form>
       </Modal>
 
-      {/* AI 작업 지시서 모달 */}
       <Modal open={!!activeWorkOrder} onClose={() => setActiveWorkOrder(null)} maxWidth="max-w-2xl">
         {activeWorkOrder && (
           <>
@@ -725,7 +721,6 @@ export default function AssetDetail() {
         )}
       </Modal>
 
-      {/* 로딩 인디케이터 */}
       {loadingWO && (
         <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-slate-800 p-4 rounded shadow-lg flex items-center gap-3">

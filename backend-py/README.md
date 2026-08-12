@@ -29,7 +29,8 @@
    uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload
    ```
 
-   최초 기동 시 테이블을 자동 생성하고 관리자 계정(admin/admin123)과 일반 계정(user/user123)을 시딩합니다.
+   최초 기동 시 테이블을 자동 생성합니다. `.env`에 `SEED_DEFAULT_USERS=true`를 설정한 경우에만 관리자 계정(admin/admin123)과
+   일반 계정(user/user123)을 시딩합니다(운영 배포 기본값은 `false`).
 
 ## 기존 Java 백엔드와의 차이점
 

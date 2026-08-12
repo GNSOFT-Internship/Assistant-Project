@@ -382,8 +382,7 @@ def _process_file_task_logic(file_upload: models.FileUpload, db: Session):
         file_upload.status = models.UploadStatus.COMPLETED
         file_upload.error_message = None
     except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning(f"File process background task failed: {e}", exc_info=True)
+        logger.warning(f"File process background task failed: {e}", exc_info=True)
         file_upload.status = models.UploadStatus.FAILED
         file_upload.error_message = str(e)
 

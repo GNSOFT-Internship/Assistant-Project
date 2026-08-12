@@ -61,10 +61,10 @@ CREATE TABLE `maintenance_record` (
 -- FileUpload 테이블 (파일 업로드 및 분석)
 CREATE TABLE `file_upload` (
     `id` BIGINT PRIMARY KEY AUTO_INCREMENT,
-    `filename` VARCHAR(255) NOT NULL,
-    `original_filename` VARCHAR(255) NOT NULL,
-    `file_type` ENUM('EXCEL', 'CSV', 'PDF') NOT NULL,
-    `file_path` VARCHAR(500) NOT NULL,
+    `filename` VARCHAR(255),
+    `original_filename` VARCHAR(255),
+    `file_type` ENUM('EXCEL', 'CSV', 'PDF'),
+    `file_path` VARCHAR(500),
     `status` ENUM('PENDING', 'PROCESSING', 'COMPLETED', 'FAILED') NOT NULL DEFAULT 'PENDING',
     `extracted_data` JSON,
     `error_message` TEXT,
