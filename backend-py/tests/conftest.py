@@ -18,8 +18,9 @@ os.environ["DATABASE_URL"] = f"sqlite:///{_TEST_DB_PATH}"
 os.environ["UPLOAD_DIRECTORY"] = str(_TEST_UPLOAD_DIR)
 os.environ.setdefault("JWT_SECRET", "test-secret-key")
 os.environ["GN_API_KEY"] = ""
-# 테스트는 admin/admin123, user/user123 계정 로그인에 의존하므로
-# (admin_headers/user_headers 픽스처) 자동 시드를 명시적으로 켠다.
+# 테스트는 admin/admin123 계정 로그인에 의존하므로(admin_headers 픽스처)
+# 자동 시드를 명시적으로 켠다. user/user123은 앱이 더 이상 자동으로
+# 만들지 않아서, user_headers 픽스처가 필요할 때 직접 만든다.
 os.environ.setdefault("SEED_DEFAULT_USERS", "true")
 # starlette TestClient가 보내는 요청의 request.client.host는 실제 IP가 아니라
 # "testclient" 고정 문자열이므로, X-Real-IP 기반 테스트가 동작하려면 이 값도
@@ -129,7 +130,21 @@ def admin_headers(client):
 
 
 @pytest.fixture()
-def user_headers(client):
+def user_headers(client, db_session):
+    """앱은 이제 admin 계정만 자동 시딩한다(운영자가 삭제한 user 계정이 재시작마다
+    되살아나던 문제 때문). 일반 사용자 권한 테스트에 필요한 user/user123 계정은
+    테스트 스스로 만든다."""
+    from app import models, auth
+
+    if db_session.query(models.User).filter(models.User.username == "user").first() is None:
+        db_session.add(models.User(
+            username="user",
+            password=auth.hash_password("user123"),
+            role=models.UserRole.USER,
+            email="user@example.com",
+        ))
+        db_session.commit()
+
     resp = client.post("/api/auth/login", json={"username": "user", "password": "user123"})
     token = resp.json()["data"]["token"]
     return {"Authorization": f"Bearer {token}"}
