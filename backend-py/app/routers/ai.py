@@ -3,6 +3,7 @@ import io
 import json
 import logging
 import re
+import time
 from datetime import date
 from typing import Optional
 from xml.sax.saxutils import escape as xml_escape
@@ -1158,12 +1159,24 @@ def _generate_procurement_spec(asset: models.Asset) -> schemas.ProcurementSpecRe
         )
 
 
+# asset_id -> (생성 시각, 생성된 규격서). PDF 다운로드가 이 화면에 표시된
+# 내용과 정확히 같은 걸 받도록, 클라이언트가 보낸 JSON을 그대로 믿는 대신
+# 서버가 직접 생성했던 결과를 여기서 재사용한다 (그렇지 않으면 인증만 된
+# 사용자라면 누구나 임의의 조작된 사양/예산을 실제 자산코드로 "공식" PDF처럼
+# 만들어낼 수 있다). 배포가 단일 프로세스(uvicorn --workers 지정 없음)라서
+# 프로세스 메모리 캐시로 충분하다.
+_PROCUREMENT_SPEC_CACHE: dict[int, tuple[float, schemas.ProcurementSpecResponse]] = {}
+_PROCUREMENT_SPEC_CACHE_TTL_SECONDS = 600
+
+
 @router.get("/procurement-spec/{asset_id}", response_model=schemas.ProcurementSpecResponse)
 def generate_procurement_spec(asset_id: int, db: Session = Depends(get_db)):
     asset = db.query(models.Asset).filter(models.Asset.id == asset_id).first()
     if not asset:
         raise HTTPException(status_code=404, detail="Asset not found")
-    return _generate_procurement_spec(asset)
+    spec = _generate_procurement_spec(asset)
+    _PROCUREMENT_SPEC_CACHE[asset_id] = (time.monotonic(), spec)
+    return spec
 
 
 def _md_inline_to_xml(text: str) -> str:
@@ -1223,12 +1236,21 @@ def _build_procurement_spec_pdf(asset: models.Asset, spec: schemas.ProcurementSp
 
 
 @router.post("/procurement-spec/{asset_id}/pdf")
-def generate_procurement_spec_pdf(asset_id: int, spec: schemas.ProcurementSpecResponse, db: Session = Depends(get_db)):
+def generate_procurement_spec_pdf(asset_id: int, db: Session = Depends(get_db)):
     asset = db.query(models.Asset).filter(models.Asset.id == asset_id).first()
     if not asset:
         raise HTTPException(status_code=404, detail="Asset not found")
 
-    # 화면에 이미 표시된 규격서 데이터를 그대로 PDF로 변환한다 (AI 재호출 없음 → 화면 내용과 100% 일치, 지연/비용 절감).
+    # 클라이언트가 보낸 사양을 그대로 믿지 않는다 - 서버가 직접 생성해 캐시해둔
+    # 결과가 있으면 그걸 쓰고(AI 재호출 없음 → 화면 내용과 100% 일치, 지연/비용
+    # 절감), 없거나 오래됐으면 새로 생성한다.
+    cached = _PROCUREMENT_SPEC_CACHE.get(asset_id)
+    if cached is not None and time.monotonic() - cached[0] <= _PROCUREMENT_SPEC_CACHE_TTL_SECONDS:
+        spec = cached[1]
+    else:
+        spec = _generate_procurement_spec(asset)
+        _PROCUREMENT_SPEC_CACHE[asset_id] = (time.monotonic(), spec)
+
     pdf_bytes = _build_procurement_spec_pdf(asset, spec)
     filename = f"procurement-spec-{asset.asset_code}.pdf"
     return StreamingResponse(

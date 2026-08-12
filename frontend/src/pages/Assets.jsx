@@ -1,17 +1,19 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { assetApi, fileApi } from '../services/api';
 import {
-  Plus, Edit, Trash2, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Download, Upload, ArrowUp, ArrowDown, ArrowUpDown,
+  Plus, Edit, Trash2, ChevronDown, ChevronUp, Download, Upload, ArrowUp, ArrowDown, ArrowUpDown,
   FileText, CheckCircle, XCircle, Loader, Play,
 } from 'lucide-react';
 import { AssetStatusBadge, FileStatusBadge } from '../components/StatusBadge';
 import LoadingState from '../components/LoadingState';
 import Modal from '../components/Modal';
 import Dropdown from '../components/Dropdown';
+import Pagination from '../components/Pagination';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
+import useDebouncedValue from '../hooks/useDebouncedValue';
 
 const PAGE_SIZE = 20;
 const DOC_PAGE_SIZE = 5;
@@ -29,7 +31,7 @@ export default function Assets() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [searchInput, setSearchInput] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
+  const searchTerm = useDebouncedValue(searchInput, 400);
   const [categoryFilter, setCategoryFilter] = useState('');
   const [sortBy, setSortBy] = useState('');
   const [sortOrder, setSortOrder] = useState('asc');
@@ -85,18 +87,9 @@ export default function Assets() {
     usefulLife: 5, status: 'ACTIVE', description: ''
   });
 
-  // 검색어 입력을 400ms 디바운스해서 서버 요청을 과도하게 보내지 않도록 함
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setSearchTerm(searchInput);
-      setPage(1);
-    }, 400);
-    return () => clearTimeout(timer);
-  }, [searchInput]);
-
   useEffect(() => {
     setPage(1);
-  }, [categoryFilter]);
+  }, [searchTerm, categoryFilter]);
 
   const loadAssets = useCallback(async () => {
     setLoading(true);
@@ -182,18 +175,32 @@ export default function Assets() {
     loadDocFiles();
   }, [loadDocFiles]);
 
-  // 대기(PENDING) 또는 처리 중(PROCESSING) 상태인 파일이 있는 경우 2초 주기로 상태 폴링
+  // 대기(PENDING) 또는 처리 중(PROCESSING) 상태인 파일이 있는 경우 2초 주기로 상태 폴링.
+  // 탭이 백그라운드에 있는 동안은 쉬고(불필요한 서버 요청 방지), 다시 보이게 되면
+  // 바로 한 번 갱신해서 오래 안 봐서 못 받은 상태 변화를 따라잡는다.
   useEffect(() => {
     const hasActiveTasks = docFiles.some(
       (f) => f.status === 'PENDING' || f.status === 'PROCESSING'
     );
+    if (!hasActiveTasks) return;
 
-    if (hasActiveTasks) {
-      const interval = setInterval(() => {
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
         loadDocFiles();
-      }, 2000);
-      return () => clearInterval(interval);
-    }
+      }
+    }, 2000);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadDocFiles();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [docFiles, loadDocFiles]);
 
   const handleDocUpload = async (e) => {
@@ -358,8 +365,13 @@ export default function Assets() {
 
   const docTotalPages = Math.max(1, Math.ceil(docFiles.length / DOC_PAGE_SIZE));
   // 최신 업로드일수록 위쪽에 보이도록 id(자동 증가) 내림차순으로 정렬한다.
-  const sortedDocFiles = [...docFiles].sort((a, b) => b.id - a.id);
-  const pagedDocFiles = sortedDocFiles.slice((docPage - 1) * DOC_PAGE_SIZE, docPage * DOC_PAGE_SIZE);
+  // docFiles가 안 바뀌었으면(예: 검색창 입력 등 무관한 상태 변경으로 인한 리렌더)
+  // 다시 정렬/슬라이스하지 않도록 메모이제이션한다.
+  const sortedDocFiles = useMemo(() => [...docFiles].sort((a, b) => b.id - a.id), [docFiles]);
+  const pagedDocFiles = useMemo(
+    () => sortedDocFiles.slice((docPage - 1) * DOC_PAGE_SIZE, docPage * DOC_PAGE_SIZE),
+    [sortedDocFiles, docPage]
+  );
 
   // 파일이 삭제되는 등으로 목록이 줄어들어 지금 페이지가 더 이상 존재하지 않게 되면
   // 마지막 페이지로 당겨준다 (빈 페이지가 표시되는 것을 방지).
@@ -607,28 +619,7 @@ export default function Assets() {
         )}
 
         {!loading && total > 0 && (
-          <div className="flex items-center justify-between mt-4 text-sm text-gray-600 dark:text-slate-400">
-            <div>전체 {total}건 중 {(page - 1) * PAGE_SIZE + 1}-{Math.min(page * PAGE_SIZE, total)}건</div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page <= 1}
-                aria-label="이전 페이지"
-                className="btn btn-secondary px-2 py-1 disabled:opacity-40"
-              >
-                <ChevronLeft size={16} />
-              </button>
-              <span>{page} / {totalPages}</span>
-              <button
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page >= totalPages}
-                aria-label="다음 페이지"
-                className="btn btn-secondary px-2 py-1 disabled:opacity-40"
-              >
-                <ChevronRight size={16} />
-              </button>
-            </div>
-          </div>
+          <Pagination page={page} totalPages={totalPages} total={total} pageSize={PAGE_SIZE} onChange={setPage} />
         )}
       </div>
 
@@ -1007,31 +998,14 @@ export default function Assets() {
           )}
 
           {docFiles.length > DOC_PAGE_SIZE && (
-            <div className="flex items-center justify-between mt-4 text-sm text-gray-600 dark:text-slate-400">
-              <div>
-                전체 {docFiles.length}건 중 {(docPage - 1) * DOC_PAGE_SIZE + 1}-
-                {Math.min(docPage * DOC_PAGE_SIZE, docFiles.length)}건
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setDocPage((p) => Math.max(1, p - 1))}
-                  disabled={docPage <= 1}
-                  aria-label="업로드 파일 이전 페이지"
-                  className="btn btn-secondary px-2 py-1 disabled:opacity-40"
-                >
-                  <ChevronLeft size={16} />
-                </button>
-                <span>{docPage} / {docTotalPages}</span>
-                <button
-                  onClick={() => setDocPage((p) => Math.min(docTotalPages, p + 1))}
-                  disabled={docPage >= docTotalPages}
-                  aria-label="업로드 파일 다음 페이지"
-                  className="btn btn-secondary px-2 py-1 disabled:opacity-40"
-                >
-                  <ChevronRight size={16} />
-                </button>
-              </div>
-            </div>
+            <Pagination
+              page={docPage}
+              totalPages={docTotalPages}
+              total={docFiles.length}
+              pageSize={DOC_PAGE_SIZE}
+              onChange={setDocPage}
+              ariaLabel="업로드 파일"
+            />
           )}
         </div>
       </div>

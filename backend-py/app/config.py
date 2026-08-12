@@ -12,7 +12,11 @@ class Settings:
     )
     JWT_SECRET: str = os.getenv("JWT_SECRET", "asset-management-secret-key-for-development")
     JWT_ALGORITHM: str = "HS256"
-    JWT_EXPIRATION_SECONDS: int = int(os.getenv("JWT_EXPIRATION_SECONDS", "86400"))
+    # 관리자 권한 회수/계정 삭제/비밀번호 변경을 해도 이미 발급된 JWT는 무효화할
+    # 방법이 없다 (role이 DB가 아니라 토큰 안에만 있음). 이 앱은 사용자 관리를
+    # DB 직접 수정으로만 하고 있어 완전한 토큰 무효화(버전 관리 등) 인프라를
+    # 넣을 실익이 크지 않으므로, 대신 만료 시간을 짧게 잡아 노출 창을 줄인다.
+    JWT_EXPIRATION_SECONDS: int = int(os.getenv("JWT_EXPIRATION_SECONDS", "7200"))
     UPLOAD_DIRECTORY: str = os.getenv("UPLOAD_DIRECTORY", "./uploads")
     DEMO_MODE: bool = os.getenv("DEMO_MODE", "true").lower() == "true"
     GN_API_KEY: str = os.getenv("GN_API_KEY", "")

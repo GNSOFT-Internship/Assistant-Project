@@ -194,23 +194,45 @@ def test_generate_procurement_spec(client, admin_headers):
 
 def test_generate_procurement_spec_pdf(client, admin_headers):
     asset = client.post("/api/assets", json=ASSET_PAYLOAD, headers=admin_headers).json()["data"]
-    spec = client.get(f"/api/ai/procurement-spec/{asset['id']}", headers=admin_headers).json()
-    resp = client.post(f"/api/ai/procurement-spec/{asset['id']}/pdf", json=spec, headers=admin_headers)
+    client.get(f"/api/ai/procurement-spec/{asset['id']}", headers=admin_headers)
+    resp = client.post(f"/api/ai/procurement-spec/{asset['id']}/pdf", headers=admin_headers)
     assert resp.status_code == 200
     assert resp.headers["content-type"] == "application/pdf"
     assert resp.content[:5] == b"%PDF-"
 
 
 def test_generate_procurement_spec_pdf_404_for_missing_asset(client, admin_headers):
-    spec = {
-        "title": "테스트",
-        "specifications": "사양",
-        "rfp": "제안요청서",
-        "budgetEstimate": 1000000,
-        "rationale": "근거",
-    }
-    resp = client.post("/api/ai/procurement-spec/999999/pdf", json=spec, headers=admin_headers)
+    resp = client.post("/api/ai/procurement-spec/999999/pdf", headers=admin_headers)
     assert resp.status_code == 404
+
+
+def test_generate_procurement_spec_pdf_ignores_client_submitted_spec(client, admin_headers):
+    """PDF는 서버가 직접 생성해 캐시해둔 규격서로만 만들어져야 한다 - 클라이언트가
+    보낸 임의의 title/budgetEstimate가 그대로 실제 자산코드에 대한 "공식" PDF로
+    둔갑하면 안 된다 (B6)."""
+    import io
+    import pdfplumber
+
+    asset = client.post("/api/assets", json=ASSET_PAYLOAD, headers=admin_headers).json()["data"]
+    client.get(f"/api/ai/procurement-spec/{asset['id']}", headers=admin_headers)
+
+    forged_spec = {
+        "title": "조작된제목문자열",
+        "specifications": "조작된 사양",
+        "rfp": "조작된 RFP",
+        "budgetEstimate": 999999999,
+        "rationale": "조작된 근거",
+    }
+    resp = client.post(f"/api/ai/procurement-spec/{asset['id']}/pdf", json=forged_spec, headers=admin_headers)
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/pdf"
+
+    with pdfplumber.open(io.BytesIO(resp.content)) as pdf:
+        text = "\n".join(page.extract_text() or "" for page in pdf.pages)
+
+    assert "조작된제목문자열" not in text
+    assert "999,999,999" not in text
+    assert asset["assetName"] in text
 
 
 def test_diagnose_asset_failure(client, admin_headers):

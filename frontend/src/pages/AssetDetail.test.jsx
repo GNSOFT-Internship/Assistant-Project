@@ -174,10 +174,9 @@ describe('AssetDetail', () => {
     await waitFor(() => expect(screen.getByText('노트북 교체 규격서')).toBeInTheDocument());
 
     await user.click(screen.getByText('규격서/RFP PDF 다운로드'));
-    await waitFor(() => expect(aiApi.downloadProcurementSpecPdf).toHaveBeenCalledWith(
-      SAMPLE_ASSET.id,
-      expect.objectContaining({ title: '노트북 교체 규격서' })
-    ));
+    // PDF는 서버가 생성해 캐시해둔 규격서로 만들어지므로(B6) 화면의 spec을 body로
+    // 보내지 않는다 - assetId만 넘기는지 확인한다.
+    await waitFor(() => expect(aiApi.downloadProcurementSpecPdf).toHaveBeenCalledWith(SAMPLE_ASSET.id));
 
     // 헤더/푸터에 동일한 기능의 "닫기" 버튼이 두 개 있으므로 첫 번째만 사용한다.
     await user.click(screen.getAllByText('닫기')[0]);

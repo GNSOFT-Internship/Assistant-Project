@@ -107,10 +107,9 @@ describe('Recommendations', () => {
     await waitFor(() => expect(screen.getByText('NAS 스토리지 규격서')).toBeInTheDocument());
 
     await user.click(screen.getByText('규격서/RFP PDF 다운로드'));
-    await waitFor(() => expect(aiApi.downloadProcurementSpecPdf).toHaveBeenCalledWith(
-      RECOMMENDATION.assetId,
-      expect.objectContaining({ title: 'NAS 스토리지 규격서' })
-    ));
+    // PDF는 서버가 생성해 캐시해둔 규격서로 만들어지므로(B6) 화면의 spec을 body로
+    // 보내지 않는다 - assetId만 넘기는지 확인한다.
+    await waitFor(() => expect(aiApi.downloadProcurementSpecPdf).toHaveBeenCalledWith(RECOMMENDATION.assetId));
   });
 
   it('re-queries with a budget filter when Enter is pressed in the budget field', async () => {

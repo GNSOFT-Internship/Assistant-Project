@@ -78,7 +78,9 @@ export const aiApi = {
   getBudgetForecast: () => api.get('/ai/budgets/forecast', { timeout: AI_TIMEOUT }),
   simulateBudget: (totalBudget) => api.post('/ai/budgets/simulate', { totalBudget }, { timeout: AI_TIMEOUT }),
   getProcurementSpec: (assetId) => api.get(`/ai/procurement-spec/${assetId}`, { timeout: AI_TIMEOUT }),
-  downloadProcurementSpecPdf: (assetId, spec) => api.post(`/ai/procurement-spec/${assetId}/pdf`, spec, { responseType: 'blob', timeout: AI_TIMEOUT }),
+  // PDF는 서버가 직접 생성해 캐시해둔 규격서로 만들어진다(조작 방지 - B6).
+  // 화면에 있는 spec 값을 body로 보내도 서버는 더 이상 신뢰하지 않는다.
+  downloadProcurementSpecPdf: (assetId) => api.post(`/ai/procurement-spec/${assetId}/pdf`, null, { responseType: 'blob', timeout: AI_TIMEOUT }),
   diagnoseFailure: (assetId, chatHistory) => api.post('/ai/diagnose', { assetId, chatHistory }, { timeout: AI_TIMEOUT }),
   // 챗봇 답변을 토큰 단위로 흘려받아 체감 속도를 높인다 (axios는 브라우저에서 스트리밍 응답을
   // 다루기 어려워 fetch를 직접 사용). onChunk가 텍스트 조각을 받을 때마다 호출된다.

@@ -5,7 +5,8 @@ import { AssetStatusBadge } from '../components/StatusBadge';
 import LoadingState from '../components/LoadingState';
 import Modal from '../components/Modal';
 import AssetDetailPreview from '../components/AssetDetailPreview';
-import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
+import Pagination from '../components/Pagination';
+import { ArrowLeft } from 'lucide-react';
 import { useSettings } from '../context/SettingsContext';
 
 const TOP_FAILURE_COUNT = 5;
@@ -361,31 +362,14 @@ export default function Maintenance() {
           )}
 
           {failureEntries.length > FAILURE_TYPE_PAGE_SIZE && (
-            <div className="flex items-center justify-between mt-4 text-sm text-gray-600 dark:text-slate-400">
-              <div>
-                전체 {failureEntries.length}건 중 {(failureTypePage - 1) * FAILURE_TYPE_PAGE_SIZE + 1}-
-                {Math.min(failureTypePage * FAILURE_TYPE_PAGE_SIZE, failureEntries.length)}건
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setFailureTypePage((p) => Math.max(1, p - 1))}
-                  disabled={failureTypePage <= 1}
-                  aria-label="고장 유형 이전 페이지"
-                  className="btn btn-secondary px-2 py-1 disabled:opacity-40"
-                >
-                  <ChevronLeft size={16} />
-                </button>
-                <span>{failureTypePage} / {failureTypeTotalPages}</span>
-                <button
-                  onClick={() => setFailureTypePage((p) => Math.min(failureTypeTotalPages, p + 1))}
-                  disabled={failureTypePage >= failureTypeTotalPages}
-                  aria-label="고장 유형 다음 페이지"
-                  className="btn btn-secondary px-2 py-1 disabled:opacity-40"
-                >
-                  <ChevronRight size={16} />
-                </button>
-              </div>
-            </div>
+            <Pagination
+              page={failureTypePage}
+              totalPages={failureTypeTotalPages}
+              total={failureEntries.length}
+              pageSize={FAILURE_TYPE_PAGE_SIZE}
+              onChange={setFailureTypePage}
+              ariaLabel="고장 유형"
+            />
           )}
         </div>
 
