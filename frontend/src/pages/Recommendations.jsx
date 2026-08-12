@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { aiApi, assetApi } from '../services/api';
-import { FileText, Download, ChevronDown, ChevronUp, Save, Sparkles } from 'lucide-react';
+import { FileText, ChevronDown, ChevronUp, Save, Sparkles } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import LoadingState from '../components/LoadingState';
-import Modal from '../components/Modal';
+import ProcurementSpecModal, { useProcurementSpecModal } from '../components/ProcurementSpecModal';
 
 const IMPORTANCE_SOURCE_LABEL = {
   AI: 'AI 산정',
@@ -30,48 +30,7 @@ export default function Recommendations() {
   const [aiRecomputingCategory, setAiRecomputingCategory] = useState(null);
 
   // 조달 사양서 생성 관련 상태
-  const [specData, setSpecData] = useState(null);
-  const [specAssetId, setSpecAssetId] = useState(null);
-  const [loadingSpec, setLoadingSpec] = useState(false);
-  const [showSpecModal, setShowSpecModal] = useState(false);
-  const [downloadingPdf, setDownloadingPdf] = useState(false);
-
-  const handleGenerateSpec = async (assetId) => {
-    setLoadingSpec(true);
-    setShowSpecModal(true);
-    setSpecAssetId(assetId);
-    try {
-      const response = await aiApi.getProcurementSpec(assetId);
-      setSpecData(response.data);
-    } catch (error) {
-      console.error('조달 규격서 생성 실패:', error);
-      toast.error('조달 규격서 생성에 실패했습니다.');
-      setShowSpecModal(false);
-    } finally {
-      setLoadingSpec(false);
-    }
-  };
-
-  const handleDownloadPdf = async () => {
-    setDownloadingPdf(true);
-    try {
-      const response = await aiApi.downloadProcurementSpecPdf(specAssetId, specData);
-      const blob = new Blob([response.data], { type: 'application/pdf' });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `조달규격서_RFP_${specData?.title || specAssetId}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('조달 규격서 PDF 다운로드 실패:', error);
-      toast.error('PDF 다운로드에 실패했습니다.');
-    } finally {
-      setDownloadingPdf(false);
-    }
-  };
+  const specModal = useProcurementSpecModal();
 
   useEffect(() => {
     loadRecommendations();
@@ -352,7 +311,7 @@ export default function Recommendations() {
                     <div className="text-sm text-blue-800 dark:text-blue-300">{rec.reason}</div>
                   </div>
                   <button
-                    onClick={() => handleGenerateSpec(rec.assetId)}
+                    onClick={() => specModal.generate(rec.assetId)}
                     className="btn btn-primary text-xs py-1.5 px-3.5 whitespace-nowrap self-end md:self-auto flex items-center gap-1.5 shadow-md shadow-blue-500/20"
                   >
                     <FileText size={14} />
@@ -371,85 +330,14 @@ export default function Recommendations() {
         )}
       </div>
 
-      {/* AI 조달 규격서 및 RFP 모달 */}
-      <Modal
-        open={showSpecModal}
-        onClose={() => { setShowSpecModal(false); setSpecData(null); setSpecAssetId(null); }}
-        maxWidth="max-w-4xl"
-      >
-        <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-700 pb-3 mb-4">
-          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            📋 AI 조달 구매 규격서 & 제안요청서(RFP)
-          </h2>
-          <button
-            onClick={() => { setShowSpecModal(false); setSpecData(null); setSpecAssetId(null); }}
-            className="text-slate-400 dark:text-slate-500 hover:text-slate-600 hover:dark:text-slate-400 font-bold"
-          >
-            닫기
-          </button>
-        </div>
-
-        {loadingSpec ? (
-          <div className="py-12 text-center flex flex-col items-center justify-center gap-3">
-            <div className="w-8 h-8 rounded-full border-4 border-blue-600 border-t-transparent animate-spin"></div>
-            <p className="text-sm text-slate-500 dark:text-slate-400 font-medium animate-pulse">Qwen3.5 AI 조달 사양서 및 제안요청서 생성 중...</p>
-          </div>
-        ) : specData ? (
-          <div className="space-y-4">
-            <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-xl border border-slate-100 dark:border-slate-700 flex flex-col md:flex-row justify-between gap-4">
-              <div>
-                <div className="text-xs text-slate-400 dark:text-slate-500 font-semibold uppercase">공고 규격서명</div>
-                <div className="text-lg font-bold text-slate-800 dark:text-slate-200 mt-0.5">{specData.title}</div>
-              </div>
-              <div className="text-right min-w-[150px]">
-                <div className="text-xs text-slate-400 dark:text-slate-500 font-semibold uppercase">예상 도입 사업비</div>
-                <div className="text-xl font-extrabold text-blue-600 mt-0.5">{specData.budgetEstimate?.toLocaleString()}원</div>
-              </div>
-            </div>
-
-            <div className="bg-blue-50/50 dark:bg-blue-500/10 p-4 rounded-xl border border-blue-100/50 dark:border-blue-500/20 text-sm text-blue-900 dark:text-blue-300 leading-relaxed">
-              <span className="font-bold">💡 규격 설계 및 예산 근거:</span> {specData.rationale}
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-              <div className="space-y-2">
-                <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 border-l-4 border-blue-600 pl-2">
-                  1. 조달 기술 규격 사양서
-                </h3>
-                <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-600 text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap font-mono leading-relaxed max-h-96 overflow-y-auto">
-                  {specData.specifications}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 border-l-4 border-indigo-600 pl-2">
-                  2. 조달 제안요청서(RFP)
-                </h3>
-                <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-600 text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap font-mono leading-relaxed max-h-96 overflow-y-auto">
-                  {specData.rfp}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-4 border-t border-slate-100 dark:border-slate-700">
-              <button
-                onClick={handleDownloadPdf}
-                disabled={downloadingPdf}
-                className="btn btn-primary flex items-center gap-1.5 disabled:opacity-60"
-              >
-                <Download size={14} />
-                {downloadingPdf ? 'PDF 생성 중...' : '규격서/RFP PDF 다운로드'}
-              </button>
-              <button
-                onClick={() => { setShowSpecModal(false); setSpecData(null); setSpecAssetId(null); }}
-                className="btn btn-secondary"
-              >
-                닫기
-              </button>
-            </div>
-          </div>
-        ) : null}
-      </Modal>
+      <ProcurementSpecModal
+        open={specModal.open}
+        onClose={specModal.close}
+        loading={specModal.loading}
+        specData={specModal.specData}
+        downloading={specModal.downloading}
+        onDownload={specModal.download}
+      />
     </div>
   );
 }

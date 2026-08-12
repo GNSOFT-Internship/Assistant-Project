@@ -4,6 +4,16 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      로그인 토큰을 localStorage에 저장하기 때문에(services/api.js), XSS가 한 번
+      터지면 토큰이 그대로 새어나간다. httpOnly 쿠키로 바꾸는 건 로그인 플로우/
+      CORS/배포 설정을 전부 건드리는 큰 작업이라, 그 대신 스크립트 실행 자체를
+      틀어막아 XSS가 애초에 성립하기 어렵게 만드는 경량 완화책을 적용한다.
+      style-src에 unsafe-inline이 남아있는 건 Recharts가 엘리먼트에 인라인
+      style 속성을 직접 찍기 때문 - script-src를 막는 게 토큰 탈취 방지의
+      핵심이라 style은 트레이드오프로 허용한다.
+    -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net data:; img-src 'self' data:; connect-src 'self' http://localhost:8080; object-src 'none'; base-uri 'self'; form-action 'self';" />
     <title>자산관리 시스템</title>
   </head>
   <body>

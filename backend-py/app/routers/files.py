@@ -2,7 +2,6 @@ import json
 import logging
 import os
 import re
-import shutil
 import uuid
 from datetime import date, datetime
 from typing import Optional
@@ -15,6 +14,7 @@ from sqlalchemy.orm import Session
 from .. import auth, models
 from ..config import settings
 from ..database import get_db
+from ..upload_limits import copy_upload_to_path
 from .assets import (
     _IMPORT_REQUIRED_COLUMNS,
     _log_change,
@@ -279,9 +279,9 @@ async def upload_file(
 
         # 업로드 전체를 메모리에 올렸다가 쓰지 않고, 청크 단위로 바로 디스크에 흘려보낸다.
         # 서비스가 systemd MemoryMax로 제한돼 있어서, 큰 파일을 한 번에 메모리로
-        # 읽으면 그 한도를 넘겨 프로세스가 강제 종료될 수 있다.
-        with open(file_path, "wb") as f:
-            shutil.copyfileobj(file.file, f)
+        # 읽으면 그 한도를 넘겨 프로세스가 강제 종료될 수 있다. 그렇다고 크기
+        # 상한 없이 무제한으로 받으면 디스크가 고갈될 수 있으므로 함께 강제한다.
+        copy_upload_to_path(file, file_path)
 
         file_upload = models.FileUpload(
             filename=filename,
@@ -296,6 +296,8 @@ async def upload_file(
         db.refresh(file_upload)
 
         return {"success": True, "message": "File uploaded successfully", "data": file_to_response(file_upload)}
+    except HTTPException:
+        raise
     except Exception:
         logger.warning("파일 업로드 실패", exc_info=True)
         raise HTTPException(status_code=400, detail="File upload failed")
@@ -448,11 +450,11 @@ async def batch_upload_files(
             filename = _safe_stored_filename(original_filename)
             file_path = os.path.join(settings.UPLOAD_DIRECTORY, filename)
 
-            # 단건 업로드(/upload)와 동일하게 청크 단위로 디스크에 흘려보낸다.
-            # 파일 전체를 메모리에 올리면 배치 업로드에서는 여러 파일이 동시에
-            # 쌓여 systemd MemoryMax 한도를 넘기기 더 쉽다.
-            with open(file_path, "wb") as f:
-                shutil.copyfileobj(file.file, f)
+            # 단건 업로드(/upload)와 동일하게 청크 단위로 디스크에 흘려보내고,
+            # 파일 하나당 크기 상한도 동일하게 강제한다. 파일 전체를 메모리에
+            # 올리면 배치 업로드에서는 여러 파일이 동시에 쌓여 systemd MemoryMax
+            # 한도를 넘기기 더 쉽고, 상한 없이 받으면 디스크 고갈로도 이어진다.
+            copy_upload_to_path(file, file_path)
 
             file_upload = models.FileUpload(
                 filename=filename,
@@ -475,6 +477,8 @@ async def batch_upload_files(
             uploaded_records.append(file_to_response(file_upload))
 
         return {"success": True, "message": f"{len(uploaded_records)} files uploaded and queued for processing", "data": uploaded_records}
+    except HTTPException:
+        raise
     except Exception:
         logger.warning("일괄 파일 업로드 실패", exc_info=True)
         raise HTTPException(status_code=400, detail="Batch upload failed")
