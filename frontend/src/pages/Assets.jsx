@@ -582,8 +582,16 @@ export default function Assets() {
               {assets.map((asset) => (
                 <tr
                   key={asset.id}
+                  role="button"
+                  tabIndex={0}
                   className="border-t cursor-pointer hover:bg-gray-50 hover:dark:bg-slate-900"
                   onClick={() => navigate(`/assets/${asset.id}`)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      navigate(`/assets/${asset.id}`);
+                    }
+                  }}
                 >
                   <td className="table-cell font-medium">{asset.assetName}</td>
                   <td className="table-cell">{asset.category}</td>
@@ -770,8 +778,16 @@ export default function Assets() {
                     return (
                       <React.Fragment key={file.id}>
                         <tr
+                          role="button"
+                          tabIndex={0}
                           className="cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-800"
                           onClick={() => toggleDocFileExpanded(file.id)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              toggleDocFileExpanded(file.id);
+                            }
+                          }}
                         >
                           <td className="table-cell">
                             <div className="flex items-center gap-2 min-w-0">

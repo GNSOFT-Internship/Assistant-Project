@@ -342,8 +342,16 @@ export default function Maintenance() {
                     return (
                       <tr
                         key={name}
+                        role="button"
+                        tabIndex={0}
                         className="border-t cursor-pointer hover:bg-gray-50 hover:dark:bg-slate-900"
                         onClick={() => handleFailureTypeClick(name)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            handleFailureTypeClick(name);
+                          }
+                        }}
                       >
                         <td className="table-cell text-blue-600 hover:underline">{name}</td>
                         <td className="table-cell">{value}건</td>
@@ -439,8 +447,16 @@ export default function Maintenance() {
                         {failureAssets.map((asset) => (
                           <tr
                             key={asset.id}
+                            role="button"
+                            tabIndex={0}
                             className="border-t cursor-pointer hover:bg-gray-50 hover:dark:bg-slate-900"
                             onClick={() => handleAssetClick(asset.id)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                handleAssetClick(asset.id);
+                              }
+                            }}
                           >
                             <td className="table-cell font-medium">{asset.assetName}</td>
                             <td className="table-cell">{asset.assetCode}</td>

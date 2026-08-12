@@ -18,6 +18,17 @@ from ..upload_limits import read_upload_bytes
 
 router = APIRouter(prefix="/api/assets", tags=["assets"])
 
+
+def _like_pattern(search: str) -> str:
+    """LIKE 검색어에 리터럴로 포함된 %, _, \\를 이스케이프한다.
+    이스케이프하지 않으면 검색어에 우연히 %나 _가 들어있을 때(파일 시리얼
+    번호 등) 의도치 않게 와일드카드로 동작해 검색 결과가 부정확해진다
+    (SQLAlchemy .like()는 파라미터 바인딩을 쓰므로 인젝션 자체는 원래도
+    안전하다 - 이건 순수 정확성 문제다)."""
+    escaped = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return f"%{escaped}%"
+
+
 _TRACKED_FIELDS = [
     ("asset_name", "assetName"),
     ("asset_code", "assetCode"),
@@ -161,9 +172,12 @@ def get_all_assets(
     query = db.query(models.Asset)
 
     if search:
-        like = f"%{search}%"
+        like = _like_pattern(search)
         query = query.filter(
-            or_(models.Asset.asset_name.like(like), cast(models.Asset.asset_code, String).like(like))
+            or_(
+                models.Asset.asset_name.like(like, escape="\\"),
+                cast(models.Asset.asset_code, String).like(like, escape="\\"),
+            )
         )
     if category:
         query = query.join(models.Category).filter(models.Category.name == category)
@@ -204,9 +218,12 @@ def export_assets(
     """현재 목록 화면의 검색어/카테고리 필터와 정렬 순서를 그대로 반영해 자산 목록을 엑셀로 내려받는다."""
     query = db.query(models.Asset)
     if search:
-        like = f"%{search}%"
+        like = _like_pattern(search)
         query = query.filter(
-            or_(models.Asset.asset_name.like(like), cast(models.Asset.asset_code, String).like(like))
+            or_(
+                models.Asset.asset_name.like(like, escape="\\"),
+                cast(models.Asset.asset_code, String).like(like, escape="\\"),
+            )
         )
     if category:
         query = query.join(models.Category).filter(models.Category.name == category)
@@ -367,7 +384,9 @@ def get_all_audit_logs(
         # 컬럼으로 표시되므로, 자산명 검색을 별도로 지원해달라는 요구사항).
         matching_ids = [
             row[0] for row in
-            db.query(models.Asset.id).filter(models.Asset.asset_name.like(f"%{search}%")).all()
+            db.query(models.Asset.id)
+            .filter(models.Asset.asset_name.like(_like_pattern(search), escape="\\"))
+            .all()
         ]
         query = query.filter(models.AssetAuditLog.asset_id.in_(matching_ids))
 
