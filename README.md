@@ -16,7 +16,7 @@
 ### 1. 자산 관리 & 변경 이력 추적
 - **자산 CRUD**: 자산 등록/수정/삭제/조회 기능 제공.
 - **서버사이드 페이지네이션, 정렬 & 필터링**: 자산 목록 조회 시 서버사이드 페이지네이션(페이지당 20건), 검색/카테고리 필터, 컬럼(자산명·구매일·구매가·상태) 클릭 정렬을 지원하여 대량 데이터에서도 원하는 자산을 빠르게 찾을 수 있습니다.
-- **카테고리별 자산번호 체계**: 자산번호는 `ASSET-001`처럼 무의미한 일련번호가 아니라, `IT-001`(IT 장비), `FUR-002`(가구)처럼 카테고리 접두사 + 순번으로 구성되어 있어 번호만 봐도 어떤 카테고리 장비인지 바로 알 수 있습니다.
+- **자산번호 자동 채번**: 자산 등록 시 자산번호는 사용자가 입력하지 않아도 서버가 1부터 순차 증가하는 정수로 자동 채번합니다(동시 등록 시에도 행 잠금으로 중복을 방지). 카테고리는 별도의 카테고리 마스터 테이블로 정규화되어 있어, 같은 이름의 카테고리가 여러 자산에 문자열 그대로 중복 저장되지 않습니다.
 - **엑셀 내보내기 / 자산 등록 및 유지보수 내역서·견적서 업로드 통합**: 현재 검색·필터·정렬 조건이 반영된 자산 목록을 엑셀로 내려받을 수 있고, 자산 관리 화면 하나에서 "신규 자산 일괄 등록"과 "기존 자산 유지보수 내역서(엑셀)/견적서(PDF) 업로드"를 같은 드롭존으로 처리합니다. 업로드된 엑셀의 컬럼 구성(자산번호+자산명/카테고리/구매일/구매가/내용연수(년) 전체 존재 여부)만 보고 서버가 두 종류를 자동으로 판별하므로, 사용자가 파일 종류에 맞는 버튼을 따로 찾아 누를 필요가 없습니다. 행 단위로 검증하여 실패한 행(중복/누락된 자산번호, 형식 오류 등)은 한국어 사유와 함께 행별 미리보기 표에 붉은색으로 표시되고, 나머지 정상 행만 반영됩니다. 적용해도 실제로 생성될 항목이 하나도 없는 파일(전부 중복이거나 전부 일치하는 자산이 없는 경우)은 "적용" 버튼 대신 안내 문구만 표시해 혼동을 줄였습니다. 등록된 자산은 다른 자산과 동일하게 취급되므로, 자산 등록 파일은 "적용 취소"를 지원하지 않고 개별 자산 삭제로만 되돌릴 수 있습니다. "예시 파일" 버튼으로 정상/중복/전체 불일치/오류 행 포함 등 각 상황별 샘플 엑셀을 바로 내려받아 동작을 확인해볼 수 있습니다.
 - **자산 변경 이력 기록 (Audit Log)**: 자산 및 유지보수 이력의 생성(CREATE), 수정(UPDATE), 삭제(DELETE)가 발생하면, 어떤 필드가 어떻게 바뀌었는지(이전 값/이후 값)와 수정자, 일시 등의 변경 로그를 `asset_audit_log` 테이블에 자동으로 기록합니다. 자산 상세 페이지의 "변경 이력" 섹션에서 자산별로 확인할 수 있고, 관리자는 "감사 로그" 메뉴에서 시스템 전체의 변경 이력을 작업 유형 필터 및 자산명 검색으로 한 화면에서 조회·필터링할 수 있습니다.
 - **유지보수 이력 관리**: 각 자산 상세 페이지에서 유지보수 이력 항목을 등록할 수 있을 뿐 아니라, 기존 이력을 수정하거나 삭제하는 기능을 추가하여 관리의 유연성을 높였습니다. 이력 목록도 서버사이드 페이지네이션을 적용해 이력이 많은 자산도 빠르게 조회됩니다.
@@ -99,10 +99,12 @@ Assistant-Project/
 │   │   │   ├── files.py     # 파일 업로드/파싱/적용
 │   │   │   ├── dashboard.py # 대시보드 통계
 │   │   │   └── auth_router.py # 로그인
-│   │   ├── models.py        # SQLAlchemy 테이블 모델 (AssetAuditLog, Budget, WorkOrder 등)
+│   │   ├── models.py        # SQLAlchemy 테이블 모델 (Category, AssetAuditLog, Budget, WorkOrder 등)
 │   │   ├── schemas.py       # Pydantic 데이터 검증 스키마
 │   │   ├── auth.py          # JWT 토큰 처리, 로그인 실패 IP 잠금, require_admin 의존성
+│   │   ├── client_ip.py     # 신뢰하는 프록시 뒤에서 실제 클라이언트 IP 판별
 │   │   ├── rate_limit.py    # AI 엔드포인트 요청 제한(Rate Limiting)
+│   │   ├── upload_limits.py # 업로드 파일 크기 상한 강제(청크 단위 검증)
 │   │   ├── scoring.py       # 교체 우선순위 점수 계산 공용 로직
 │   │   ├── category_importance.py # 카테고리별 업무 중요도 AI 산정/캐싱/관리자 override
 │   │   ├── config.py        # 환경변수 로딩 및 설정
@@ -145,7 +147,7 @@ cp .env.example .env         # 환경설정 파일 복사 (DATABASE_URL, API KEY
 uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload
 ```
 
-백엔드 서버는 `http://localhost:8080` 에서 구동됩니다. 최초 기동 시 테이블을 자동으로 생성하고 기본 관리자 계정(`admin`/`admin123`) 및 일반 사용자 계정(`user`/`user123`)을 시딩합니다.
+백엔드 서버는 `http://localhost:8080` 에서 구동됩니다. 최초 기동 시 테이블을 자동으로 생성하며, `.env`에 `SEED_DEFAULT_USERS=true`를 설정한 경우에만 기본 관리자 계정(`admin`/`admin123`) 및 일반 사용자 계정(`user`/`user123`)을 시딩합니다(운영 배포 기본값은 `false`이며, 이 경우 계정을 직접 만들어야 합니다).
 *자세한 백엔드 설정 사항은 `backend-py/README.md`를 참고하세요.*
 
 #### 데모 데이터 적재 (선택)
@@ -168,6 +170,7 @@ npm run dev
 ---
 
 ## 데모 계정
+`.env`의 `SEED_DEFAULT_USERS=true`일 때만 아래 계정이 자동으로 생성/유지됩니다(기본값 `false`).
 - **관리자 계정**: admin / admin123 — 자산/예산/유지보수 이력/파일업로드 등록·수정·삭제 등 모든 기능 사용 가능
 - **일반 계정**: user / user123 — 조회 전용. 등록/수정/삭제 등 쓰기 작업은 서버에서 403으로 차단되며, 프론트엔드에서도 관련 버튼이 노출되지 않음
 
@@ -192,7 +195,7 @@ cd frontend
 npm test
 ```
 
-Vitest + React Testing Library 기반으로 공용 유틸/컨텍스트/컴포넌트 및 주요 페이지 동작을 검증하는 프론트엔드 테스트가 `frontend/src/**/*.test.{js,jsx}`에 있습니다. 백엔드와 마찬가지로 GitHub Actions로 `frontend` 변경 시마다 자동 실행됩니다.
+Vitest + React Testing Library 기반으로 공용 유틸/컨텍스트/컴포넌트 및 주요 페이지 동작을 검증하는 프론트엔드 테스트가 `frontend/src/**/*.test.{js,jsx}`에 있습니다. 백엔드와 마찬가지로 GitHub Actions로 `frontend` 변경 시마다 자동 실행됩니다. 자세한 테스트 구성과 최근 실행 결과는 `TESTING.md`를 참고하세요.
 
 ---
 
@@ -205,8 +208,10 @@ Vitest + React Testing Library 기반으로 공용 유틸/컨텍스트/컴포넌
 - `GET /api/assets` - 자산 목록 조회 (서버사이드 페이지네이션, 검색어, 카테고리 필터, 컬럼 정렬 매개변수 지원)
 - `GET /api/assets/export` - 현재 검색/필터/정렬 조건이 반영된 자산 목록 엑셀 다운로드
 - `GET /api/assets/audit-logs` - 시스템 전체 변경 이력(감사 로그) 조회, 작업 유형/작업자/자산명 검색 필터 지원 (관리자 전용)
+- `GET /api/assets/categories` - 실제 자산 데이터에 쓰이고 있는 카테고리 목록 조회 (하드코딩 목록이 아닌 DB 기준)
 - `GET /api/assets/category-importance` - 카테고리별 교체 우선순위 업무 중요도(0~100점) 목록 조회
 - `PUT /api/assets/category-importance` - 카테고리 중요도를 관리자가 직접 덮어쓰기 (이후 AI 자동 재계산 안 함, 관리자 전용)
+- `POST /api/assets/category-importance/ai-recompute` - 카테고리 중요도를 AI로 다시 산정 (관리자 전용)
 - `POST /api/assets/import` - 엑셀 파일로 자산 일괄 등록 (행 단위 검증, 실패 행은 사유와 함께 건너뜀, 관리자 전용. 프론트엔드는 아래 `/api/files/*`의 자동 판별 업로드 드롭존을 통해 이 로직을 재사용함)
 - `GET /api/assets/{id}` - 자산 상세 조회
 - `POST /api/assets` - 자산 신규 등록 (변경 이력 기록, 관리자 전용)
@@ -260,15 +265,22 @@ Vitest + React Testing Library 기반으로 공용 유틸/컨텍스트/컴포넌
 ```env
 DATABASE_URL=mysql+pymysql://asset:assetpass@127.0.0.1:3306/asset_management?charset=utf8mb4
 JWT_SECRET=CHANGE_ME_to_a_unique_random_secret
-JWT_EXPIRATION_SECONDS=86400
+JWT_EXPIRATION_SECONDS=7200
 UPLOAD_DIRECTORY=./uploads
 DEMO_MODE=true
 # 사내 GPU 서버(gn-cab) API Key (AI 기능 실구동 시 필수 입력)
 GN_API_KEY=
 GN_MODEL=qwen35   # 간단한 응답용. 심층 분석이 필요한 일부 기능은 내부적으로 qwen35-think를 사용
+
+# admin/admin123, user/user123 기본 계정을 자동 생성/유지할지 여부 (기본값 false)
+SEED_DEFAULT_USERS=false
+# X-Real-IP/X-Forwarded-For 헤더를 신뢰할 리버스 프록시(nginx 등)의 IP 목록
+TRUSTED_PROXY_IPS=127.0.0.1,::1
+# 업로드 파일 하나당 허용하는 최대 크기(MB)
+MAX_UPLOAD_SIZE_MB=20
 ```
 
-> **보안 안전장치**: `.env`는 `.gitignore`에 등록되어 git에 커밋되지 않습니다 (`git add -A`를 써도 자동으로 제외됨). 배포 서버에서는 파일 권한을 `chmod 600`으로 설정해 소유자(root) 외에는 읽을 수 없도록 제한하는 것을 권장합니다. `JWT_SECRET`을 예시 기본값 그대로 두면(공개 저장소에 노출된 값이라 토큰 위조가 가능해짐) `DEMO_MODE` 설정과 무관하게 서버가 기동을 아예 거부합니다.
+> **보안 안전장치**: `.env`는 `.gitignore`에 등록되어 git에 커밋되지 않습니다 (`git add -A`를 써도 자동으로 제외됨). 배포 서버에서는 파일 권한을 `chmod 600`으로 설정해 소유자(root) 외에는 읽을 수 없도록 제한하는 것을 권장합니다. `JWT_SECRET`을 예시 기본값 그대로 두면(공개 저장소에 노출된 값이라 토큰 위조가 가능해짐) `DEMO_MODE` 설정과 무관하게 서버가 기동을 아예 거부합니다. `SEED_DEFAULT_USERS=false`(기본값)인데도 admin 계정 비밀번호가 여전히 `admin123`이면 마찬가지로 서버가 기동을 거부합니다.
 
 ---
 
@@ -287,8 +299,8 @@ GN_MODEL=qwen35   # 간단한 응답용. 심층 분석이 필요한 일부 기�
 관리 대상인 공공시설 자산의 상세 명세를 저장합니다.
 - `id`: BIGINT (PK, Auto Increment)
 - `asset_name`: VARCHAR(200) (NOT NULL) - 자산 명칭
-- `asset_code`: VARCHAR(50) (NOT NULL, UNIQUE) - 식별 코드, 카테고리 접두사 + 순번 (예: `IT-001`, `FUR-002`)
-- `category`: VARCHAR(100) (NOT NULL) - 분류 카테고리 (IT 장비, 설비 등)
+- `asset_code`: INT (NOT NULL, UNIQUE) - 자산번호, 1부터 순차 자동 채번 (사용자 입력 아님)
+- `category_id`: BIGINT (FK -> `category.id`, NOT NULL) - 분류 카테고리. `category` 테이블로 정규화되어 있으며, API 요청/응답에서는 여전히 카테고리명 문자열(`category`)로 주고받음
 - `location`: VARCHAR(200) - 설치 위치
 - `responsible_person`: VARCHAR(100) - 담당 관리자
 - `purchase_date`: DATE (NOT NULL) - 구매/취득 일자
@@ -329,7 +341,7 @@ GN_MODEL=qwen35   # 간단한 응답용. 심층 분석이 필요한 일부 기�
 자산의 등록, 수정, 삭제 시 변경된 이전 값과 이후 값의 스냅샷을 기록합니다.
 - `id`: BIGINT (PK, Auto Increment)
 - `asset_id`: BIGINT (index) - 변경 대상 자산 ID (자산 삭제 후 보존을 위해 외래키 해제)
-- `asset_code`: VARCHAR(50) - 자산 식별 코드
+- `asset_code`: INT - 자산 식별 코드
 - `action`: ENUM('CREATE', 'UPDATE', 'DELETE') (NOT NULL) - 작업 종류
 - `changed_by`: VARCHAR(50) - 변경을 수행한 로그인 유저명
 - `changes`: TEXT - 변경된 필드들의 변경 전/후 값 스냅샷 (JSON 형식 문자열)
@@ -366,17 +378,23 @@ AI 어시스턴트와의 계정별 대화 기록을 관리합니다.
 - `estimated_time`: VARCHAR(100) - 예상 소요 시간
 - `created_at`: TIMESTAMP - 생성 일시
 
-### 9. 카테고리별 업무 중요도 (`category_importance`)
+### 9. 카테고리 마스터 (`category`)
+자산의 분류(카테고리)명을 정규화해서 저장하는 테이블로, `asset.category_id`/`category_importance.category_id`가 여기를 참조합니다.
+- `id`: BIGINT (PK, Auto Increment)
+- `name`: VARCHAR(100) (NOT NULL, UNIQUE) - 카테고리명
+- `created_at`: TIMESTAMP - 최초 등록 일시
+
+### 10. 카테고리별 업무 중요도 (`category_importance`)
 교체 우선순위 점수에 반영되는, 카테고리(장비 종류)별 "고장 시 업무 영향도" 점수를 캐싱합니다.
 - `id`: BIGINT (PK, Auto Increment)
-- `category`: VARCHAR(100) (NOT NULL, UNIQUE) - 자산의 카테고리 문자열 (저장 전 앞뒤 공백 제거)
+- `category_id`: BIGINT (FK -> `category.id`, NOT NULL, UNIQUE) - 대상 카테고리
 - `importance_score`: DECIMAL(5, 1) (NOT NULL) - 0~100점 중요도
 - `reason`: TEXT - 이 점수를 준 근거 (AI가 생성했거나, 관리자가 직접 입력한 사유)
 - `source`: ENUM('AI', 'MANUAL', 'DEFAULT') (NOT NULL) - 산정 방식 (AI 산정 / 관리자 수동 지정 / AI 미설정 시 기본값)
 - `created_at`: TIMESTAMP - 최초 산정 일시
 - `updated_at`: TIMESTAMP - 최종 수정 일시
 
-### 10. AI 교체 추천 사유 캐시 (`asset_replacement_reason`)
+### 11. AI 교체 추천 사유 캐시 (`asset_replacement_reason`)
 교체 우선순위 추천 사유(AI 생성 텍스트)를 캐싱하여, 근거 수치가 안 바뀌었으면 AI를 다시 호출하지 않습니다.
 - `asset_id`: BIGINT (PK, FK -> `asset.id` ON DELETE CASCADE) - 대상 자산 ID
 - `metrics_hash`: VARCHAR(64) (NOT NULL) - 사용기간/수리비율/고장횟수/점수 등 근거 수치의 해시

@@ -22,4 +22,4 @@ npm test          # 1회 실행 (CI에서 사용)
 npm run test:watch  # 감시 모드
 ```
 
-Vitest + React Testing Library 기반으로 `src/**/*.test.{js,jsx}`에 위치합니다. 공용 유틸(`utils/format.js`, `utils/shortcut.js`), Toast/Confirm 컨텍스트, `Modal` 컴포넌트, 그리고 실제로 있었던 회귀 버그(널 상태에서 자산 상세 접근 시 크래시)를 재현하는 `AiAssistant` 페이지 테스트를 포함합니다. `backend-py`와 마찬가지로 GitHub Actions(`.github/workflows/ci.yml`)에서 `main`으로 향하는 PR에 `frontend/**` 변경이 포함되면 자동 실행되고, `main`에 머지된 뒤에는 `deploy.yml`이 배포 직전에 한 번 더 실행합니다.
+Vitest + React Testing Library 기반으로 `src/**/*.test.{js,jsx}`에 위치합니다. 공용 유틸(`utils/format.js`, `utils/shortcut.js`), `services/api.js`(Axios 인터셉터), Toast/Confirm 컨텍스트, `Modal` 컴포넌트, 그리고 실제로 있었던 회귀 버그(널 상태에서 자산 상세 접근 시 크래시)를 재현하는 `AiAssistant` 페이지 테스트를 포함합니다. `backend-py`와 마찬가지로 GitHub Actions(`.github/workflows/ci.yml`)에서 `main`으로 향하는 PR에 `frontend/**` 변경이 포함되면 자동 실행되고, `main`에 머지된 뒤에는 `deploy.yml`이 배포 직전에 한 번 더 실행합니다.

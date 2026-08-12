@@ -7,20 +7,20 @@
 
 | 구분 | 위치 | 실행 명령 | 최근 결과 |
 |---|---|---|---|
-| 백엔드 (pytest) | `backend-py/tests/` | `cd backend-py && python -m pytest tests/ -q` | **142개 전체 통과** |
-| 프론트엔드 (vitest) | `frontend/src/**/*.test.jsx` | `cd frontend && npx vitest run` | **104개 전체 통과** |
+| 백엔드 (pytest) | `backend-py/tests/` | `cd backend-py && python -m pytest tests/ -q` | **161개 전체 통과** |
+| 프론트엔드 (vitest) | `frontend/src/**/*.test.{js,jsx}` | `cd frontend && npx vitest run` | **111개 전체 통과** |
 
-### 백엔드 테스트 파일 (17개)
+### 백엔드 테스트 파일 (18개)
 `test_ai_gating.py`, `test_ai_search_and_recommendation.py`, `test_assets.py`, `test_auth.py`,
 `test_budget_clamp.py`, `test_budgets.py`, `test_category_importance.py`, `test_chat.py`,
 `test_client_ip.py`, `test_dashboard.py`, `test_files.py`, `test_permissions.py`, `test_qna_logic.py`,
-`test_rate_limit.py`, `test_reports.py`, `test_scoring.py`, `test_startup_security.py`
+`test_rate_limit.py`, `test_reports.py`, `test_scoring.py`, `test_startup_security.py`, `test_upload_limits.py`
 (+ 픽스처 정의 `conftest.py`)
 
-### 프론트엔드 테스트 파일 (15개)
+### 프론트엔드 테스트 파일 (16개)
 `AiAssistant`, `AssetDetail`, `Assets`, `AuditLog`, `Budget`, `Dashboard`, `Login`,
 `Maintenance`, `Recommendations`, `Reports` 각 페이지 + `Modal`, `ConfirmContext`, `ToastContext`,
-`format`, `shortcut` 공용 컴포넌트/유틸
+`format`, `shortcut`, `services/api`(Axios 인터셉터) 공용 컴포넌트/유틸
 
 `Assets` 페이지에는 원래 별도 페이지였던 "파일 업로드"(유지보수 내역서 엑셀/견적서 PDF
 AI 분석) 기능이 통합되어 있고, 자산 등록용 엑셀 업로드까지 같은 드롭존에서 컬럼 구성만
