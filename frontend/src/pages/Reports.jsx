@@ -1,24 +1,37 @@
 import React from 'react';
 import { reportApi } from '../services/api';
-import { FileText, Download, RefreshCw } from 'lucide-react';
+import { FileText, Download, RefreshCw, Trash2, History, Loader2 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
+import { useConfirm } from '../context/ConfirmContext';
 import { formatCurrency } from '../utils/format';
 import Dropdown from '../components/Dropdown';
+import * as pdfHistory from '../utils/pdfDownloadHistory';
 
 const now = new Date();
 const CURRENT_YEAR = now.getFullYear();
 const CURRENT_MONTH = now.getMonth() + 1;
 const YEAR_OPTIONS = Array.from({ length: 6 }, (_, i) => CURRENT_YEAR - i);
 const MONTH_OPTIONS = Array.from({ length: 12 }, (_, i) => i + 1);
-// PDF는 AI 서술까지 포함해 서버가 통째로 만든 뒤 한 번에 내려주는 방식이라 실제
-// "다운로드 진행률"은 의미가 없다(전송 자체는 완성 즉시 순식간에 끝남). 그래서 평소
-// 소요 시간(경험적 추정치) 대비 경과 비율로 "예상 진행률"을 보여주고, 실제 완료 시 100%로 스냅한다.
-const ESTIMATED_PDF_SECONDS = 12;
 
 export default function Reports() {
   const toast = useToast();
+  const confirmDialog = useConfirm();
   const [generating, setGenerating] = React.useState(false);
   const [elapsedMs, setElapsedMs] = React.useState(0);
+
+  // 'generate' = 기존 보고서 생성/미리보기 화면, 'history' = 예전에 받았던 PDF 목록
+  const [activeTab, setActiveTab] = React.useState('generate');
+  // handleGenerate 내부의 비동기 콜백(다운로드 완료 시점)에서 "지금 실제로 보고 있는 탭"을
+  // 정확히 알기 위한 ref. state를 직접 읽으면 클릭 시점의 값으로 클로저에 고정돼버린다.
+  const activeTabRef = React.useRef(activeTab);
+  React.useEffect(() => {
+    activeTabRef.current = activeTab;
+  }, [activeTab]);
+  const [historyEntries, setHistoryEntries] = React.useState([]);
+  const [historyLoading, setHistoryLoading] = React.useState(false);
+  // 다운로드가 진행 중인 연/월. null이 아니면 기록 탭에 "다운로드 중..." 회색 임시 행을
+  // 하나 보여준다 - 완료되면 이 값이 비워지고 실제 기록(historyEntries)에 항목이 생긴다.
+  const [pendingHistoryEntry, setPendingHistoryEntry] = React.useState(null);
 
   const [loading, setLoading] = React.useState(true);
   const [report, setReport] = React.useState(null);
@@ -60,6 +73,25 @@ export default function Reports() {
     loadPreview();
   }, [loadPreview]);
 
+  const refreshHistory = React.useCallback(async () => {
+    setHistoryLoading(true);
+    try {
+      const entries = await pdfHistory.listEntries();
+      setHistoryEntries(entries);
+    } catch (error) {
+      console.error('다운로드 기록 로드 실패:', error);
+      toast.error('다운로드 기록을 불러오는 중 오류가 발생했습니다.');
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, [toast]);
+
+  React.useEffect(() => {
+    if (activeTab === 'history') {
+      refreshHistory();
+    }
+  }, [activeTab, refreshHistory]);
+
   const handleLoadAiSummary = async () => {
     setLoadingAiSummary(true);
     try {
@@ -87,6 +119,7 @@ export default function Reports() {
 
     setGenerating(true);
     setElapsedMs(0);
+    setPendingHistoryEntry({ year: reqYear, month: reqMonth });
     const startedAt = Date.now();
     const timerId = setInterval(() => {
       setElapsedMs(Date.now() - startedAt);
@@ -103,14 +136,29 @@ export default function Reports() {
       if (requestGeneration !== generationRef.current) return;
 
       const blob = new Blob([response.data], { type: 'application/pdf' });
+      const filename = `자산관리_보고서_${reqYear}-${String(reqMonth).padStart(2, '0')}.pdf`;
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `자산관리_보고서_${reqYear}-${String(reqMonth).padStart(2, '0')}.pdf`;
+      link.download = filename;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
+
+      // 방금 받은 PDF를 기록에 남긴다. 이 저장이 실패해도(사파리 프라이빗 모드 등) 이미
+      // 다운로드 자체는 끝난 뒤라 사용자 흐름을 막을 이유가 없으므로 조용히 무시한다.
+      // (activeTab을 직접 읽지 않고 ref로 확인하는 이유: handleGenerate는 클릭 시점의
+      // activeTab을 클로저로 캡처하므로, 다운로드 중에 '다운로드 기록' 탭으로 넘어가도
+      // 그 값이 갱신되지 않아 목록이 안 채워지는 버그가 있었다. ref는 항상 최신 탭을
+      // 가리키므로 다운로드가 끝나는 시점에 실제로 그 탭을 보고 있는지 정확히 알 수 있다.)
+      try {
+        await pdfHistory.addEntry({ year: reqYear, month: reqMonth, filename, blob });
+        setPendingHistoryEntry(null);
+        if (activeTabRef.current === 'history') refreshHistory();
+      } catch (historyError) {
+        console.error('다운로드 기록 저장 실패:', historyError);
+      }
     } catch (error) {
       if (requestGeneration !== generationRef.current) return;
       if (error?.name === 'CanceledError' || error?.name === 'AbortError') {
@@ -127,6 +175,7 @@ export default function Reports() {
       if (requestGeneration === generationRef.current) {
         setGenerating(false);
         abortControllerRef.current = null;
+        setPendingHistoryEntry(null);
       }
     }
   };
@@ -138,7 +187,47 @@ export default function Reports() {
     generationRef.current++;
     setGenerating(false);
     abortControllerRef.current = null;
+    setPendingHistoryEntry(null);
   };
+
+  // 기록에 저장된 Blob을 그대로 내려준다 - 서버를 다시 부르지 않으므로 즉시 다운로드된다.
+  const handleHistoryDownload = (entry) => {
+    const url = window.URL.createObjectURL(entry.blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = entry.filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  };
+
+  const handleHistoryDelete = async (entry) => {
+    if (!(await confirmDialog(`${entry.year}년 ${entry.month}월 다운로드 기록을 삭제하시겠습니까?`, { danger: true, confirmLabel: '삭제' }))) {
+      return;
+    }
+    try {
+      await pdfHistory.deleteEntry(entry.id);
+      setHistoryEntries((prev) => prev.filter((e) => e.id !== entry.id));
+    } catch (error) {
+      console.error('다운로드 기록 삭제 실패:', error);
+      toast.error('삭제 중 오류가 발생했습니다.');
+    }
+  };
+
+  const formatFileSize = (bytes) => {
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)}KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+  };
+
+  const formatGeneratedAt = (isoString) =>
+    new Date(isoString).toLocaleString('ko-KR', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
 
   const activeCount = report?.byStatus?.ACTIVE || 0;
   const replacementCount = report?.byStatus?.REPLACEMENT_NEEDED || 0;
@@ -147,7 +236,33 @@ export default function Reports() {
     <div className="space-y-6">
       <div className="card">
         <div className="flex items-center justify-between mb-4">
-          <h1 className="text-2xl font-bold">AI 보고서 자동 생성</h1>
+          <div className="flex items-center gap-4">
+            <h1 className="text-2xl font-bold">AI 보고서 자동 생성</h1>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setActiveTab('generate')}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  activeTab === 'generate'
+                    ? 'bg-blue-600 text-white'
+                    : 'text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700'
+                }`}
+              >
+                보고서 생성
+              </button>
+              <button
+                onClick={() => setActiveTab('history')}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
+                  activeTab === 'history'
+                    ? 'bg-blue-600 text-white'
+                    : 'text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700'
+                }`}
+              >
+                <History size={14} />
+                다운로드 기록
+              </button>
+            </div>
+          </div>
+          {activeTab === 'generate' && (
           <div
             className="flex items-center gap-2"
             title={generating ? `${CURRENT_MONTH}월 PDF 를 다운중입니다 !` : undefined}
@@ -180,8 +295,11 @@ export default function Reports() {
               새로고침
             </button>
           </div>
+          )}
         </div>
 
+        {activeTab === 'generate' && (
+        <>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="border rounded-lg p-6">
             <div className="flex items-center gap-3 mb-4">
@@ -215,16 +333,6 @@ export default function Reports() {
                   </button>
                 )}
               </div>
-              {generating && (
-                <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-blue-100 dark:bg-blue-500/15">
-                  <div
-                    className="h-full rounded-full bg-blue-600 transition-all duration-200 ease-linear"
-                    style={{
-                      width: `${Math.min(96, Math.round((elapsedMs / (ESTIMATED_PDF_SECONDS * 1000)) * 100))}%`,
-                    }}
-                  />
-                </div>
-              )}
             </div>
           </div>
 
@@ -299,6 +407,85 @@ export default function Reports() {
                   </div>
                 </div>
               </div>
+            )}
+          </div>
+        )}
+        </>
+        )}
+
+        {activeTab === 'history' && (
+          <div>
+            {historyLoading ? (
+              <p className="text-sm text-gray-500 dark:text-slate-400 py-6 text-center">불러오는 중...</p>
+            ) : historyEntries.length === 0 && !pendingHistoryEntry ? (
+              <p className="text-sm text-gray-500 dark:text-slate-400 py-6 text-center">
+                아직 다운로드한 보고서가 없습니다. &apos;보고서 생성&apos; 탭에서 PDF를 받으면 여기에 기록됩니다.
+              </p>
+            ) : (
+              <table className="table">
+                <thead className="table-header">
+                  <tr>
+                    <th className="table-cell">보고 대상</th>
+                    <th className="table-cell">다운로드 일시</th>
+                    <th className="table-cell">파일 크기</th>
+                    <th className="table-cell"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pendingHistoryEntry && (
+                    <tr>
+                      <td className="table-cell font-medium text-gray-400 dark:text-slate-500">
+                        {pendingHistoryEntry.year}년 {pendingHistoryEntry.month}월
+                      </td>
+                      <td className="table-cell text-gray-400 dark:text-slate-500">
+                        <span className="flex items-center gap-1.5">
+                          <Loader2 size={14} className="animate-spin" />
+                          다운로드 중...
+                        </span>
+                      </td>
+                      <td className="table-cell text-gray-400 dark:text-slate-500">-</td>
+                      <td className="table-cell">
+                        <div className="flex items-center gap-2">
+                          <button disabled className="btn btn-secondary flex items-center gap-1.5 opacity-40 cursor-not-allowed">
+                            <Download size={14} />
+                            다운로드
+                          </button>
+                          <button disabled className="btn btn-danger flex items-center gap-1.5 opacity-40 cursor-not-allowed">
+                            <Trash2 size={14} />
+                            삭제
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                  {historyEntries.map((entry) => (
+                    <tr key={entry.id}>
+                      <td className="table-cell font-medium">{entry.year}년 {entry.month}월</td>
+                      <td className="table-cell">{formatGeneratedAt(entry.generatedAt)}</td>
+                      <td className="table-cell">{formatFileSize(entry.size)}</td>
+                      <td className="table-cell">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleHistoryDownload(entry)}
+                            className="btn btn-secondary flex items-center gap-1.5"
+                          >
+                            <Download size={14} />
+                            다운로드
+                          </button>
+                          <button
+                            onClick={() => handleHistoryDelete(entry)}
+                            className="btn btn-danger flex items-center gap-1.5"
+                            title="기록 삭제"
+                          >
+                            <Trash2 size={14} />
+                            삭제
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             )}
           </div>
         )}
