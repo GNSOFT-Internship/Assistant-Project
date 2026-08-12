@@ -26,3 +26,10 @@ def test_falls_back_to_x_forwarded_for_first_entry():
 def test_falls_back_to_request_client_host_when_no_headers():
     req = _request({}, client_host="192.168.1.1")
     assert get_client_ip(req) == "192.168.1.1"
+
+
+def test_ignores_forwarded_headers_from_untrusted_peer():
+    """nginx(TRUSTED_PROXY_IPS)를 거치지 않고 직접 접근한 요청이 X-Real-IP를
+    위조해 로그인 잠금/AI 요청 제한을 우회하거나 타인의 IP로 위장하지 못해야 한다."""
+    req = _request({"x-real-ip": "203.0.113.5"}, client_host="8.8.8.8")
+    assert get_client_ip(req) == "8.8.8.8"

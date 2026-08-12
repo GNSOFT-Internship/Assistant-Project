@@ -25,3 +25,13 @@ def test_startup_rejects_default_jwt_secret_outside_demo_mode(monkeypatch):
 def test_startup_allows_custom_jwt_secret(monkeypatch):
     monkeypatch.setattr(settings, "JWT_SECRET", "a-real-custom-secret")
     main.on_startup()  # 예외 없이 정상 기동되어야 한다
+
+
+def test_startup_rejects_default_admin_password_when_not_seeding(monkeypatch, client):
+    """SEED_DEFAULT_USERS=false(운영 기본값)인데 admin 비밀번호가 여전히
+    admin123이면, 그 계정으로 로그인 시 전체 관리자 권한을 얻을 수 있으므로
+    JWT_SECRET 검증과 동일하게 기동을 막아야 한다."""
+    monkeypatch.setattr(settings, "JWT_SECRET", "a-real-custom-secret")
+    monkeypatch.setattr(settings, "SEED_DEFAULT_USERS", False)
+    with pytest.raises(RuntimeError, match="admin"):
+        main.on_startup()

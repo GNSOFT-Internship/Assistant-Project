@@ -18,6 +18,13 @@ os.environ["DATABASE_URL"] = f"sqlite:///{_TEST_DB_PATH}"
 os.environ["UPLOAD_DIRECTORY"] = str(_TEST_UPLOAD_DIR)
 os.environ.setdefault("JWT_SECRET", "test-secret-key")
 os.environ["GN_API_KEY"] = ""
+# 테스트는 admin/admin123, user/user123 계정 로그인에 의존하므로
+# (admin_headers/user_headers 픽스처) 자동 시드를 명시적으로 켠다.
+os.environ.setdefault("SEED_DEFAULT_USERS", "true")
+# starlette TestClient가 보내는 요청의 request.client.host는 실제 IP가 아니라
+# "testclient" 고정 문자열이므로, X-Real-IP 기반 테스트가 동작하려면 이 값도
+# 신뢰 프록시 목록에 포함되어야 한다.
+os.environ.setdefault("TRUSTED_PROXY_IPS", "127.0.0.1,::1,testclient")
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
