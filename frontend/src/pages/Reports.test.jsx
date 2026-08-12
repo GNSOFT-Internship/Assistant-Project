@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import Reports from './Reports';
 import { ToastProvider } from '../context/ToastContext';
+import { ConfirmProvider } from '../context/ConfirmContext';
 import { reportApi } from '../services/api';
 
 const CURRENT_MONTH = new Date().getMonth() + 1;
@@ -28,7 +29,9 @@ const REPORT_DATA = {
 function renderPage() {
   return render(
     <ToastProvider>
-      <Reports />
+      <ConfirmProvider>
+        <Reports />
+      </ConfirmProvider>
     </ToastProvider>
   );
 }
