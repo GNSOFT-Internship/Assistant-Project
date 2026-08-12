@@ -45,7 +45,6 @@ _DEFAULT_JWT_SECRET = "asset-management-secret-key-for-development"
 @app.on_event("startup")
 def on_startup():
     Base.metadata.create_all(bind=engine)
-    seed_initial_users()
 
     from .config import settings
     # 이 기본값은 GitHub 공개 저장소에 그대로 노출되어 있으므로, DEMO_MODE 여부와
@@ -58,6 +57,11 @@ def on_startup():
             "SECURITY: JWT_SECRET이 공개 저장소에 노출된 기본 개발용 값으로 설정되어 있습니다. "
             ".env 파일에 고유한 JWT_SECRET을 반드시 설정한 뒤 다시 시작하세요."
         )
+
+    if settings.SEED_DEFAULT_USERS:
+        seed_initial_users()
+    else:
+        _reject_if_default_credentials_active()
 
 
 def seed_initial_users():
@@ -84,6 +88,24 @@ def seed_initial_users():
             db.add(user)
             db.commit()
             print("User created: user / user123")
+    finally:
+        db.close()
+
+
+def _reject_if_default_credentials_active():
+    """SEED_DEFAULT_USERS=false(운영 기본값)인데도 admin 계정 비밀번호가
+    여전히 공개 저장소에 노출된 기본값(admin123)이면 기동을 막는다.
+    이 계정으로 로그인하면 누구나 자산/예산/파일을 마음대로 변경할 수 있는
+    관리자 권한을 얻으므로, JWT_SECRET 검증과 동일한 수준으로 취급한다."""
+    db = SessionLocal()
+    try:
+        admin = db.query(models.User).filter(models.User.username == "admin").first()
+        if admin is not None and auth.verify_password("admin123", admin.password):
+            raise RuntimeError(
+                "SECURITY: 기본 관리자 계정(admin/admin123)의 비밀번호가 아직 그대로입니다. "
+                "관리자 비밀번호를 변경한 뒤 다시 시작하거나, 개발/데모 환경이라면 "
+                ".env에 SEED_DEFAULT_USERS=true를 명시적으로 설정하세요."
+            )
     finally:
         db.close()
 
