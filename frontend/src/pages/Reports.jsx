@@ -64,11 +64,38 @@ export default function Reports() {
   const historyTotalPages = Math.max(1, Math.ceil(historyEntries.length / HISTORY_PAGE_SIZE));
   React.useEffect(() => {
     if (historyPage > historyTotalPages) setHistoryPage(historyTotalPages);
-  }, [historyPage, historyTotalPages]);
-  const historyPageEntries = historyEntries.slice(
+  }, [historyPage, historyTotalPages]);  const historyPageEntries = historyEntries.slice(
     (historyPage - 1) * HISTORY_PAGE_SIZE,
     historyPage * HISTORY_PAGE_SIZE
   );
+
+  // 체크박스로 선택된 기록의 id 모음. 페이지를 넘기거나 목록이 새로고침되면 화면에
+  // 없는 항목을 선택한 채로 남겨두는 게 의미가 없으니 그때마다 비워준다.
+  const [selectedHistoryIds, setSelectedHistoryIds] = React.useState(() => new Set());
+  const toggleHistorySelection = (id) => {
+    setSelectedHistoryIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+  const isAllOnPageSelected =
+    historyPageEntries.length > 0 && historyPageEntries.every((e) => selectedHistoryIds.has(e.id));
+  const toggleSelectAllOnPage = () => {
+    setSelectedHistoryIds((prev) => {
+      const next = new Set(prev);
+      if (isAllOnPageSelected) {
+        historyPageEntries.forEach((e) => next.delete(e.id));
+      } else {
+        historyPageEntries.forEach((e) => next.add(e.id));
+      }
+      return next;
+    });
+  };
+  React.useEffect(() => {
+    setSelectedHistoryIds(new Set());
+  }, [historyPage]);
 
   const [loading, setLoading] = React.useState(true);
   const [report, setReport] = React.useState(null);
@@ -116,6 +143,7 @@ export default function Reports() {
       const entries = await pdfHistory.listEntries();
       setHistoryEntries(entries);
       setHistoryPage(1);
+      setSelectedHistoryIds(new Set());
     } catch (error) {
       console.error('다운로드 기록 로드 실패:', error);
       toast.error('다운로드 기록을 불러오는 중 오류가 발생했습니다.');
@@ -254,8 +282,36 @@ export default function Reports() {
     try {
       await pdfHistory.deleteEntry(entry.id);
       setHistoryEntries((prev) => prev.filter((e) => e.id !== entry.id));
+      setSelectedHistoryIds((prev) => {
+        if (!prev.has(entry.id)) return prev;
+        const next = new Set(prev);
+        next.delete(entry.id);
+        return next;
+      });
     } catch (error) {
       console.error('다운로드 기록 삭제 실패:', error);
+      toast.error('삭제 중 오류가 발생했습니다.');
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    const ids = Array.from(selectedHistoryIds);
+    if (ids.length === 0) return;
+    if (
+      !(await confirmDialog(`선택한 ${ids.length}개의 다운로드 기록을 삭제하시겠습니까?`, {
+        danger: true,
+        confirmLabel: '삭제',
+      }))
+    ) {
+      return;
+    }
+    try {
+      await pdfHistory.deleteEntries(ids);
+      const idSet = new Set(ids);
+      setHistoryEntries((prev) => prev.filter((e) => !idSet.has(e.id)));
+      setSelectedHistoryIds(new Set());
+    } catch (error) {
+      console.error('다운로드 기록 일괄 삭제 실패:', error);
       toast.error('삭제 중 오류가 발생했습니다.');
     }
   };
@@ -477,10 +533,34 @@ export default function Reports() {
                 아직 다운로드한 보고서가 없습니다. &apos;보고서 생성&apos; 탭에서 PDF를 받으면 여기에 기록됩니다.
               </p>
             ) : (
+              <>
+              {selectedHistoryIds.size > 0 && (
+                <div className="flex items-center justify-between mb-3 px-3 py-2 rounded-lg bg-blue-50 dark:bg-blue-500/10 border border-blue-100 dark:border-blue-500/20">
+                  <span className="text-sm text-blue-700 dark:text-blue-400">
+                    {selectedHistoryIds.size}개 선택됨
+                  </span>
+                  <button
+                    onClick={handleBulkDelete}
+                    className="btn btn-danger px-3 py-1.5 text-xs flex items-center gap-1.5"
+                  >
+                    <Trash2 size={14} />
+                    선택 삭제
+                  </button>
+                </div>
+              )}
               <div className="overflow-x-auto -mx-2">
                 <table className="table">
                   <thead className="table-header">
                     <tr>
+                      <th className="table-cell w-10">
+                        <input
+                          type="checkbox"
+                          className="rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500"
+                          checked={isAllOnPageSelected}
+                          onChange={toggleSelectAllOnPage}
+                          aria-label="이 페이지 전체 선택"
+                        />
+                      </th>
                       <th className="table-cell">보고 대상</th>
                       <th className="table-cell">다운로드 일시</th>
                       <th className="table-cell text-right">파일 크기</th>
@@ -490,6 +570,7 @@ export default function Reports() {
                   <tbody>
                     {historyPage === 1 && pendingHistoryEntry && (
                       <tr>
+                        <td className="table-cell"></td>
                         <td className="table-cell font-medium text-gray-400 dark:text-slate-500">
                           {pendingHistoryEntry.year}년 {pendingHistoryEntry.month}월
                         </td>
@@ -516,6 +597,15 @@ export default function Reports() {
                     )}
                     {historyPageEntries.map((entry) => (
                       <tr key={entry.id}>
+                        <td className="table-cell">
+                          <input
+                            type="checkbox"
+                            className="rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500"
+                            checked={selectedHistoryIds.has(entry.id)}
+                            onChange={() => toggleHistorySelection(entry.id)}
+                            aria-label={`${entry.year}년 ${entry.month}월 기록 선택`}
+                          />
+                        </td>
                         <td className="table-cell font-medium">
                           <span className="inline-flex items-center gap-2">
                             {entry.year}년 {entry.month}월
@@ -555,6 +645,7 @@ export default function Reports() {
                   </tbody>
                 </table>
               </div>
+              </>
             )}
             {!historyLoading && historyTotalPages > 1 && (
               <div className="flex items-center justify-between mt-4 text-sm text-gray-500 dark:text-slate-400">
