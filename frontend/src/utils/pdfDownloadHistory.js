@@ -82,3 +82,11 @@ export function deleteEntry(id) {
     store.delete(id);
   });
 }
+
+// 체크박스로 여러 개 골라 한 번에 지울 때 사용. 각각 deleteEntry를 따로 호출해도 결과는
+// 같지만, 하나의 트랜잭션으로 묶어서 처리하면 더 빠르고 중간에 실패해도 원자적이다.
+export function deleteEntries(ids) {
+  return runTx('readwrite', (store) => {
+    ids.forEach((id) => store.delete(id));
+  });
+}
